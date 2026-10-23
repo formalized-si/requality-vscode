@@ -1,0 +1,330 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.1//EN" "http://www.w3.org/TR/xhtml11/DTD/xhtml11.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml">
+<head>
+  <meta http-equiv="content-type" content="text/html; charset=UTF-8" />
+  <title>Requality: general information</title>
+  <style type="text/css" title="Requality theme">
+body {
+    font-size: 12pt;
+    font-family: Times, serif;
+    font-weight: normal;
+    font-style: normal;
+    color: black;
+    background-color: white;
+    line-height: 1em;
+    margin-left: 2em;
+    margin-right: 2em;
+   }
+
+/* paragraphs */
+p  {
+    padding: 0;
+    margin-top: 0em;
+    margin-bottom: 0em;
+    text-align: justify;
+    text-indent: 0em;
+   }
+
+/* headings */
+h1 {
+    background-color: #e8e1e1;
+    font-size: 150%;
+    font-weight: bold;
+    font-style: normal;
+    font-variant: normal;
+    text-align: center;
+    padding: 0;
+    margin-top: .7em;
+    margin-bottom: 2em;
+   }
+h2 {
+	background-color: #e8e1e1;
+    font-size: 150%;
+    font-weight: bold;
+    font-style: normal;
+    padding: 0;
+    margin-top: .7em;
+    margin-bottom: .7em;
+   }
+h3 {
+    background-color: #e8e1e1;
+	font-size: 130%;
+    font-weight: bold;
+    font-style: normal;
+    padding: 0;
+    margin-top: .5em;
+    margin-bottom: .5em;
+   }
+h4 {
+    background-color: #e8e1e1;
+	font-size: 100%;
+    font-weight: bold;
+    font-style: normal;
+    padding: 0;
+    margin-top: .3em;
+    margin-bottom: .3em;
+   }
+
+/* lists */
+ul, ol {
+    padding: 0 0 0 15px;
+    margin-top: .1em;
+    margin-bottom: .1em;
+   }
+ul ul, ol ol, ul ol, ol ul {
+    margin-top: .1em;
+    margin-bottom: .1em;
+   }
+li {
+    padding: 0;
+    margin-top: .1em;
+    margin-bottom: .1em;
+    text-align: justify;
+   }
+li p {
+    margin-top: .1em;
+    margin-bottom: .1em;
+   }
+
+/* images */
+img {
+	border: 1px solid #696969;
+	}
+	
+/* end */  
+  </style>
+</head>
+
+<body>
+<h1><a id="general"></a>Requality: general information</h1>
+
+<h2><a id="destination"></a>What is Requality</h2>
+
+<p><strong>Requality</strong> is a tool to manage requirements primarily to software. It allows:</p>
+<ul>
+  <li>defining set of system requirements, including requirements based on analysis of existing documents;</li>
+  <li>structuring requirements: combining, supplying it with additional information;</li>
+  <li>analyzing set of requirements: tracing completeness of requirements test coverage with tests, tracing compliance of the test results with requirements and etc.; generating the appropriate reports.</li>
+</ul>
+
+<p>Multiuser revision control for documents and requirements is supported. You can use any revision control system, e.g. 
+<a href="http://git-scm.com/" target="_blank">Git</a>.</p>
+
+<p>The tool is implemented as an <em>Eclipse</em> plugin. 
+It could be used in IDE based on this platform, and independently.</p>
+
+<h2><a id="developer"></a>About team</h2>
+
+<p><a href="https://forge.ispras.ru/projects/reqdb" target="_blank">Requality home page</a>, <a href="https://www.requality.org/en/" target="_blank">Requality official website</a></p>
+
+<p><a href="https://www.ispras.ru/en/groups/se/" target="_blank">Software Engineering Department</a>, <a
+href="http://www.ispras.ru/en/" target="_blank">Ivannikov Institute for System Programming of the RAS</a></p>
+
+<p>E-mail: <a href="mailto:requality@ispras.ru" target="_blank">requality@ispras.ru</a></p>
+
+<h2><a id="installation"></a>Requality installation instructions</h2>
+<h3><a id="system_requirements"></a>System requirements</h3>
+<p>Windows or Linux. x86 and x86-64 architectures are supported.</p>
+<p>For <strong>Windows</strong> you have to install:</p>
+<ul> 
+	<li>For Requality 1.3 and earlier: <a href="https://adoptopenjdk.net/releases.html?variant=openjdk8&jvmVariant=hotspot" target="_blank">OpenJDK8 HotSpot</a>: 
+	<em>select</em> OpenJDK8 (LTS), HotSpot -&gt; Other Platforms -&gt; <em>select</em> Windows, x86 -> <em>download</em> JDK</li>
+	<li>For Requality 1.4 and later: <a href="https://adoptium.net/temurin/releases/?version=17" target="_blank">OpenJDK17 HotSpot</a>: 
+	<em>select</em> OpenJDK17 (LTS), HotSpot -&gt; Other Platforms -&gt; <em>select</em> Windows, x64 -> <em>download</em> JDK</li>
+</ul>
+<p><br/></p>
+<p>Also for correct work in Requality in Windows it is necessary to install components:</p>
+<ul>
+	<li>For Windows 7: <a href="https://forge.ispras.ru/attachments/download/13298/MicrosoftEdgeWebView2RuntimeInstallerX64.exe">Microsoft Edge WebView</a>.</li>
+	<li>For Windows 7-11: <a href="https://forge.ispras.ru/attachments/download/13297/VC_redist.x64.exe">Visual C++</a>.</li>
+</ul>
+<p><br/></p>
+<p>By default, for Windows 10 the number of simultaneously opened editors (tabs) in Requality is limited - no more than 8.
+To remove this limitation, you need to install <a href="https://forge.ispras.ru/attachments/download/13278/win10SocketConnectionsLimitFix.reg">the registry fix</a>.</p>
+
+<p><br/></p>
+<table width="95%" border="1">
+<tr>
+	<th colspan="3">Dependencies for Windows</th>
+</tr>
+<tr>
+	<th>Dependency</th>
+	<th>Recommended version</th>
+	<th>x86, x86-64</th>
+</tr>
+<tr>
+	<td>OpenJDK8 HotSpot (1.3 and earlier)</td>
+	<td>8.0</td>
+	<td>x86</td>
+</tr>
+<tr>
+	<td>OpenJDK17 HotSpot (1.4 and later)</td>
+	<td>17.0</td>
+	<td>x64</td>
+</tr>
+</table>
+<p><br/></p>
+<p>For <strong>Linux</strong> you have to install <em>OpenJDK</em> and <em>libxt6</em>. Following dependencies are required for Ubuntu 14 x86, x86-64. For other Linux systems additional packages could be required.</p>
+<p><br/></p>
+<table width="95%" border="1">
+<tr>
+	<th colspan="4">Dependencies for Linux</th>
+</tr>
+<tr>
+	<th>Dependency</th>
+	<th>Recommended version</th>
+	<th>x86, x86-64</th>
+	<th>package name</th>
+</tr>
+<tr>
+	<td>OpenJDK (1.3 and earlier)</td>
+	<td>8.0</td>
+	<td>i386</td>
+	<td>openjdk-8-jre:i386</td>
+</tr>
+<tr>
+	<td>OpenJDK (1.4 and later)</td>
+	<td>17.0</td>
+	<td>x64</td>
+	<td>openjdk-17-jre</td>
+</tr>
+<tr>
+	<td>libxt6 (only for 32-bit version on 64-bit systems)</td>
+	<td></td>
+	<td></td>
+	<td>libxt6:i386</td>
+</tr>
+</table>
+<p>Packages could be installed using <em>"apt-get install &lt;package_name&gt;"</em> command in command line for Debian-like systems.
+<br/>
+</p>
+
+<h3><a id="requality_installation"></a>Requality installation</h3>
+<p>Requality can be installed from a bundle. For 64-bit systems and tool version 1.3 and below use 32-bit version of Java and all libraries.</p>
+<p>Latest stable bundle can be downloaded from <a href="https://requality.org/en/">official site</a>.</p>
+<p>When the download is complete unpack the archive to any convenient place on the disk. After that Requality will be available for work.</p>
+<p>Please note! If using 64-bit systems you have to specify a path to 32-bit Java in <em>'requality.ini'</em> before the <em>"-vmargs"</em> line as shown:</p>
+<p><em>"-vm <br/>
+&lt;path-to-32bit-java&gt;"</em></p>
+<p><br/></p>
+<p>For example, <em>&lt;path-to-32bit-java&gt;</em> can look like:</p>
+<p><br/></p>
+<ul>
+<li>
+<p>for <strong>Ubuntu:</strong></p>
+<p><em>"/usr/lib/jvm/open-jdk-7-jre/jre/bin"</em></p>
+<p><br/></p>
+</li>
+<li>
+<p>or for <strong>Windows</strong>:</p>
+<p><em>"C:\Program Files (x86)\Java\jre1.8.0_45\bin"</em></p>
+</li>
+</ul>
+<p><br/></p>
+
+<p><br/></p>
+<h3><a id="requality_plugins"></a>Requality plugins</h3>
+<p>For <strong>Requality</strong> a number of plugins have been developed that provide additional features. These plugins can be installed by update-site to Eclipse with <strong>Requality</strong> using update-site. 
+The following describes the plugins installation process and a list of available plugins with a description of their capabilities and the update-site addresses.
+<br/>
+</p>
+<h4><a id="plugin_installation"></a>Plugin installation by update-site</h4>
+<p>To install plugin you need to know the address of update-site. Next in the list of plugins for each plugin there is its update-site.</p>
+<p>Plugin installation instructions:</p>
+<ol>
+<li>In the Eclipse main menu open <em>'Help -> Install New Software...'</em>.
+<br/>
+<img src="images/InstallNewSoftware_Menu.png" alt="Install New Software main menu item"/>
+<br/>
+</li>
+<li>Click <em>'Add...'</em> button in the opened <em>'Install'</em> dialog view.
+<br/>
+<img src="images/InstallView1.png" alt="Add Repository dialog for update-site address"/>
+<br/>
+</li>
+<li>Set update-site address to the <em>'Location'</em> field in <em>'Add Repository'</em> dialog view. In the <em>'Name'</em> field you can specify an arbitrary name 
+that is convenient for you to designate the plug-in. With this name the plugin will appear in the general list of plugins installed in your Eclipse. Click <em>'OK'</em>.</li>
+<li>The plugin will be shown in the list of available plugins in the <em>'Install'</em> view. There can be several plugins on one update-site, in addition they can be grouped into several groups. 
+You can expand the group to see plugins in it. To display the list of plugins without sorting by groups uncheck <em>'Group items by category'</em>. If the plugin is already installed the icon 
+in front of its name will be gray. To display only not installed yet plugins check the box <em>'Hide items that are already installed'</em>. Update-site may contain several versions of one plugin 
+(current and older), to display only the latest version check the box <em>'Show only the latest version of available software'</em>.
+<br/>
+<img src="images/InstallView2.png" alt="View for plugin installation by update-site"/>
+<br/>
+</li>
+<li>Select the required plugin in the list (check the box), click the <em> 'Next>' </em> button and follow the dialog instructions.</li>
+<li>During the plugin installation the <em> 'Security Warning' </em> dialog view will appear informing you about the installation of unsigned content. In it you need to click <em> 'OK' </em>.
+<br/>
+<img src="images/SecurityWarning.png" alt="Unsigned content warning"/>
+<br/>
+</li>
+<li>After the installation is complete, you will need to restart Eclipse.</li>
+</ol>
+<p>You can read more about plugins installation <a href="http://help.eclipse.org/indigo/index.jsp?topic=%2Forg.eclipse.platform.doc.user%2Ftasks%2Ftasks-124.htm">here</a>.</p>
+<p>Please note that links below are designed only for plugin installation in eclipse.</p>
+<h4><a id="coverage_plugin"></a>Requality Coverage Tools</h4>
+<p><strong>Requality Coverage Tools</strong> is required to create various coverage reports (see <a href="manual.en.html#report_coverage">Report 'Requirements coverage analysis' ('Анализ покрытия требований')</a>, 
+<a href="manual.en.html#report_documentmodel">Report 'Document model' ('Анализ покрытия выделенных требований')</a>, 
+<a href="manual.en.html#report_progress">Report 'Progress' ('Прогресс по проекту')</a> sections).</p>
+<p><strong>Requality Coverage Tools</strong> update-site: <a href="https://forge.ispras.ru/repo/requality/site">https://forge.ispras.ru/repo/requality/site</a>
+<br/>
+</p>
+<h4><a id="gitconnector_plugin"></a>Requality GIT Connector</h4>
+<p><strong>Requality GIT Connector</strong> is required to work with GIT through the internal <strong> Requality </strong> interface for GIT. This plugin is also needed, for example, 
+when creating reports using the '<em>Progress</em>' template (see <a href="manual.en.html#report_progress">Report 'Progress' ('Прогресс по проекту')</a> section), if you use GIT for version control.</p>
+<p><strong>Requality GIT Connector</strong> update-site: <a href="https://forge.ispras.ru/repo/requality/site">https://forge.ispras.ru/repo/requality/site</a>
+<br/>
+</p>
+<h4><a id="apiprovider_plugin"></a>Requality API provider</h4>
+<p><strong>Requality API provider</strong> update-site: <a href="https://forge.ispras.ru/repo/requality/site">https://forge.ispras.ru/repo/requality/site</a></p>
+<p><br/></p>
+<h2><a id="requality_perspective"></a>Requality perspective</h2>
+<p>To open <em>Requality</em> perspective choose in main menu <em>'Window' &rarr; 'Open Perspective' &rarr; 'Other...'</em>. 
+In the opened window choose <em>Requality</em> (see the picture) and push <em>'OK'</em>.<br />
+<img src="images/OpenPersp1.png" alt="Choosing Requality perspective" />
+<br />
+<br /></p>
+<p>If you create <em>'Requality'</em> project <em>'Requality'</em>-perspective opens itself.</p>
+
+<p>Following views are opened in <em>'Requality'</em> perspective by default:</p>
+<ol>
+  <li><p><strong>Requality Explorer</strong> – contains a documents tree, tree of requirements, 
+  test purposes and comments, reports tree. <em>'Requality Explorer'</em> is similar to <em>'Package explorer'</em>, 
+  but you can open only <em>'Requality'</em> projects in it. <em>'Requality'</em> project contains following components:</p>
+    <ul>
+      <li><strong>Documents folder</strong> – contains all imported project documents.</li>
+      <li><strong>Requirements root node</strong> 
+	  – contains all project requirements and is a requirement itself. It’s root position in requirements hierarchy 
+		and <em>'Requirements'</em> identifier cannot be changed (but <em>name</em> can). 
+		Also this node contains test purposes and comments.</li>
+      <li><strong>Reports folder</strong> – contains reports.</li>
+    </ul>
+    <br />
+	<a id="import"><img src="images/ReqExplorerStructureRequality_en.png" alt="Requality Explorer structure" /></a>
+	<br />
+	<br />
+	</li>
+  <li><p><strong>Properties</strong> – view to edit properties of requirements, test purposes, reports, documents. 
+  Properties view has some tabs. The number and contents of tabs depends on type of component. Note that you can 
+  open several Properties views at the same time. To do this select in the view menu <em>'New Properties View'</em> 
+  item. To fix properties of some special component in Properties view, select <em>'Pin to Selection'</em> in the 
+  view menu or push an appropriate button in the view. Now the content of the view is not being changed even if 
+  you switch between other components.
+    </p>
+  </li>
+  <li><p><strong>Outline</strong> – shows a list of locations marked in current document. Current document is a 
+  document that is opened in <em>'Markup Editor'</em> and is in a focus. At other times this view is empty.</p>
+  </li>
+  <li><p><strong>Requality Links Explorer</strong> – view that displays links between nodes. If you select one of the nodes of the requirements tree in the <em>'Requality Explorer'</em>, 
+  the <em>'Requality Links Explorer'</em> displays the nodes that are linked to the selected node by various types of link relations.</p>
+  </li>
+  <li>In addition, in the center of the perspective there is a large, by default empty space, in which generated reports and various editors will be opened. For example, 
+  the document editor <em>'Requality Markup Editor'</em>, in which imported documents with requirements are opened, here they are also marked up into fragments for requirements. 
+  Or <em>'UniEditor'</em> - an editor that provides the ability to conveniently manipulate and edit requirements, test situations and comments. And other editors.</li>
+</ol>
+<p><br /><img src="images/ReqPersp1.png" alt="Requality perspective"  />
+<br />
+<br /></p>
+</body>
+</html>

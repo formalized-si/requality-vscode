@@ -1,0 +1,5 @@
+# The Gradle wrapper scripts keep the line endings of their systems (cmd needs CRLF, sh LF) on every checkout.
+*.bat text eol=crlf
+*.cmd text eol=crlf
+server/gradlew text eol=lf
+*.sh text eol=lf

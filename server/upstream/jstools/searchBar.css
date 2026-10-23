@@ -1,0 +1,16 @@
+#searchBar{
+	position: fixed;
+	bottom: 15px;
+	left:0;
+	width: 100%;
+	background-color: #dbe3f6;
+	padding: 10px;
+	zIndex: 999;
+}
+.search-hidden{	
+    padding: 0px;
+    height:0px;
+    overflow: hidden;
+    border-radius: none;
+    display: none;
+}

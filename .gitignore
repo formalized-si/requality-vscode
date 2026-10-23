@@ -1,0 +1,16 @@
+node_modules/
+out/
+.vscode-test/
+*.vsix
+*.log
+.DS_Store
+/coverage/
+.upstream-cache/
+.claude/
+# build output: the server distribution (npm run build:server) and the Gradle build of the server
+/dist/
+server/build/
+server/.gradle/
+server/logs/
+/release/
+/jre/

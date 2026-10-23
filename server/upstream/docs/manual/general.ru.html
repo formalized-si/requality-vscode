@@ -1,0 +1,317 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.1//EN" "http://www.w3.org/TR/xhtml11/DTD/xhtml11.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml">
+<head>
+  <meta http-equiv="content-type" content="text/html; charset=UTF-8" />
+  <title>Requality: основная информация</title>
+  <style type="text/css" title="Requality theme">
+body {
+    font-size: 12pt;
+    font-family: Times, serif;
+    font-weight: normal;
+    font-style: normal;
+    color: black;
+    background-color: white;
+    line-height: 1em;
+    margin-left: 2em;
+    margin-right: 2em;
+   }
+
+/* paragraphs */
+p  {
+    padding: 0;
+    margin-top: 0em;
+    margin-bottom: 0em;
+    text-align: justify;
+    text-indent: 0em;
+   }
+
+/* headings */
+h1 {
+    background-color: #e8e1e1;
+    font-size: 150%;
+    font-weight: bold;
+    font-style: normal;
+    font-variant: normal;
+    text-align: center;
+    padding: 0;
+    margin-top: .7em;
+    margin-bottom: 2em;
+	line-height: 1
+   }
+h2 {
+	background-color: #e8e1e1;
+    font-size: 150%;
+    font-weight: bold;
+    font-style: normal;
+    padding: 0;
+    margin-top: .7em;
+    margin-bottom: .7em;
+	line-height: 1
+   }
+h3 {
+    background-color: #e8e1e1;
+	font-size: 130%;
+    font-weight: bold;
+    font-style: normal;
+    padding: 0;
+    margin-top: .5em;
+    margin-bottom: .5em;
+   }
+h4 {
+    background-color: #e8e1e1;
+	font-size: 100%;
+    font-weight: bold;
+    font-style: normal;
+    padding: 0;
+    margin-top: .3em;
+    margin-bottom: .3em;
+   }
+
+/* lists */
+ul, ol {
+    padding: 0 0 0 15px;
+    margin-top: .1em;
+    margin-bottom: .1em;
+   }
+ul ul, ol ol, ul ol, ol ul {
+    margin-top: .1em;
+    margin-bottom: .1em;
+   }
+li {
+    padding: 0;
+    margin-top: .1em;
+    margin-bottom: .1em;
+    text-align: justify;
+   }
+li p {
+    margin-top: .1em;
+    margin-bottom: .1em;
+   }
+   
+/* images */
+img {
+	border: 1px solid #696969;
+	}
+
+/* end */  
+  </style>
+</head>
+
+<body>
+<h1><a id="general"></a>Requality: основная информация</h1>
+
+<h2><a id="destination"></a>Назначение инструмента</h2>
+
+<p><strong>Requality</strong> - это инструмент для работы с
+требованиями, в первую очередь к
+программным системам. Он позволяет:</p>
+<ul>
+  <li>определять набор требований к системе,
+    в том числе на основе анализа
+    существующих документов;</li>
+  <li>структурировать требования:
+    группировать, снабжать их
+    дополнительной информацией;</li>
+  <li>анализировать набор требований:
+    прослеживать полноту покрытия набора
+    требований тестами, выполнение
+    требований по результатам тестирования
+    и т.п.; генерировать соответствующие
+    отчеты.</li>
+</ul>
+
+<p>Возможна совместная работа над документами и требованиями при их хранении с использованием любой системы управления
+версиями, например, <a href="http://git-scm.com/" target="_blank">Git</a>.</p>
+
+<p>Инструмент реализован как плагин на
+платформе <em>Eclipse</em> и может быть
+использован как в средах разработки на
+основе этой платформы, так и независимо.
+<br/></p>
+<h2><a id="developer"></a>Информация о разработчике</h2>
+
+<p><a href="https://forge.ispras.ru/projects/reqdb" target="_blank">Домашняя страница проекта</a>, 
+<a href="https://www.requality.ru/ru/" target="_blank">Официальный сайт инструмента</a></p> 
+
+<p><a href="https://www.ispras.ru/groups/se/" target="_blank">Отдел Технологии программирования</a>, 
+<a href="http://www.ispras.ru" target="_blank">Институт системного программирования им. В.П. Иванникова РАН</a></p>
+
+<p>Почта для связи: <a href="mailto:requality@ispras.ru" target="_blank">requality@ispras.ru</a>
+
+<br/>
+</p>
+
+<h2><a id="installation"></a>Инструкция по установке Requality</h2>
+
+<h3><a id="system_requirements"></a>Системные требования</h3>
+<p>Операционная система Windows или Linux. Поддерживаются архитектуры x86 и x86-64.</p>
+<p>Для <strong>Windows</strong> должны быть установлены:</p>
+<ul>
+	<li>Для версии Requality 1.3 и старше: <a href="https://adoptopenjdk.net/releases.html?variant=openjdk8&amp;jvmVariant=hotspot" target="_blank">OpenJDK8 HotSpot</a>: <em>выбрать</em> OpenJDK8 (LTS), HotSpot -&gt; Other Platforms -&gt; <em>выбрать</em> Windows, x86 -> <em>скачать</em> JDK</li>
+	<li>Для версии Requality 1.4 и новее: <a href="https://adoptium.net/temurin/releases/?version=17" target="_blank">OpenJDK17 HotSpot</a>: <em>выбрать</em> OpenJDK17 (LTS), HotSpot -&gt; Other Platforms -&gt; <em>выбрать</em> Windows, x64 -> <em>скачать</em> JDK</li>
+</ul>
+<p><br/></p>
+<p>Также для корректной работы Requality в Windows необходимо установить следующие компоненты:</p>
+<ul>
+	<li>Для Windows 7 необходимо установить компонент <a href="https://forge.ispras.ru/attachments/download/13298/MicrosoftEdgeWebView2RuntimeInstallerX64.exe">Microsoft Edge WebView</a>.</li>
+	<li>Для Windows 7-11  необходимо установить компонент <a href="https://forge.ispras.ru/attachments/download/13297/VC_redist.x64.exe">Visual C++</a>.</li>
+</ul>
+<p><br/></p>
+<p>По умолчанию для Windows 10 количество одновременно открытых в Requality редакторов (вкладок) ограничено - не более 8.
+Для снятия данного ограничения необходимо установить <a href="https://forge.ispras.ru/attachments/download/13278/win10SocketConnectionsLimitFix.reg">фикс реестра</a>.</p>
+<p><br/></p>
+<table width="95%" border="1">
+<tr>
+	<th colspan="3">Зависимости для Windows</th>
+</tr>
+<tr>
+	<th>Зависимость</th>
+	<th>Рекомендуемая версия</th>
+	<th>x86, x86-64</th>
+</tr>
+<tr>
+	<td>OpenJDK8 HotSpot (1.3 и старше)</td>
+	<td>8.0</td>
+	<td>x86</td>
+</tr>
+<tr>
+	<td>OpenJDK17 HotSpot (1.4 и новее)</td>
+	<td>17.0</td>
+	<td>x64</td>
+</tr>
+</table>
+<p><br/></p>
+<p>Для <strong>Linux</strong> должны быть установлены <em>OpenJDK</em> и <em>libxt6</em>. Указанные далее зависимости являются требованиями для Ubuntu 14 x86, x86-64. Для других систем Linux могут потребоваться дополнительные пакеты.</p>
+<p><br/></p>
+<table width="95%" border="1">
+<tr>
+	<th colspan="4">Зависимости для Linux</th>
+</tr>
+<tr>
+	<th>Зависимость</th>
+	<th>Рекомендуемая версия</th>
+	<th>x86, x86-64</th>
+	<th>Название пакета</th>
+</tr>
+<tr>
+	<td>OpenJDK (1.3 и старше)</td>
+	<td>8.0</td>
+	<td>i386</td>
+	<td>openjdk-8-jre:i386</td>
+</tr>
+<tr>
+	<td>OpenJDK (1.4 и новее)</td>
+	<td>17.0</td>
+	<td>x64</td>
+	<td>openjdk-17-jre</td>
+</tr>
+<tr>
+	<td>libxt6 (только для 32-битной версии на 64-битных системах)</td>
+	<td></td>
+	<td></td>
+	<td>libxt6:i386</td>
+</tr>
+</table>
+<p>Пакеты могут быть установлены с помощью команды <em>"apt-get install &lt;package_name&gt;"</em> в консоли для Debian-подобных систем.
+<br/>
+</p>
+
+<h3><a id="requality_installation"></a>Установка Requality</h3>
+<p><strong>Requality</strong> может быть установлена с помощью bundle. Для 64-битных систем и версий 1.3 и старше требуется использовать 32-битную версию Java и всех требуемых библиотек.</p>
+<p>Последние опубликованные стабильные сборки можно скачать на главной странице <a href="https://www.requality.ru/ru/">официального сайта</a>.</p>
+<p>После окончания загрузки требуется распаковать архив в любое удобное место на диске. После распаковки <strong>Requality</strong> будет доступна для работы.</p>
+<p>Внимание! Нужно иметь в виду, что для 64-битных систем может потребоваться указать путь к 32-битной версии Java в файле <em>'requality.ini'</em>. Путь должен быть указан перед строкой <em>"-vmargs"</em> в виде текста: </p>
+<p><em>"-vm <br/>
+&lt;путь-к-32битной-java&gt;"</em></p>
+<p><br/></p>
+<p>Например, <em>&lt;путь-к-32битной-java&gt;</em> может выглядеть так:</p>
+<p><br/></p>
+<ul>
+<li>
+<p>для <strong>Ubuntu:</strong></p>
+<p><em>"/usr/lib/jvm/open-jdk-7-jre/jre/bin"</em></p>
+<p><br/></p>
+</li>
+<li>
+<p>или для <strong>Windows</strong>:</p>
+<p><em>"C:\Program Files (x86)\Java\jre1.8.0_45\bin"</em></p>
+</li>
+</ul>
+<p><br/></p>
+<h3><a id="requality_plugins"></a>Плагины к Requality</h3>
+<p>Для <strong>Requality</strong> разработан ряд плагинов, предоставляющих дополнительные возможности.  Плагины могут быть установлены в Eclipse, где находится <strong>Requality</strong>, с помощью update-site. Далее описан процесс установки плагинов и перечень доступных плагинов с описанием их возможностей и указание адресов update-site.
+<br/>
+</p>
+<h4><a id="plugin_installation"></a>Установка плагина через update-site</h4>
+<p>Для такой установки плагина нужно знать адрес update-site. Далее в перечне плагинов для каждого плагина указан его update-site.</p>
+<p>Процесс установки плагина:</p>
+<ol>
+<li>В Eclipse в главном меню откройте раздел <em>'Help -> Install New Software...'</em>.
+<br/>
+<img src="images/InstallNewSoftware_Menu.png" alt="Пункт главного меню 'Install New Software'"/>
+<br/>
+</li>
+<li>В открывшемся окне <em>'Install'</em> нажмите кнопку <em>'Add...'</em>.
+<br/>
+<img src="images/InstallView1.png" alt="Окно 'Add Repository' для указания адреса update-site" />
+<br/>
+</li>
+<li>В новом открывшемся окне <em>'Add Repository'</em> в поле <em>'Location'</em> введите адрес update-site. В поле <em>'Name'</em> вы можете указать произвольное, понятное вам название для обозначения плагина. Под таким именем этот плагин будет фигурировать в общем списке установленных в ваш Eclipse плагинов. Нажмите <em>'OK'</em>.</li>
+<li>В окне <em>'Install'</em> плагин отобразится в списке доступных. На одном update-site может быть несколько плагинов, кроме того они могут быть сгруппированы в несколько групп. Вы можете развернуть группу, чтобы посмотреть, какие плагины в ней находятся. Для отображения списка плагинов без сортировки по группам нужно снять галочку <em>'Group items by category'</em>. Если плагин уже установлен, пиктограмма перед его названием будет серой. Чтобы отображались только неустановленные плагины, нужно поставить галочку <em>'Hide items that are already installed'</em>. На update-site может содержаться несколько версий одного плагина (актуальная и более старые), для отображения только актуальной, самой последней версии нужно поставить галочку <em>'Show only the latest version of available software'</em>.
+<br/>
+<img src="images/InstallView2.png" alt="Окно установки плагинов через update-site"/>
+<br/>
+</li>
+<li>Выберите нужный плагин в списке (отметьте галочкой), нажмите кнопку <em>'Next >'</em> и следуйте дальше инструкциям диалога.</li>
+<li>В процессе установки плагина появится окно <em>'Security Warning'</em>, сообщающее об установке неподписанного контента. В нем нужно нажать <em>'ОК'</em>.
+<br/>
+<img src="images/SecurityWarning.png" alt="Предупреждение о неподписанном контенте"/>
+<br/>
+</li>
+<li>После окончания установки нужно будет перезапустить Eclipse.</li>
+</ol>
+<p>Более подробно об установке плагинов можно прочитать <a href="https://help.eclipse.org/indigo/index.jsp?topic=%2Forg.eclipse.platform.doc.user%2Ftasks%2Ftasks-124.htm">здесь</a>.</p>
+<p>Обратите внимание, что ссылки в следующих подразделах предназначены только для использования в Eclipse для установки плагинов.</p>
+<h4><a id="coverage_plugin"></a>Requality Coverage Tools</h4>
+<p><strong>Requality Coverage Tools</strong> требуется для создания различных отчетов о покрытии (см. <a href="manual.ru.html#report_coverage">Отчет 'Анализ покрытия требований'</a>, 
+<a href="manual.ru.html#report_documentmodel">Отчет 'Анализ покрытия выделенных требований'</a>, <a href="manual.ru.html#report_progress">Отчет 'Прогресс по проекту'</a>).</p>
+<p>Update-site для установки плагина <strong>Requality Coverage Tools</strong>: <a href="https://forge.ispras.ru/repo/requality/site">https://forge.ispras.ru/repo/requality/site</a>
+<br/>
+</p>
+<h4><a id="gitconnector_plugin"></a>Requality GIT Connector</h4>
+<p><strong>Requality GIT Connector</strong> требуется для работы с GIT через внутренний интерфейс <strong>Requality</strong> для GIT. 
+Также этот плагин нужен, например, при создании отчетов по шаблону <em>'Прогресс по проекту'</em> (см. <a href="manual.ru.html#report_progress">Отчет 'Прогресс по проекту'</a>), 
+если для управления версиями используется GIT.</p>
+<p>Update-site для установки плагина <strong>Requality GIT Connector</strong>: <a href="https://forge.ispras.ru/repo/requality/site">https://forge.ispras.ru/repo/requality/site</a>
+<br/>
+</p>
+<h4><a id="apiprovider_plugin"></a>Requality API provider</h4>
+<p>Update-site для установки плагина <strong>Requality API provider</strong>: <a href="https://forge.ispras.ru/repo/requality/site">https://forge.ispras.ru/repo/requality/site</a></p>
+<p><br/></p>
+<h2><a id="requality_perspective"></a>Перспектива Requality</h2>
+<p>Чтобы открыть перспективу <strong>Requality</strong>, выберите в главном меню <em>'Window -&gt; Open Perspective -&gt; Other...'</em>. В появившемся диалоговом окне выберите <em>'Requality'</em> (как показано на рисунке ниже) и нажмите кнопку <em>'OK'</em>.
+<br/>
+<img src="images/OpenPersp1.png" alt="Окно для выбора перспективы Requality"/>
+<br/></p>
+<p>Если вы начнете работу с создания проекта <strong>Requality</strong>, переключение на перспективу <em>'Requality'</em> произойдет автоматически.</p>
+<p>В перспективе <em>'Requality'</em> по умолчанию открыты следующие отображения:</p>
+<ol>
+	<li><strong>Requality Explorer</strong> – содержит дерево документов, дерево требований с тестовыми ситуациями и комментариями и дерево отчетов проекта. <em>'Requality Explorer'</em> аналогичен <em>'Package Explorer'</em>, но раскрыть в нем вы можете только проекты формата <strong>Requality</strong>. Проект <strong>Requality</strong> содержит следующие компоненты:
+	<ul>
+		<li><strong>Папка Documents</strong> – в ней размещаются все импортированные в проект документы с требованиями.</li>
+		<li><strong>Корневое требование Requirements</strong> – контейнер для всех требований проекта, при этом сам являющийся требованием. Не может изменять свое корневое положение в иерархии требований и имеет неизменный идентификатор <em>'Requirements'</em> (но имя данного узла может изменяться). Кроме требований, в этом контейнере также располагаются тестовые ситуации и комментарии.</li>
+		<li><strong>Папка Reports</strong> – в ней размещаются отчеты.</li>
+	</ul>
+	<img src="images/ReqExplorerStructureRequality.png" alt="Структура проекта Requality"/>
+	</li>
+	<li><strong>Properties</strong> – окно, в котором отображаются свойства требований, тестовых ситуаций, отчетов, документов. Содержимое окна <em>'Properties'</em> разбито на несколько вкладок. Для различных объектов набор и содержимое вкладок отличаются. Обратите внимание, вы можете открыть несколько окон <em>'Properties'</em>. Для этого выберите в меню окна <em>'New Properties View'</em>. Чтобы зафиксировать в окне <em>Properties</em> свойства какого-либо конкретного объекта, нажмите кнопку закрепления окна или выберите в меню окна <em>'Pin to Selection'</em>. Теперь в этом окне содержимое не будет меняться, даже если вы будете переключаться между другими объектами.</li>
+	<li><strong>Outline</strong> – отображает список отмеченных фрагментов требований. Причем отображаются фрагменты только того документа, который в данный момент открыт в <em>'Markup Editor'</em> и находится в фокусе. В остальное время окно пусто.</li>
+	<li><strong>Requality Links Explorer</strong> — окно, в котором отображаются ссылки между узлами. Если в <em>'Requality Explorer'</em> выбрать один из узлов дерева требований, то в <em>'Requality Links Explorer'</em> отобразятся узлы, которые связаны с выбранным узлом различными видами ссылочных связей.</li>
+	<li>Кроме того, в центре перспективы расположено большое, по умолчанию пустое окно, в котором будут открываться сгенерированные отчеты и различные редакторы. Например, редактор документов <em>'Requality Markup Editor'</em>, в нем открываются импортированные документы с требованиями, здесь же они размечаются на фрагменты для требований. Или <em>'UniEditor'</em> – редактор, предоставляющий возможность удобного манипулирования и редактирования требований, тестовых ситуаций и комментариев. И другие редакторы.</li>
+</ol>
+<p><br /><img src="images/ReqPersp1.png" alt="Requality perspective"  />
+<br />
+<br /></p>
+</body>
+</html>

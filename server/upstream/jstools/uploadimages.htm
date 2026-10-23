@@ -1,0 +1,25 @@
+<html>
+<body>
+	<script type='text/javascript'>
+		try{
+			alert(window.parent.CKEDITOR.dialog.getCurrent().getContentElement( 'Upload', 'upload' ).getElement().$.files[0]);
+		}
+		catch(e){
+			alert(e);
+		}
+		function GET(parameterName) {
+		    var result = null,
+		        tmp = [];
+		    location.search
+		    .substr(1)
+		        .split("&")
+		        .forEach(function (item) {
+		        tmp = item.split("=");
+		        if (tmp[0] === parameterName) result = decodeURIComponent(tmp[1]);
+		    });
+		    return result;
+		}
+		window.parent.CKEDITOR.tools.callFunction(GET('CKEditorFuncNum'), 'test', null);
+	</script>
+</body>
+</html>

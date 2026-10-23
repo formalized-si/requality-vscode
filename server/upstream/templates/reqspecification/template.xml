@@ -1,0 +1,6 @@
+<?xml version="1.0" ?>
+<report start="reqspec.ftl" order="10" id="com.unitesk.requality.reports.reqSpecification" name="Экспорт в LORequality" read-only = "true" group="extra">
+    <description>Для обмена требованиями с LibreOffice.</description>
+    <template source="reqspec.ftl" location="{project_name}-reqspec.htm"/>
+</report>
+

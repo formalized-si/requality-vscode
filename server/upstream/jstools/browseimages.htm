@@ -1,0 +1,25 @@
+<!doctype html>
+<html>
+	<head>
+		<meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+		<base>
+	</head>
+<body>
+   <script type="text/javascript">
+		function GET(parameterName) {
+		    var result = null,
+		        tmp = [];
+		    location.search
+		    .substr(1)
+		        .split("&")
+		        .forEach(function (item) {
+		        tmp = item.split("=");
+		        if (tmp[0] === parameterName) result = decodeURIComponent(tmp[1]);
+		    });
+		    return result;
+		}
+		var path = selectFileDialog("*.jpeg|*.png|*.jpg|*.gif|*.bmp");
+		window.parent.CKEDITOR.tools.callFunction(GET("CKEditorFuncNum"), path, null);
+	</script>
+	</body>
+</html>

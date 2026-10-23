@@ -1,0 +1,43 @@
+	.hotkey-menu {
+		
+	}
+	.hotkey-menu-item > table, .menu-item-disabled > table {
+		width: 100%;
+		border: none;
+		border-collapse: collapse;
+	}
+	.hotkey-menu-item > table > tbody > tr > td, .menu-item-disabled > table > tbody > tr > td {
+		border: none;
+	}
+	.hotkey-menu-item, .hotkey-menu-item-disabled {
+		white-space: nowrap;
+		font-size: 75%;
+		border: solid 1px transparent;
+	}
+	.hotkey-menu-item {
+		cursor: pointer;
+		color: #4040c0;
+	}
+	.hotkey-menu-item-disabled {
+		cursor: default;
+		color: #808080;
+	}
+	.hotkey-menu-item:hover {
+		border-color: #a0a0d0;
+		background-color: #d0e0f0;
+	}
+	.hotkey-menu-item > img, .menu-item-disabled > img {
+		vertical-align: text-bottom;
+	}
+	.htmenuctrls{
+		padding: 0px;
+		background-color: #e9f1fa;
+		background-image: linear-gradient(bottom, #dbe3f6 0%, #f7ffff 100%);
+		background-image: -moz-linear-gradient(bottom, #dbe3f6 0%, #f7ffff 100%);
+		background-image: -webkit-linear-gradient(bottom, #dbe3f6 0%, #f7ffff 100%);
+		border: solid 1px #c0c0c0;
+	}
+	
+	.htmenuctrls:hover {
+	}
+	

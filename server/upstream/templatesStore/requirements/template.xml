@@ -1,0 +1,5 @@
+<?xml version="1.0" ?>
+<report start="reqs.ftl" group="requirementsExport" id="com.unitesk.requality.reports.requirements" name="Requirements" read-only = "true">
+    <template source="reqs.ftl" location="{project_name}-reqs.html"/>
+    <description>Requirements report where single requirement may have a header with its name and some text below it.</description>
+</report>

@@ -1,0 +1,6 @@
+<?xml version="1.0" ?>
+<report start="custom.ftl" order="10" id="com.unitesk.requality.reports.xml-out" name="Экспорт проекта в XML" read-only = "true" group="export">
+    <description>Для экспорта проекта в виде xml документа.</description>
+    <template source="custom.ftl" location="{project_name}-base.xml"/>
+</report>
+

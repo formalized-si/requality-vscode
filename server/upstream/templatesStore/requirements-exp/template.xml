@@ -1,0 +1,5 @@
+<?xml version="1.0" ?>
+<report start="reqs2.ftl" id="com.unitesk.requality.reports.requirementsExp" name="Requirements to DOORS" read-only = "true">
+    <template source="reqs2.ftl" location="{project_name}-reqs2.html"/>
+</report>
+

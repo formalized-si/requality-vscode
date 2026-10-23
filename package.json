@@ -1,0 +1,3301 @@
+{
+  "name": "requality-vscode",
+  "displayName": "Requality (Unofficial)",
+  "description": "Unofficial port of the Requality Eclipse plug-in (ISP RAS) for requirements management. It runs the original Requality core and plug-in code.",
+  "version": "1.4.0",
+  "publisher": "formalized-si",
+  "icon": "media/icon.png",
+  "preview": true,
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/formalized-si/requality-vscode.git"
+  },
+  "bugs": {
+    "url": "https://github.com/formalized-si/requality-vscode/issues"
+  },
+  "homepage": "https://github.com/formalized-si/requality-vscode#readme",
+  "qna": "https://github.com/formalized-si/requality-vscode/issues",
+  "galleryBanner": {
+    "color": "#3949AB",
+    "theme": "dark"
+  },
+  "badges": [
+    {
+      "url": "https://img.shields.io/visual-studio-marketplace/v/formalized-si.requality-vscode",
+      "href": "https://marketplace.visualstudio.com/items?itemName=formalized-si.requality-vscode",
+      "description": "Visual Studio Marketplace version"
+    },
+    {
+      "url": "https://img.shields.io/open-vsx/v/formalized-si/requality-vscode",
+      "href": "https://open-vsx.org/extension/formalized-si/requality-vscode",
+      "description": "Open VSX version"
+    },
+    {
+      "url": "https://github.com/formalized-si/requality-vscode/actions/workflows/ci.yml/badge.svg",
+      "href": "https://github.com/formalized-si/requality-vscode/actions/workflows/ci.yml",
+      "description": "CI"
+    }
+  ],
+  "license": "SEE LICENSE IN LICENSE",
+  "engines": {
+    "vscode": "^1.95.0"
+  },
+  "categories": [
+    "Testing",
+    "Other"
+  ],
+  "keywords": [
+    "requirements",
+    "requirements management",
+    "traceability",
+    "requality",
+    "eclipse",
+    "ispras",
+    "specification",
+    "test coverage",
+    "reqif"
+  ],
+  "main": "./out/src/extension.js",
+  "activationEvents": [
+    "workspaceContains:**/.project",
+    "onView:requality.explorer",
+    "onView:requality.explorerView"
+  ],
+  "capabilities": {
+    "untrustedWorkspaces": {
+      "supported": false,
+      "description": "Requality starts a Java server that reads and writes the catalogs in the workspace."
+    },
+    "virtualWorkspaces": {
+      "supported": false,
+      "description": "Requality catalogs must be on the local file system."
+    }
+  },
+  "contributes": {
+    "commands": [
+      {
+        "command": "requality.newProject",
+        "title": "New Requality Project...",
+        "category": "Requality",
+        "icon": "$(new-folder)"
+      },
+      {
+        "command": "requality.importDocument",
+        "title": "Import Document...",
+        "category": "Requality",
+        "enablement": "requality.enabled.importDocument"
+      },
+      {
+        "command": "requality.importReqIF",
+        "title": "Import from ReqIF...",
+        "category": "Requality"
+      },
+      {
+        "command": "requality.exportReqIF",
+        "title": "Export to ReqIF...",
+        "category": "Requality"
+      },
+      {
+        "command": "requality.projectProperties",
+        "title": "Project Properties",
+        "category": "Requality"
+      },
+      {
+        "command": "requality.preferences",
+        "title": "Preferences",
+        "category": "Requality"
+      },
+      {
+        "command": "requality.help",
+        "title": "Requality Manual",
+        "category": "Requality"
+      },
+      {
+        "command": "requality.showView.explorer",
+        "title": "Requality Explorer",
+        "category": "Requality",
+        "enablement": "requality.enabled.showView.explorer"
+      },
+      {
+        "command": "requality.showView.properties",
+        "title": "Properties",
+        "category": "Requality",
+        "enablement": "requality.enabled.showView.properties"
+      },
+      {
+        "command": "requality.showView.outline",
+        "title": "Outline",
+        "category": "Requality",
+        "enablement": "requality.enabled.showView.outline"
+      },
+      {
+        "command": "requality.showView.links",
+        "title": "Requality Links Explorer",
+        "category": "Requality",
+        "enablement": "requality.enabled.showView.links"
+      },
+      {
+        "command": "requality.showView.todo",
+        "title": "Update Processor Tasks",
+        "category": "Requality",
+        "enablement": "requality.enabled.showView.todo"
+      },
+      {
+        "command": "requality.showView.bookmarks",
+        "title": "Bookmarks",
+        "category": "Requality",
+        "enablement": "requality.enabled.showView.bookmarks"
+      },
+      {
+        "command": "requality.showView.tasks",
+        "title": "Tasks",
+        "category": "Requality",
+        "enablement": "requality.enabled.showView.tasks"
+      },
+      {
+        "command": "requality.showView.problems",
+        "title": "Problems",
+        "category": "Requality",
+        "enablement": "requality.enabled.showView.problems"
+      },
+      {
+        "command": "requality.showView.progress",
+        "title": "Progress",
+        "category": "Requality",
+        "enablement": "requality.enabled.showView.progress"
+      },
+      {
+        "command": "requality.showView.history",
+        "title": "History",
+        "category": "Requality",
+        "enablement": "requality.enabled.showView.history"
+      },
+      {
+        "command": "requality.showView.synchronize",
+        "title": "Synchronize",
+        "category": "Requality",
+        "enablement": "requality.enabled.showView.synchronize"
+      },
+      {
+        "command": "requality.showView.other",
+        "title": "Other...",
+        "category": "Requality",
+        "enablement": "requality.enabled.showView.other"
+      },
+      {
+        "command": "requality.perspective.open",
+        "title": "Open Perspective...",
+        "category": "Requality",
+        "enablement": "requality.enabled.perspective.open"
+      },
+      {
+        "command": "requality.perspective.openOther",
+        "title": "Other...",
+        "category": "Requality",
+        "enablement": "requality.enabled.perspective.openOther"
+      },
+      {
+        "command": "requality.perspective.customize",
+        "title": "Customize Perspective...",
+        "category": "Requality",
+        "enablement": "requality.enabled.perspective.customize"
+      },
+      {
+        "command": "requality.perspective.saveAs",
+        "title": "Save Perspective As...",
+        "category": "Requality",
+        "enablement": "requality.enabled.perspective.saveAs"
+      },
+      {
+        "command": "requality.perspective.reset",
+        "title": "Reset Perspective...",
+        "category": "Requality",
+        "enablement": "requality.enabled.perspective.reset"
+      },
+      {
+        "command": "requality.perspective.close",
+        "title": "Close Perspective",
+        "category": "Requality",
+        "enablement": "requality.enabled.perspective.close"
+      },
+      {
+        "command": "requality.perspective.closeAll",
+        "title": "Close All Perspectives",
+        "category": "Requality",
+        "enablement": "requality.enabled.perspective.closeAll"
+      },
+      {
+        "command": "requality.compare",
+        "title": "Requality Compare",
+        "category": "Requality",
+        "icon": "$(diff)"
+      },
+      {
+        "command": "requality.refresh",
+        "title": "Refresh",
+        "category": "Requality",
+        "icon": "$(refresh)"
+      },
+      {
+        "command": "requality.explorer.collapseAll",
+        "title": "Collapse All",
+        "category": "Requality",
+        "icon": "$(collapse-all)"
+      },
+      {
+        "command": "requality.filters",
+        "title": "Filters and Customization...",
+        "category": "Requality",
+        "icon": "$(filter)",
+        "enablement": "requality.enabled.filters"
+      },
+      {
+        "command": "requality.recentFilters",
+        "title": "Recent Filters...",
+        "category": "Requality",
+        "enablement": "requality.enabled.recentFilters"
+      },
+      {
+        "command": "requality.linkWithEditor",
+        "title": "Link with Editor",
+        "category": "Requality",
+        "icon": "$(link)"
+      },
+      {
+        "command": "requality.unlinkWithEditor",
+        "title": "Unlink from Editor",
+        "category": "Requality",
+        "icon": "$(link-external)"
+      },
+      {
+        "command": "requality.undo",
+        "title": "Undo",
+        "category": "Requality"
+      },
+      {
+        "command": "requality.redo",
+        "title": "Redo",
+        "category": "Requality"
+      },
+      {
+        "command": "requality.open",
+        "title": "Open",
+        "category": "Requality"
+      },
+      {
+        "command": "requality.showProperties",
+        "title": "Show Properties",
+        "category": "Requality"
+      },
+      {
+        "command": "requality.properties",
+        "title": "Properties",
+        "category": "Requality",
+        "enablement": "requality.enabled.properties"
+      },
+      {
+        "command": "requality.restartServer",
+        "title": "Restart Requality Server",
+        "category": "Requality"
+      },
+      {
+        "command": "requality.showLog",
+        "title": "Show Server Log",
+        "category": "Requality"
+      },
+      {
+        "command": "requality.new",
+        "title": "Other...",
+        "category": "Requality"
+      },
+      {
+        "command": "requality.createRequirement",
+        "title": "Requirement",
+        "category": "Requality"
+      },
+      {
+        "command": "requality.createTextNode",
+        "title": "Text Node",
+        "category": "Requality"
+      },
+      {
+        "command": "requality.createTestPurpose",
+        "title": "Test Purpose",
+        "category": "Requality"
+      },
+      {
+        "command": "requality.createComment",
+        "title": "Comment",
+        "category": "Requality"
+      },
+      {
+        "command": "requality.createDocFolder",
+        "title": "Document Folder",
+        "category": "Requality"
+      },
+      {
+        "command": "requality.createReportFolder",
+        "title": "Report Folder",
+        "category": "Requality"
+      },
+      {
+        "command": "requality.createReportSettings",
+        "title": "Report Settings",
+        "category": "Requality"
+      },
+      {
+        "command": "requality.createVirtualNode",
+        "title": "Virtual Node",
+        "category": "Requality"
+      },
+      {
+        "command": "requality.createNodeType",
+        "title": "Node Type",
+        "category": "Requality"
+      },
+      {
+        "command": "requality.createTest",
+        "title": "Test",
+        "category": "Requality",
+        "enablement": "requality.enabled.createTest"
+      },
+      {
+        "command": "requality.addRefTo",
+        "title": "Add reference to...",
+        "category": "Requality",
+        "enablement": "requality.enabled.addRefTo"
+      },
+      {
+        "command": "requality.openBindings",
+        "title": "Open bindings",
+        "category": "Requality",
+        "enablement": "requality.enabled.openBindings"
+      },
+      {
+        "command": "requality.copyQId",
+        "title": "Copy Full Name",
+        "category": "Requality",
+        "enablement": "requality.enabled.copyQId"
+      },
+      {
+        "command": "requality.copy",
+        "title": "Copy",
+        "category": "Requality",
+        "enablement": "requality.enabled.copy"
+      },
+      {
+        "command": "requality.pasteInto",
+        "title": "Paste into",
+        "category": "Requality",
+        "enablement": "requality.enabled.pasteInto"
+      },
+      {
+        "command": "requality.pasteNear",
+        "title": "Paste near",
+        "category": "Requality",
+        "enablement": "requality.enabled.pasteNear"
+      },
+      {
+        "command": "requality.delete",
+        "title": "Delete Selection",
+        "category": "Requality",
+        "enablement": "requality.enabled.delete"
+      },
+      {
+        "command": "requality.renameDocFolder",
+        "title": "Rename Document Folder",
+        "category": "Requality",
+        "enablement": "requality.enabled.renameDocFolder"
+      },
+      {
+        "command": "requality.renameProject",
+        "title": "Rename...",
+        "category": "Requality",
+        "enablement": "requality.enabled.renameProject"
+      },
+      {
+        "command": "requality.rename",
+        "title": "Rename",
+        "category": "Requality"
+      },
+      {
+        "command": "requality.showHiddenChildren",
+        "title": "Show Hidden Children",
+        "category": "Requality",
+        "enablement": "requality.enabled.showHiddenChildren"
+      },
+      {
+        "command": "requality.hideVirtualNodes",
+        "title": "Hide Selected Virtual Nodes",
+        "category": "Requality",
+        "enablement": "requality.enabled.hideVirtualNodes"
+      },
+      {
+        "command": "requality.find",
+        "title": "Find Node...",
+        "category": "Requality",
+        "enablement": "requality.enabled.find"
+      },
+      {
+        "command": "requality.transferredStatus",
+        "title": "Transferred Status...",
+        "category": "Requality"
+      },
+      {
+        "command": "requality.massOps",
+        "title": "Open Mass Ops Wizard",
+        "category": "Requality",
+        "enablement": "requality.enabled.massOps"
+      },
+      {
+        "command": "requality.fixLocationsDescriptions",
+        "title": "Fix Locations Descriptions",
+        "category": "Requality",
+        "enablement": "requality.enabled.fixLocationsDescriptions"
+      },
+      {
+        "command": "requality.forceCheckers",
+        "title": "Clear caches and run Checkers",
+        "category": "Requality",
+        "enablement": "requality.enabled.forceCheckers"
+      },
+      {
+        "command": "requality.deleteStatisticsFile",
+        "title": "Delete Statistics File",
+        "category": "Requality",
+        "enablement": "requality.enabled.deleteStatisticsFile"
+      },
+      {
+        "command": "requality.checkers",
+        "title": "Checkers...",
+        "category": "Requality"
+      },
+      {
+        "command": "requality.resetProblems",
+        "title": "Reset Problems",
+        "category": "Requality",
+        "enablement": "requality.enabled.resetProblems"
+      },
+      {
+        "command": "requality.openUniEditor",
+        "title": "Edit in UniEditor",
+        "category": "Requality",
+        "enablement": "requality.enabled.openUniEditor"
+      },
+      {
+        "command": "requality.openModuleEditor",
+        "title": "Edit in ModuleEditor",
+        "category": "Requality",
+        "enablement": "requality.enabled.openModuleEditor"
+      },
+      {
+        "command": "requality.openReview",
+        "title": "Review",
+        "category": "Requality",
+        "enablement": "requality.enabled.openReview"
+      },
+      {
+        "command": "requality.openExternal.moduleEditor",
+        "title": "ModuleEditor",
+        "category": "Requality",
+        "enablement": "requality.enabled.openExternal.moduleEditor"
+      },
+      {
+        "command": "requality.openExternal.uniEditor",
+        "title": "UniEditor",
+        "category": "Requality",
+        "enablement": "requality.enabled.openExternal.uniEditor"
+      },
+      {
+        "command": "requality.openExternal.markup",
+        "title": "Markup",
+        "category": "Requality",
+        "enablement": "requality.enabled.openExternal.markup"
+      },
+      {
+        "command": "requality.openExternal.report",
+        "title": "Report",
+        "category": "Requality",
+        "enablement": "requality.enabled.openExternal.report"
+      },
+      {
+        "command": "requality.findNext",
+        "title": "Find Next",
+        "category": "Requality",
+        "enablement": "requality.enabled.findNext"
+      },
+      {
+        "command": "requality.findPrevious",
+        "title": "Find Previous",
+        "category": "Requality",
+        "enablement": "requality.enabled.findPrevious"
+      },
+      {
+        "command": "requality.docproc.saxHeaders",
+        "title": "HTML Headers Document Processor",
+        "category": "Requality",
+        "enablement": "requality.enabled.docproc.saxHeaders"
+      },
+      {
+        "command": "requality.docproc.updateDocument",
+        "title": "Update Document",
+        "category": "Requality",
+        "enablement": "requality.enabled.docproc.updateDocument"
+      },
+      {
+        "command": "requality.docproc.textToReq",
+        "title": "Custom Text To Requirements Parser",
+        "category": "Requality",
+        "enablement": "requality.enabled.docproc.textToReq"
+      },
+      {
+        "command": "requality.docproc.updateFromLibreOffice",
+        "title": "Update From Libre Office",
+        "category": "Requality",
+        "enablement": "requality.enabled.docproc.updateFromLibreOffice"
+      },
+      {
+        "command": "requality.docproc.oldMarkup",
+        "title": "Test processor for updating old markup",
+        "category": "Requality",
+        "enablement": "requality.enabled.docproc.oldMarkup"
+      },
+      {
+        "command": "requality.docproc.paramExtraction",
+        "title": "Param extracton processor",
+        "category": "Requality",
+        "enablement": "requality.enabled.docproc.paramExtraction"
+      },
+      {
+        "command": "requality.generateReport",
+        "title": "Generate Report",
+        "category": "Requality",
+        "enablement": "requality.enabled.generateReport"
+      },
+      {
+        "command": "requality.exportReport",
+        "title": "Export Report",
+        "category": "Requality",
+        "enablement": "requality.enabled.exportReport"
+      },
+      {
+        "command": "requality.exportToOdt",
+        "title": "Export To Odt",
+        "category": "Requality",
+        "enablement": "requality.enabled.exportToOdt"
+      },
+      {
+        "command": "requality.coverageSettings",
+        "title": "Coverage Settings",
+        "category": "Requality",
+        "enablement": "requality.enabled.coverageSettings"
+      },
+      {
+        "command": "requality.progressSettings",
+        "title": "Progress Settings",
+        "category": "Requality",
+        "enablement": "requality.enabled.progressSettings"
+      },
+      {
+        "command": "requality.traceabilitySettings",
+        "title": "Traceability Settings",
+        "category": "Requality",
+        "enablement": "requality.enabled.traceabilitySettings"
+      },
+      {
+        "command": "requality.traceSettings",
+        "title": "Trace Settings",
+        "category": "Requality",
+        "enablement": "requality.enabled.traceSettings"
+      },
+      {
+        "command": "requality.tvSettings",
+        "title": "Table view settings",
+        "category": "Requality",
+        "enablement": "requality.enabled.tvSettings"
+      },
+      {
+        "command": "requality.selectReferencedNode",
+        "title": "Select Referenced Node",
+        "category": "Requality",
+        "icon": {
+          "light": "dist/server/resources/icons/zerolink.png",
+          "dark": "dist/server/resources/icons/zerolink.png"
+        },
+        "enablement": "requality.enabled.selectReferencedNode"
+      },
+      {
+        "command": "requality.links.changeDirection",
+        "title": "Change reference direction in view",
+        "category": "Requality",
+        "icon": {
+          "light": "dist/server/resources/icons/biarrow.png",
+          "dark": "dist/server/resources/icons/biarrow.png"
+        },
+        "enablement": "requality.enabled.links.changeDirection"
+      },
+      {
+        "command": "requality.links.selectAttribute",
+        "title": "Select filter for reference names",
+        "category": "Requality",
+        "icon": {
+          "light": "dist/server/resources/icons/attribute.png",
+          "dark": "dist/server/resources/icons/attribute.png"
+        },
+        "enablement": "requality.enabled.links.selectAttribute"
+      },
+      {
+        "command": "requality.links.lightLinks",
+        "title": "Light up links",
+        "category": "Requality",
+        "icon": {
+          "light": "dist/server/resources/icons/link_break.png",
+          "dark": "dist/server/resources/icons/link_break.png"
+        },
+        "enablement": "requality.enabled.links.lightLinks"
+      },
+      {
+        "command": "requality.selectReferencedNode.oneLink",
+        "title": "Select Referenced Node",
+        "category": "Requality",
+        "icon": {
+          "light": "dist/server/resources/icons/onelink.png",
+          "dark": "dist/server/resources/icons/onelink.png"
+        },
+        "enablement": "requality.enabled.selectReferencedNode.oneLink"
+      },
+      {
+        "command": "requality.selectReferencedNode.multiLink",
+        "title": "Select Referenced Node",
+        "category": "Requality",
+        "icon": {
+          "light": "dist/server/resources/icons/multilink.png",
+          "dark": "dist/server/resources/icons/multilink.png"
+        },
+        "enablement": "requality.enabled.selectReferencedNode.multiLink"
+      },
+      {
+        "command": "requality.links.changeDirection.down",
+        "title": "Change reference direction in view",
+        "category": "Requality",
+        "icon": {
+          "light": "dist/server/resources/icons/downarrow.png",
+          "dark": "dist/server/resources/icons/downarrow.png"
+        },
+        "enablement": "requality.enabled.links.changeDirection.down"
+      },
+      {
+        "command": "requality.links.changeDirection.up",
+        "title": "Change reference direction in view",
+        "category": "Requality",
+        "icon": {
+          "light": "dist/server/resources/icons/uparrow.png",
+          "dark": "dist/server/resources/icons/uparrow.png"
+        },
+        "enablement": "requality.enabled.links.changeDirection.up"
+      },
+      {
+        "command": "requality.links.lightLinks.on",
+        "title": "Light up links",
+        "category": "Requality",
+        "icon": {
+          "light": "dist/server/resources/icons/light_link.png",
+          "dark": "dist/server/resources/icons/light_link.png"
+        },
+        "enablement": "requality.enabled.links.lightLinks.on"
+      },
+      {
+        "command": "requality.todo.hideCompleted",
+        "title": "Hide Completed Items",
+        "category": "Requality",
+        "icon": {
+          "light": "dist/server/resources/icons/exclusion_filter.png",
+          "dark": "dist/server/resources/icons/exclusion_filter.png"
+        },
+        "enablement": "requality.enabled.todo.hideCompleted"
+      },
+      {
+        "command": "requality.todo.showCompleted",
+        "title": "Show Completed Items",
+        "category": "Requality",
+        "icon": "$(eye)",
+        "enablement": "requality.enabled.todo.showCompleted"
+      },
+      {
+        "command": "requality.todo.delete",
+        "title": "Delete Selected Task",
+        "category": "Requality",
+        "icon": {
+          "light": "dist/server/resources/icons/rem_co.png",
+          "dark": "dist/server/resources/icons/rem_co.png"
+        },
+        "enablement": "requality.enabled.todo.delete"
+      },
+      {
+        "command": "requality.todo.deleteAll",
+        "title": "Delete All Update Processor Tasks",
+        "category": "Requality",
+        "icon": {
+          "light": "dist/server/resources/icons/trash.png",
+          "dark": "dist/server/resources/icons/trash.png"
+        },
+        "enablement": "requality.enabled.todo.deleteAll"
+      },
+      {
+        "command": "requality.project.copy",
+        "title": "Copy",
+        "category": "Requality",
+        "enablement": "requality.enabled.project.copy"
+      },
+      {
+        "command": "requality.project.paste",
+        "title": "Paste",
+        "category": "Requality",
+        "enablement": "requality.enabled.project.paste"
+      },
+      {
+        "command": "requality.project.delete",
+        "title": "Delete",
+        "category": "Requality",
+        "enablement": "requality.enabled.project.delete"
+      },
+      {
+        "command": "requality.project.move",
+        "title": "Move...",
+        "category": "Requality",
+        "enablement": "requality.enabled.project.move"
+      },
+      {
+        "command": "requality.project.build",
+        "title": "Build Project",
+        "category": "Requality",
+        "enablement": "requality.enabled.project.build"
+      },
+      {
+        "command": "requality.project.refresh",
+        "title": "Refresh",
+        "category": "Requality",
+        "enablement": "requality.enabled.project.refresh"
+      },
+      {
+        "command": "requality.project.open",
+        "title": "Open Project",
+        "category": "Requality",
+        "enablement": "requality.enabled.project.open"
+      },
+      {
+        "command": "requality.project.close",
+        "title": "Close Project",
+        "category": "Requality",
+        "enablement": "requality.enabled.project.close"
+      },
+      {
+        "command": "requality.project.closeUnrelated",
+        "title": "Close Unrelated Projects",
+        "category": "Requality",
+        "enablement": "requality.enabled.project.closeUnrelated"
+      },
+      {
+        "command": "requality.goInto",
+        "title": "Go Into",
+        "category": "Requality",
+        "enablement": "requality.enabled.goInto"
+      },
+      {
+        "command": "requality.importAsProject",
+        "title": "Import as Project",
+        "category": "Requality",
+        "enablement": "requality.enabled.importAsProject"
+      },
+      {
+        "command": "requality.goToProject",
+        "title": "Go to Project",
+        "category": "Requality",
+        "enablement": "requality.enabled.goToProject"
+      },
+      {
+        "command": "requality.import",
+        "title": "Import...",
+        "category": "Requality",
+        "enablement": "requality.enabled.import"
+      },
+      {
+        "command": "requality.export",
+        "title": "Export...",
+        "category": "Requality",
+        "enablement": "requality.enabled.export"
+      },
+      {
+        "command": "requality.edit.copy",
+        "title": "Copy",
+        "category": "Requality",
+        "enablement": "requality.enabled.edit.copy"
+      },
+      {
+        "command": "requality.edit.paste",
+        "title": "Paste",
+        "category": "Requality",
+        "enablement": "requality.enabled.edit.paste"
+      },
+      {
+        "command": "requality.edit.refresh",
+        "title": "Refresh",
+        "category": "Requality",
+        "enablement": "requality.enabled.edit.refresh"
+      },
+      {
+        "command": "requality.buildAll",
+        "title": "Build All",
+        "category": "Requality",
+        "enablement": "requality.enabled.buildAll"
+      },
+      {
+        "command": "requality.clean",
+        "title": "Clean...",
+        "category": "Requality",
+        "enablement": "requality.enabled.clean"
+      },
+      {
+        "command": "requality.buildAutomatically",
+        "title": "Build Automatically",
+        "category": "Requality",
+        "toggled": "requality.autoBuilding",
+        "enablement": "requality.enabled.buildAutomatically"
+      },
+      {
+        "command": "requality.openWith",
+        "title": "Open With...",
+        "category": "Requality",
+        "enablement": "requality.enabled.openWith"
+      },
+      {
+        "command": "requality.showIn",
+        "title": "Show In...",
+        "category": "Requality",
+        "enablement": "requality.enabled.showIn"
+      },
+      {
+        "command": "requality.goToResource",
+        "title": "Go to Resource...",
+        "category": "Requality",
+        "enablement": "requality.enabled.goToResource"
+      },
+      {
+        "command": "requality.addBookmark",
+        "title": "Add Bookmark",
+        "category": "Requality",
+        "enablement": "requality.enabled.addBookmark"
+      },
+      {
+        "command": "requality.addTask",
+        "title": "Add Task...",
+        "category": "Requality",
+        "enablement": "requality.enabled.addTask"
+      },
+      {
+        "command": "requality.properties.pin",
+        "title": "Pin to Selection",
+        "category": "Requality",
+        "icon": "$(pin)"
+      },
+      {
+        "command": "requality.properties.unpin",
+        "title": "Pin to Selection",
+        "category": "Requality",
+        "icon": "$(pinned)"
+      },
+      {
+        "command": "requality.bookmarks.show",
+        "title": "Show",
+        "category": "Requality",
+        "enablement": "requality.enabled.bookmarks.show"
+      },
+      {
+        "command": "requality.bookmarks.sortBy",
+        "title": "Sort By",
+        "category": "Requality",
+        "enablement": "requality.enabled.bookmarks.sortBy"
+      },
+      {
+        "command": "requality.bookmarks.filters",
+        "title": "Filters...",
+        "category": "Requality",
+        "enablement": "requality.enabled.bookmarks.filters"
+      },
+      {
+        "command": "requality.bookmarks.columns",
+        "title": "Configure Columns...",
+        "category": "Requality",
+        "enablement": "requality.enabled.bookmarks.columns"
+      },
+      {
+        "command": "requality.tasks.show",
+        "title": "Show",
+        "category": "Requality",
+        "enablement": "requality.enabled.tasks.show"
+      },
+      {
+        "command": "requality.tasks.groupBy",
+        "title": "Group By",
+        "category": "Requality",
+        "enablement": "requality.enabled.tasks.groupBy"
+      },
+      {
+        "command": "requality.tasks.sortBy",
+        "title": "Sort By",
+        "category": "Requality",
+        "enablement": "requality.enabled.tasks.sortBy"
+      },
+      {
+        "command": "requality.tasks.filters",
+        "title": "Filters...",
+        "category": "Requality",
+        "enablement": "requality.enabled.tasks.filters"
+      },
+      {
+        "command": "requality.tasks.columns",
+        "title": "Configure Columns...",
+        "category": "Requality",
+        "enablement": "requality.enabled.tasks.columns"
+      },
+      {
+        "command": "requality.synchronize.synchronizations",
+        "title": "Synchronizations",
+        "category": "Requality",
+        "icon": "$(sync)"
+      },
+      {
+        "command": "requality.synchronize.pin",
+        "title": "Pin Current Synchronization",
+        "category": "Requality",
+        "icon": "$(pin)",
+        "toggled": "requality.checked.synchronize.pin",
+        "enablement": "requality.enabled.synchronize.pin"
+      },
+      {
+        "command": "requality.synchronize.link",
+        "title": "Link with Editor",
+        "category": "Requality",
+        "toggled": "requality.checked.synchronize.link",
+        "enablement": "requality.enabled.synchronize.link"
+      },
+      {
+        "command": "requality.synchronize.removeCurrent",
+        "title": "Remove Current Synchronization",
+        "category": "Requality",
+        "enablement": "requality.enabled.synchronize.removeCurrent"
+      },
+      {
+        "command": "requality.synchronize.removeUnpinned",
+        "title": "Remove Un-Pinned Synchronizations",
+        "category": "Requality",
+        "enablement": "requality.enabled.synchronize.removeUnpinned"
+      },
+      {
+        "command": "requality.progress.removeAllFinished",
+        "title": "Remove All Finished Operations",
+        "category": "Requality",
+        "icon": "$(clear-all)",
+        "enablement": "requality.enabled.progress.removeAllFinished"
+      },
+      {
+        "command": "requality.progress.preferences",
+        "title": "Preferences...",
+        "category": "Requality",
+        "enablement": "requality.enabled.progress.preferences"
+      },
+      {
+        "command": "requality.newResource.project",
+        "title": "Project...",
+        "category": "Requality",
+        "enablement": "requality.enabled.newResource.project"
+      },
+      {
+        "command": "requality.newResource.folder",
+        "title": "Folder",
+        "category": "Requality",
+        "enablement": "requality.enabled.newResource.folder"
+      },
+      {
+        "command": "requality.newResource.file",
+        "title": "File",
+        "category": "Requality",
+        "enablement": "requality.enabled.newResource.file"
+      },
+      {
+        "command": "requality.newResource.other",
+        "title": "Other...",
+        "category": "Requality",
+        "enablement": "requality.enabled.newResource.other"
+      },
+      {
+        "command": "requality.newWizard",
+        "title": "New...",
+        "category": "Requality",
+        "enablement": "requality.enabled.newWizard"
+      },
+      {
+        "command": "requality.fileImport",
+        "title": "Import...",
+        "category": "Requality",
+        "enablement": "requality.enabled.fileImport"
+      },
+      {
+        "command": "requality.fileExport",
+        "title": "Export...",
+        "category": "Requality",
+        "enablement": "requality.enabled.fileExport"
+      },
+      {
+        "command": "requality.workingSet.select",
+        "title": "Select Working Set...",
+        "category": "Requality",
+        "enablement": "requality.enabled.workingSet.select"
+      },
+      {
+        "command": "requality.workingSet.deselect",
+        "title": "Deselect Working Set",
+        "category": "Requality",
+        "enablement": "requality.enabled.workingSet.deselect"
+      },
+      {
+        "command": "requality.workingSet.edit",
+        "title": "Edit Active Working Set...",
+        "category": "Requality",
+        "enablement": "requality.enabled.workingSet.edit"
+      },
+      {
+        "command": "requality.workingSet.recent",
+        "title": "Recent Working Sets...",
+        "category": "Requality",
+        "enablement": "requality.enabled.workingSet.recent"
+      },
+      {
+        "command": "requality.workingSet.topProjects",
+        "title": "Projects",
+        "category": "Requality",
+        "toggled": "requality.checked.workingSet.topProjects",
+        "enablement": "requality.enabled.workingSet.topProjects"
+      },
+      {
+        "command": "requality.workingSet.topWorkingSets",
+        "title": "Working Sets",
+        "category": "Requality",
+        "toggled": "requality.checked.workingSet.topWorkingSets",
+        "enablement": "requality.enabled.workingSet.topWorkingSets"
+      },
+      {
+        "command": "requality.explorer.back",
+        "title": "Back",
+        "category": "Requality",
+        "icon": "$(arrow-left)",
+        "enablement": "requality.explorer.canBack"
+      },
+      {
+        "command": "requality.explorer.forward",
+        "title": "Forward",
+        "category": "Requality",
+        "icon": "$(arrow-right)",
+        "enablement": "requality.explorer.canForward"
+      },
+      {
+        "command": "requality.explorer.up",
+        "title": "Up One Level",
+        "category": "Requality",
+        "icon": "$(arrow-up)",
+        "enablement": "requality.explorer.canUp"
+      },
+      {
+        "command": "requality.importProjects",
+        "title": "Import Existing Projects...",
+        "category": "Requality"
+      },
+      {
+        "command": "requality.openProjectsFromFileSystem",
+        "title": "Open Projects from File System...",
+        "category": "Requality",
+        "enablement": "requality.enabled.openProjectsFromFileSystem"
+      },
+      {
+        "command": "requality.configureProject",
+        "title": "Configure and Detect Nested Projects...",
+        "category": "Requality",
+        "enablement": "requality.enabled.configureProject"
+      },
+      {
+        "command": "requality.team.applyPatch",
+        "title": "Apply Patch...",
+        "category": "Requality",
+        "enablement": "requality.enabled.team.applyPatch"
+      },
+      {
+        "command": "requality.team.showLocalHistory",
+        "title": "Show Local History",
+        "category": "Requality",
+        "enablement": "requality.enabled.team.showLocalHistory"
+      },
+      {
+        "command": "requality.team.shareProject",
+        "title": "Share Project...",
+        "category": "Requality",
+        "enablement": "requality.enabled.team.shareProject"
+      },
+      {
+        "command": "requality.team.importProjectSet",
+        "title": "Import Project Set...",
+        "category": "Requality",
+        "enablement": "requality.enabled.team.importProjectSet"
+      },
+      {
+        "command": "requality.compareWith.eachOther",
+        "title": "Each Other",
+        "category": "Requality",
+        "enablement": "requality.enabled.compareWith.eachOther"
+      },
+      {
+        "command": "requality.compareWith.localHistory",
+        "title": "Local History...",
+        "category": "Requality",
+        "enablement": "requality.enabled.compareWith.localHistory"
+      },
+      {
+        "command": "requality.compareWith.clipboard",
+        "title": "Clipboard",
+        "category": "Requality",
+        "enablement": "requality.enabled.compareWith.clipboard"
+      },
+      {
+        "command": "requality.replaceWith.localHistory",
+        "title": "Local History...",
+        "category": "Requality",
+        "enablement": "requality.enabled.replaceWith.localHistory"
+      },
+      {
+        "command": "requality.replaceWith.previous",
+        "title": "Previous from Local History",
+        "category": "Requality",
+        "enablement": "requality.enabled.replaceWith.previous"
+      },
+      {
+        "command": "requality.replaceWith.clipboard",
+        "title": "Clipboard",
+        "category": "Requality",
+        "enablement": "requality.enabled.replaceWith.clipboard"
+      },
+      {
+        "command": "requality.restoreFromLocalHistory",
+        "title": "Restore from Local History...",
+        "category": "Requality",
+        "enablement": "requality.enabled.restoreFromLocalHistory"
+      }
+    ],
+    "submenus": [
+      {
+        "id": "requality.newMenu",
+        "label": "New"
+      },
+      {
+        "id": "requality.newResourceMenu",
+        "label": "New"
+      },
+      {
+        "id": "requality.topLevelMenu",
+        "label": "Top Level Elements"
+      },
+      {
+        "id": "requality.externalMenu",
+        "label": "Edit in external browser"
+      },
+      {
+        "id": "requality.checkersMenu",
+        "label": "Checkers"
+      },
+      {
+        "id": "requality.transferredStatusMenu",
+        "label": "Transferred status"
+      },
+      {
+        "id": "requality.teamMenu",
+        "label": "Team"
+      },
+      {
+        "id": "requality.compareWithMenu",
+        "label": "Compare With"
+      },
+      {
+        "id": "requality.replaceWithMenu",
+        "label": "Replace With"
+      },
+      {
+        "id": "requality.configureMenu",
+        "label": "Configure"
+      },
+      {
+        "id": "requality.mainMenu.file",
+        "label": "File"
+      },
+      {
+        "id": "requality.mainMenu.edit",
+        "label": "Edit"
+      },
+      {
+        "id": "requality.mainMenu.navigate",
+        "label": "Navigate"
+      },
+      {
+        "id": "requality.mainMenu.navigate.goTo",
+        "label": "Go To"
+      },
+      {
+        "id": "requality.mainMenu.project",
+        "label": "Project"
+      },
+      {
+        "id": "requality.mainMenu.window",
+        "label": "Window"
+      },
+      {
+        "id": "requality.mainMenu.window.showView",
+        "label": "Show View"
+      },
+      {
+        "id": "requality.mainMenu.window.perspective",
+        "label": "Perspective"
+      },
+      {
+        "id": "requality.mainMenu.window.perspective.open",
+        "label": "Open Perspective"
+      },
+      {
+        "id": "requality.mainMenu.help",
+        "label": "Help"
+      }
+    ],
+    "viewsContainers": {
+      "activitybar": [
+        {
+          "id": "requality",
+          "title": "Requality",
+          "icon": "media/requality.svg"
+        }
+      ],
+      "panel": [
+        {
+          "id": "requality-panel",
+          "title": "Requality",
+          "icon": "media/requality.svg"
+        }
+      ],
+      "secondarySidebar": [
+        {
+          "id": "requality-right",
+          "title": "Requality",
+          "icon": "media/requality.svg"
+        }
+      ]
+    },
+    "views": {
+      "requality": [
+        {
+          "id": "requality.explorerView",
+          "name": "Requality Explorer",
+          "type": "webview",
+          "icon": "media/requality.svg",
+          "when": "config.requality.explorer.view != native"
+        },
+        {
+          "id": "requality.explorer",
+          "name": "Requality Explorer",
+          "icon": "media/requality.svg",
+          "when": "config.requality.explorer.view == native"
+        }
+      ],
+      "requality-right": [
+        {
+          "id": "requality.outline",
+          "name": "Outline",
+          "type": "webview",
+          "icon": "media/requality.svg"
+        },
+        {
+          "id": "requality.links",
+          "name": "Requality Links Explorer",
+          "type": "webview",
+          "icon": "media/requality.svg"
+        }
+      ],
+      "requality-panel": [
+        {
+          "id": "requality.properties",
+          "name": "Properties",
+          "type": "webview",
+          "icon": "media/requality.svg"
+        },
+        {
+          "id": "requality.problems",
+          "name": "Problems",
+          "type": "webview",
+          "icon": "media/requality.svg"
+        },
+        {
+          "id": "requality.todo",
+          "name": "Update Processor Tasks",
+          "type": "webview",
+          "icon": "media/requality.svg"
+        },
+        {
+          "id": "requality.bookmarks",
+          "name": "Bookmarks",
+          "type": "webview",
+          "icon": "media/requality.svg"
+        },
+        {
+          "id": "requality.tasks",
+          "name": "Tasks",
+          "type": "webview",
+          "icon": "media/requality.svg"
+        },
+        {
+          "id": "requality.history",
+          "name": "History",
+          "type": "webview",
+          "icon": "media/requality.svg"
+        },
+        {
+          "id": "requality.synchronize",
+          "name": "Synchronize",
+          "type": "webview",
+          "icon": "media/requality.svg"
+        },
+        {
+          "id": "requality.progress",
+          "name": "Progress",
+          "type": "webview",
+          "icon": "media/requality.svg"
+        }
+      ]
+    },
+    "viewsWelcome": [
+      {
+        "view": "requality.explorer",
+        "contents": "No Requality projects in this workspace.\n[New Requality Project](command:requality.newProject)\n[Open Folder](command:vscode.openFolder)",
+        "when": "requality.serverState == ready"
+      },
+      {
+        "view": "requality.explorer",
+        "contents": "Starting the Requality server...",
+        "when": "requality.serverState == starting"
+      },
+      {
+        "view": "requality.explorer",
+        "contents": "The Requality server is not running.\n[Restart Requality Server](command:requality.restartServer)\n[Show Server Log](command:requality.showLog)",
+        "when": "requality.serverState == failed"
+      }
+    ],
+    "menus": {
+      "view/title": [
+        {
+          "command": "requality.explorer.back",
+          "when": "view =~ /^requality\\.explorer(View)?$/ && requality.explorer.frames",
+          "group": "navigation@-3"
+        },
+        {
+          "command": "requality.explorer.forward",
+          "when": "view =~ /^requality\\.explorer(View)?$/ && requality.explorer.frames",
+          "group": "navigation@-2"
+        },
+        {
+          "command": "requality.explorer.up",
+          "when": "view =~ /^requality\\.explorer(View)?$/ && requality.explorer.frames",
+          "group": "navigation@-1"
+        },
+        {
+          "command": "requality.newProject",
+          "when": "view == requality.explorer",
+          "group": "navigation@1"
+        },
+        {
+          "command": "requality.selectReferencedNode",
+          "when": "view =~ /^requality\\.explorer(View)?$/ && requality.toolItem.com.unitesk.requality.commands.RequilityCNFRefSel.image != onelink.png && requality.toolItem.com.unitesk.requality.commands.RequilityCNFRefSel.image != multilink.png",
+          "group": "navigation@2"
+        },
+        {
+          "command": "requality.selectReferencedNode.oneLink",
+          "when": "view =~ /^requality\\.explorer(View)?$/ && requality.toolItem.com.unitesk.requality.commands.RequilityCNFRefSel.image == onelink.png",
+          "group": "navigation@2"
+        },
+        {
+          "command": "requality.selectReferencedNode.multiLink",
+          "when": "view =~ /^requality\\.explorer(View)?$/ && requality.toolItem.com.unitesk.requality.commands.RequilityCNFRefSel.image == multilink.png",
+          "group": "navigation@2"
+        },
+        {
+          "command": "requality.refresh",
+          "when": "view == requality.explorer",
+          "group": "navigation@3"
+        },
+        {
+          "command": "requality.explorer.collapseAll",
+          "when": "view == requality.explorerView",
+          "group": "navigation@4"
+        },
+        {
+          "command": "requality.linkWithEditor",
+          "when": "view =~ /^requality\\.explorer(View)?$/ && !requality.linked",
+          "group": "navigation@5"
+        },
+        {
+          "command": "requality.unlinkWithEditor",
+          "when": "view =~ /^requality\\.explorer(View)?$/ && requality.linked",
+          "group": "navigation@5"
+        },
+        {
+          "command": "requality.links.changeDirection",
+          "when": "view == requality.links && requality.toolItem.com.unitesk.requality.commands.RequilityLinksDirection.image != downarrow.png && requality.toolItem.com.unitesk.requality.commands.RequilityLinksDirection.image != uparrow.png",
+          "group": "navigation@1"
+        },
+        {
+          "command": "requality.links.changeDirection.down",
+          "when": "view == requality.links && requality.toolItem.com.unitesk.requality.commands.RequilityLinksDirection.image == downarrow.png",
+          "group": "navigation@1"
+        },
+        {
+          "command": "requality.links.changeDirection.up",
+          "when": "view == requality.links && requality.toolItem.com.unitesk.requality.commands.RequilityLinksDirection.image == uparrow.png",
+          "group": "navigation@1"
+        },
+        {
+          "command": "requality.links.selectAttribute",
+          "when": "view == requality.links",
+          "group": "navigation@2"
+        },
+        {
+          "command": "requality.links.lightLinks",
+          "when": "view == requality.links && requality.toolItem.com.unitesk.requality.commands.LightLinks.image != light_link.png",
+          "group": "navigation@3"
+        },
+        {
+          "command": "requality.links.lightLinks.on",
+          "when": "view == requality.links && requality.toolItem.com.unitesk.requality.commands.LightLinks.image == light_link.png",
+          "group": "navigation@3"
+        },
+        {
+          "command": "requality.todo.hideCompleted",
+          "when": "view == requality.todo && !requality.toolItem.com.unitesk.requality.commands.HideCompletedItems.checked",
+          "group": "navigation@1"
+        },
+        {
+          "command": "requality.todo.showCompleted",
+          "when": "view == requality.todo && requality.toolItem.com.unitesk.requality.commands.HideCompletedItems.checked",
+          "group": "navigation@1"
+        },
+        {
+          "command": "requality.todo.delete",
+          "when": "view == requality.todo",
+          "group": "navigation@2"
+        },
+        {
+          "command": "requality.todo.deleteAll",
+          "when": "view == requality.todo",
+          "group": "navigation@3"
+        },
+        {
+          "command": "requality.bookmarks.show",
+          "when": "view == requality.bookmarks && requality.shown.bookmarks.show",
+          "group": "1_markers@0"
+        },
+        {
+          "command": "requality.bookmarks.sortBy",
+          "when": "view == requality.bookmarks && requality.shown.bookmarks.sortBy",
+          "group": "1_markers@1"
+        },
+        {
+          "command": "requality.bookmarks.filters",
+          "when": "view == requality.bookmarks && requality.shown.bookmarks.filters",
+          "group": "1_markers@2"
+        },
+        {
+          "command": "requality.bookmarks.columns",
+          "when": "view == requality.bookmarks && requality.shown.bookmarks.columns",
+          "group": "1_markers@3"
+        },
+        {
+          "command": "requality.tasks.show",
+          "when": "view == requality.tasks && requality.shown.tasks.show",
+          "group": "1_markers@0"
+        },
+        {
+          "command": "requality.tasks.groupBy",
+          "when": "view == requality.tasks && requality.shown.tasks.groupBy",
+          "group": "1_markers@1"
+        },
+        {
+          "command": "requality.tasks.sortBy",
+          "when": "view == requality.tasks && requality.shown.tasks.sortBy",
+          "group": "1_markers@2"
+        },
+        {
+          "command": "requality.tasks.filters",
+          "when": "view == requality.tasks && requality.shown.tasks.filters",
+          "group": "1_markers@3"
+        },
+        {
+          "command": "requality.tasks.columns",
+          "when": "view == requality.tasks && requality.shown.tasks.columns",
+          "group": "1_markers@4"
+        },
+        {
+          "command": "requality.progress.removeAllFinished",
+          "when": "view == requality.progress && requality.shown.progress.removeAllFinished",
+          "group": "navigation@1"
+        },
+        {
+          "command": "requality.progress.removeAllFinished",
+          "when": "view == requality.progress && requality.shown.progress.removeAllFinished",
+          "group": "1_progress@1"
+        },
+        {
+          "command": "requality.progress.preferences",
+          "when": "view == requality.progress && requality.shown.progress.preferences",
+          "group": "1_progress@2"
+        },
+        {
+          "command": "requality.synchronize.synchronizations",
+          "when": "view == requality.synchronize",
+          "group": "navigation@1"
+        },
+        {
+          "command": "requality.synchronize.pin",
+          "when": "view == requality.synchronize && requality.shown.synchronize.pin",
+          "group": "navigation@2"
+        },
+        {
+          "command": "requality.synchronize.pin",
+          "when": "view == requality.synchronize && requality.shown.synchronize.pin",
+          "group": "1_sync@1"
+        },
+        {
+          "command": "requality.synchronize.link",
+          "when": "view == requality.synchronize && requality.shown.synchronize.link",
+          "group": "1_sync@2"
+        },
+        {
+          "command": "requality.synchronize.removeCurrent",
+          "when": "view == requality.synchronize && requality.shown.synchronize.removeCurrent",
+          "group": "1_sync@3"
+        },
+        {
+          "command": "requality.synchronize.removeUnpinned",
+          "when": "view == requality.synchronize && requality.shown.synchronize.removeUnpinned",
+          "group": "1_sync@4"
+        },
+        {
+          "command": "requality.properties.pin",
+          "when": "view == requality.properties && !requality.properties.pinned",
+          "group": "navigation@1"
+        },
+        {
+          "command": "requality.properties.unpin",
+          "when": "view == requality.properties && requality.properties.pinned",
+          "group": "navigation@1"
+        },
+        {
+          "command": "requality.workingSet.select",
+          "when": "view =~ /^requality\\.explorer(View)?$/ && requality.shown.workingSet.select",
+          "group": "1_workingSets@1"
+        },
+        {
+          "command": "requality.workingSet.deselect",
+          "when": "view =~ /^requality\\.explorer(View)?$/ && requality.shown.workingSet.deselect",
+          "group": "1_workingSets@2"
+        },
+        {
+          "command": "requality.workingSet.edit",
+          "when": "view =~ /^requality\\.explorer(View)?$/ && requality.shown.workingSet.edit",
+          "group": "1_workingSets@3"
+        },
+        {
+          "command": "requality.workingSet.recent",
+          "when": "view =~ /^requality\\.explorer(View)?$/ && requality.shown.workingSet.recent",
+          "group": "1_workingSets@4"
+        },
+        {
+          "submenu": "requality.topLevelMenu",
+          "when": "view =~ /^requality\\.explorer(View)?$/ && requality.shown.workingSet.topProjects",
+          "group": "2_topLevel@1"
+        },
+        {
+          "command": "requality.filters",
+          "when": "view =~ /^requality\\.explorer(View)?$/",
+          "group": "7_filters@1"
+        },
+        {
+          "command": "requality.recentFilters",
+          "when": "view =~ /^requality\\.explorer(View)?$/ && requality.shown.recentFilters",
+          "group": "7_filters@2"
+        },
+        {
+          "submenu": "requality.mainMenu.file",
+          "when": "view =~ /^requality\\.explorer(View)?$/",
+          "group": "9_mainMenu@1"
+        },
+        {
+          "submenu": "requality.mainMenu.edit",
+          "when": "view =~ /^requality\\.explorer(View)?$/",
+          "group": "9_mainMenu@2"
+        },
+        {
+          "submenu": "requality.mainMenu.navigate",
+          "when": "view =~ /^requality\\.explorer(View)?$/",
+          "group": "9_mainMenu@3"
+        },
+        {
+          "submenu": "requality.mainMenu.project",
+          "when": "view =~ /^requality\\.explorer(View)?$/",
+          "group": "9_mainMenu@4"
+        },
+        {
+          "submenu": "requality.mainMenu.window",
+          "when": "view =~ /^requality\\.explorer(View)?$/",
+          "group": "9_mainMenu@5"
+        },
+        {
+          "submenu": "requality.mainMenu.help",
+          "when": "view =~ /^requality\\.explorer(View)?$/",
+          "group": "9_mainMenu@6"
+        }
+      ],
+      "requality.mainMenu.file": [
+        {
+          "command": "requality.newWizard",
+          "group": "1_new@1",
+          "when": "!requality.menuHidden.requality.newWizard"
+        },
+        {
+          "command": "requality.openProjectsFromFileSystem",
+          "group": "2_open@1",
+          "when": "!requality.menuHidden.requality.openProjectsFromFileSystem"
+        },
+        {
+          "command": "requality.rename",
+          "group": "4_edit@1",
+          "when": "!requality.menuHidden.requality.rename"
+        },
+        {
+          "command": "requality.edit.refresh",
+          "group": "4_edit@2",
+          "when": "!requality.menuHidden.requality.edit.refresh"
+        },
+        {
+          "command": "requality.fileImport",
+          "group": "5_import@1",
+          "when": "!requality.menuHidden.requality.fileImport"
+        },
+        {
+          "command": "requality.fileExport",
+          "group": "5_import@2",
+          "when": "!requality.menuHidden.requality.fileExport"
+        },
+        {
+          "command": "requality.properties",
+          "group": "6_properties@1",
+          "when": "!requality.menuHidden.requality.properties"
+        }
+      ],
+      "requality.mainMenu.edit": [
+        {
+          "command": "requality.undo",
+          "group": "1_undo@1",
+          "when": "!requality.menuHidden.requality.undo"
+        },
+        {
+          "command": "requality.redo",
+          "group": "1_undo@2",
+          "when": "!requality.menuHidden.requality.redo"
+        },
+        {
+          "command": "requality.edit.copy",
+          "group": "2_edit@1",
+          "when": "!requality.menuHidden.requality.edit.copy"
+        },
+        {
+          "command": "requality.edit.paste",
+          "group": "2_edit@2",
+          "when": "!requality.menuHidden.requality.edit.paste"
+        },
+        {
+          "command": "requality.delete",
+          "group": "2_edit@3",
+          "when": "!requality.menuHidden.requality.delete"
+        },
+        {
+          "command": "requality.findNext",
+          "when": "(activeWebviewPanelId == requality.markup) && !requality.menuHidden.requality.findNext",
+          "group": "3_find@1"
+        },
+        {
+          "command": "requality.findPrevious",
+          "when": "(activeWebviewPanelId == requality.markup) && !requality.menuHidden.requality.findPrevious",
+          "group": "3_find@2"
+        },
+        {
+          "command": "requality.addBookmark",
+          "group": "4_additions@1",
+          "when": "!requality.menuHidden.requality.addBookmark"
+        },
+        {
+          "command": "requality.addTask",
+          "group": "4_additions@2",
+          "when": "!requality.menuHidden.requality.addTask"
+        }
+      ],
+      "requality.mainMenu.navigate": [
+        {
+          "command": "requality.goInto",
+          "group": "1_go@1",
+          "when": "!requality.menuHidden.requality.goInto"
+        },
+        {
+          "submenu": "requality.mainMenu.navigate.goTo",
+          "group": "1_go@2",
+          "when": "!requality.menuHidden.requality.mainMenu.navigate.goTo"
+        },
+        {
+          "command": "requality.showIn",
+          "group": "2_show@1",
+          "when": "!requality.menuHidden.requality.showIn"
+        }
+      ],
+      "requality.mainMenu.navigate.goTo": [
+        {
+          "command": "requality.explorer.back",
+          "group": "1_go@1",
+          "when": "!requality.menuHidden.requality.explorer.back"
+        },
+        {
+          "command": "requality.explorer.forward",
+          "group": "1_go@2",
+          "when": "!requality.menuHidden.requality.explorer.forward"
+        },
+        {
+          "command": "requality.explorer.up",
+          "group": "1_go@3",
+          "when": "!requality.menuHidden.requality.explorer.up"
+        },
+        {
+          "command": "requality.goToResource",
+          "group": "2_resource@1",
+          "when": "!requality.menuHidden.requality.goToResource"
+        }
+      ],
+      "requality.mainMenu.project": [
+        {
+          "command": "requality.project.open",
+          "group": "1_open@1",
+          "when": "!requality.menuHidden.requality.project.open"
+        },
+        {
+          "command": "requality.project.close",
+          "group": "1_open@2",
+          "when": "!requality.menuHidden.requality.project.close"
+        },
+        {
+          "command": "requality.buildAll",
+          "group": "2_build@1",
+          "when": "!requality.menuHidden.requality.buildAll"
+        },
+        {
+          "command": "requality.project.build",
+          "group": "2_build@2",
+          "when": "!requality.menuHidden.requality.project.build"
+        },
+        {
+          "command": "requality.clean",
+          "group": "2_build@3",
+          "when": "!requality.menuHidden.requality.clean"
+        },
+        {
+          "command": "requality.buildAutomatically",
+          "group": "2_build@4",
+          "when": "!requality.menuHidden.requality.buildAutomatically"
+        },
+        {
+          "command": "requality.projectProperties",
+          "group": "3_properties@1",
+          "when": "!requality.menuHidden.requality.projectProperties"
+        }
+      ],
+      "requality.mainMenu.window": [
+        {
+          "submenu": "requality.mainMenu.window.showView",
+          "group": "1_views@1",
+          "when": "!requality.menuHidden.requality.mainMenu.window.showView"
+        },
+        {
+          "submenu": "requality.mainMenu.window.perspective",
+          "group": "1_views@2",
+          "when": "!requality.menuHidden.requality.mainMenu.window.perspective"
+        },
+        {
+          "command": "requality.preferences",
+          "group": "9_preferences@1",
+          "when": "!requality.menuHidden.requality.preferences"
+        }
+      ],
+      "requality.mainMenu.window.showView": [
+        {
+          "command": "requality.showView.bookmarks",
+          "when": "(requality.showViewMenu.org.eclipse.ui.views.BookmarkView) && !requality.menuHidden.requality.showView.bookmarks",
+          "group": "1_views@1"
+        },
+        {
+          "command": "requality.showView.history",
+          "when": "(requality.showViewMenu.org.eclipse.team.ui.GenericHistoryView) && !requality.menuHidden.requality.showView.history",
+          "group": "1_views@2"
+        },
+        {
+          "command": "requality.showView.outline",
+          "when": "(requality.showViewMenu.org.eclipse.ui.views.ContentOutline) && !requality.menuHidden.requality.showView.outline",
+          "group": "1_views@3"
+        },
+        {
+          "command": "requality.showView.problems",
+          "when": "(requality.showViewMenu.org.eclipse.ui.views.ProblemView) && !requality.menuHidden.requality.showView.problems",
+          "group": "1_views@4"
+        },
+        {
+          "command": "requality.showView.progress",
+          "when": "(requality.showViewMenu.org.eclipse.ui.views.ProgressView) && !requality.menuHidden.requality.showView.progress",
+          "group": "1_views@5"
+        },
+        {
+          "command": "requality.showView.properties",
+          "when": "(requality.showViewMenu.org.eclipse.ui.views.PropertySheet) && !requality.menuHidden.requality.showView.properties",
+          "group": "1_views@6"
+        },
+        {
+          "command": "requality.showView.explorer",
+          "when": "(requality.showViewMenu.com.unitesk.requality.views.RequalityExplorer) && !requality.menuHidden.requality.showView.explorer",
+          "group": "1_views@7"
+        },
+        {
+          "command": "requality.showView.links",
+          "when": "(requality.showViewMenu.com.unitesk.requality.views.RequalityLinksExplorer) && !requality.menuHidden.requality.showView.links",
+          "group": "1_views@8"
+        },
+        {
+          "command": "requality.showView.synchronize",
+          "when": "(requality.showViewMenu.org.eclipse.team.sync.views.SynchronizeView) && !requality.menuHidden.requality.showView.synchronize",
+          "group": "1_views@9"
+        },
+        {
+          "command": "requality.showView.tasks",
+          "when": "(requality.showViewMenu.org.eclipse.ui.views.TaskList) && !requality.menuHidden.requality.showView.tasks",
+          "group": "1_views@10"
+        },
+        {
+          "command": "requality.showView.todo",
+          "when": "(requality.showViewMenu.com.unitesk.requality.views.ToDoList) && !requality.menuHidden.requality.showView.todo",
+          "group": "1_views@11"
+        },
+        {
+          "command": "requality.showView.other",
+          "group": "2_other@1",
+          "when": "!requality.menuHidden.requality.showView.other"
+        }
+      ],
+      "requality.mainMenu.window.perspective": [
+        {
+          "submenu": "requality.mainMenu.window.perspective.open",
+          "group": "1_open@1",
+          "when": "!requality.menuHidden.requality.mainMenu.window.perspective.open"
+        },
+        {
+          "command": "requality.perspective.customize",
+          "group": "2_customize@1",
+          "when": "!requality.menuHidden.requality.perspective.customize"
+        },
+        {
+          "command": "requality.perspective.saveAs",
+          "group": "2_customize@2",
+          "when": "!requality.menuHidden.requality.perspective.saveAs"
+        },
+        {
+          "command": "requality.perspective.reset",
+          "group": "2_customize@3",
+          "when": "!requality.menuHidden.requality.perspective.reset"
+        },
+        {
+          "command": "requality.perspective.close",
+          "group": "3_close@1",
+          "when": "!requality.menuHidden.requality.perspective.close"
+        },
+        {
+          "command": "requality.perspective.closeAll",
+          "group": "3_close@2",
+          "when": "!requality.menuHidden.requality.perspective.closeAll"
+        }
+      ],
+      "requality.mainMenu.window.perspective.open": [
+        {
+          "command": "requality.perspective.openOther",
+          "group": "2_other@1",
+          "when": "!requality.menuHidden.requality.perspective.openOther"
+        }
+      ],
+      "requality.mainMenu.help": [
+        {
+          "command": "requality.help",
+          "group": "1_help@1",
+          "when": "!requality.menuHidden.requality.help"
+        }
+      ],
+      "editor/title": [
+        {
+          "command": "requality.compare",
+          "when": "isInDiffEditor && resourceExtname == .json",
+          "group": "navigation@1"
+        }
+      ],
+      "explorer/context": [
+        {
+          "command": "requality.compare",
+          "when": "listDoubleSelection && resourceExtname == .json",
+          "group": "3_compare@9"
+        }
+      ],
+      "view/item/context": [
+        {
+          "submenu": "requality.newMenu",
+          "when": "view == requality.explorer && viewItem =~ /\\brequality\\.node\\b/ && !listMultiSelection",
+          "group": "1_new@1"
+        },
+        {
+          "submenu": "requality.newResourceMenu",
+          "when": "view == requality.explorer && viewItem =~ /\\brequality\\.(project|resource)\\b/ && !listMultiSelection",
+          "group": "1_new@0"
+        },
+        {
+          "command": "requality.addRefTo",
+          "when": "view == requality.explorer && viewItem =~ /\\brequality\\.node\\b/",
+          "group": "1_new@2"
+        },
+        {
+          "command": "requality.importDocument",
+          "when": "view == requality.explorer && (viewItem =~ /\\bis\\.DocFolder\\b/)",
+          "group": "1_new@3"
+        },
+        {
+          "command": "requality.deleteStatisticsFile",
+          "when": "view == requality.explorer && viewItem =~ /\\brequality\\.project\\b.*\\bready\\b/ && !listMultiSelection",
+          "group": "4_edit@0"
+        },
+        {
+          "command": "requality.copyQId",
+          "when": "view == requality.explorer && viewItem =~ /\\brequality\\.node\\b/ && !listMultiSelection",
+          "group": "5_edit@1"
+        },
+        {
+          "command": "requality.copy",
+          "when": "view == requality.explorer && viewItem =~ /\\brequality\\.node\\b/",
+          "group": "5_edit@2"
+        },
+        {
+          "command": "requality.pasteInto",
+          "when": "view == requality.explorer && viewItem =~ /\\brequality\\.node\\b/ && !listMultiSelection",
+          "group": "5_edit@3"
+        },
+        {
+          "command": "requality.pasteNear",
+          "when": "view == requality.explorer && viewItem =~ /\\brequality\\.node\\b/ && !listMultiSelection",
+          "group": "5_edit@4"
+        },
+        {
+          "command": "requality.openUniEditor",
+          "when": "view == requality.explorer && (viewItem =~ /\\bis\\.Requirement\\b/)",
+          "group": "5_edit@5"
+        },
+        {
+          "command": "requality.openModuleEditor",
+          "when": "view == requality.explorer && (viewItem =~ /\\bis\\.Requirement\\b/)",
+          "group": "5_edit@6"
+        },
+        {
+          "command": "requality.massOps",
+          "when": "view == requality.explorer",
+          "group": "5_edit@7"
+        },
+        {
+          "command": "requality.openReview",
+          "when": "view == requality.explorer && (viewItem =~ /\\bis\\.Requirement\\b/) && !(viewItem =~ /\\bis\\.TextNode\\b/)",
+          "group": "5_edit@8"
+        },
+        {
+          "command": "requality.renameDocFolder",
+          "when": "view == requality.explorer && (viewItem =~ /\\bis\\.DocFolder\\b/) && !listMultiSelection",
+          "group": "5_edit@9"
+        },
+        {
+          "command": "requality.project.copy",
+          "when": "view == requality.explorer && viewItem =~ /\\brequality\\.(project|resource)\\b/ && requality.shown.project.copy",
+          "group": "5_edit@20"
+        },
+        {
+          "command": "requality.project.paste",
+          "when": "view == requality.explorer && viewItem =~ /\\brequality\\.(project|resource)\\b/ && requality.shown.project.paste",
+          "group": "5_edit@21"
+        },
+        {
+          "command": "requality.project.delete",
+          "when": "view == requality.explorer && viewItem =~ /\\brequality\\.(project|resource)\\b/ && requality.shown.project.delete",
+          "group": "5_edit@22"
+        },
+        {
+          "command": "requality.project.move",
+          "when": "view == requality.explorer && viewItem =~ /\\brequality\\.(project|resource)\\b/ && requality.shown.project.move",
+          "group": "5_reorganize@0"
+        },
+        {
+          "command": "requality.renameProject",
+          "when": "view == requality.explorer && viewItem =~ /\\brequality\\.(project|resource)\\b/ && !listMultiSelection",
+          "group": "5_reorganize@1"
+        },
+        {
+          "command": "requality.goInto",
+          "when": "view == requality.explorer && viewItem =~ /\\brequality\\.(project|resource)\\b/ && !listMultiSelection && requality.shown.goInto",
+          "group": "1_new@9"
+        },
+        {
+          "command": "requality.open",
+          "when": "view == requality.explorer && viewItem =~ /\\brequality\\.resource\\b/ && (viewItem =~ /\\bis\\.IFile\\b/)",
+          "group": "2_open@1"
+        },
+        {
+          "command": "requality.openWith",
+          "when": "view == requality.explorer && viewItem =~ /\\brequality\\.resource\\b/ && !listMultiSelection && requality.shown.openWith",
+          "group": "2_open@2"
+        },
+        {
+          "command": "requality.showIn",
+          "when": "view == requality.explorer && viewItem =~ /\\brequality\\.(project|resource)\\b/ && requality.shown.showIn",
+          "group": "2_open@3"
+        },
+        {
+          "command": "requality.goToProject",
+          "when": "view == requality.explorer && viewItem =~ /\\brequality\\.resource\\b/ && requality.shown.goToProject",
+          "group": "2_open@4"
+        },
+        {
+          "command": "requality.importAsProject",
+          "when": "view == requality.explorer && viewItem =~ /\\brequality\\.resource\\b/ && requality.shown.importAsProject",
+          "group": "5_x_port@0"
+        },
+        {
+          "command": "requality.import",
+          "when": "view == requality.explorer && viewItem =~ /\\brequality\\.(project|resource)\\b/ && requality.shown.import",
+          "group": "5_x_port@1"
+        },
+        {
+          "command": "requality.export",
+          "when": "view == requality.explorer && viewItem =~ /\\brequality\\.(project|resource)\\b/ && requality.shown.export",
+          "group": "5_x_port@2"
+        },
+        {
+          "command": "requality.delete",
+          "when": "view == requality.explorer && viewItem =~ /\\brequality\\.node\\b/",
+          "group": "5_edit@10"
+        },
+        {
+          "command": "requality.showHiddenChildren",
+          "when": "view == requality.explorer",
+          "group": "5_edit@11"
+        },
+        {
+          "command": "requality.hideVirtualNodes",
+          "when": "view == requality.explorer",
+          "group": "5_edit@12"
+        },
+        {
+          "submenu": "requality.transferredStatusMenu",
+          "when": "view == requality.explorer && viewItem =~ /\\brequality\\.node\\b/",
+          "group": "5_edit@13"
+        },
+        {
+          "command": "requality.fixLocationsDescriptions",
+          "when": "view == requality.explorer && viewItem =~ /\\brequality\\.project\\b.*\\bready\\b/ && !listMultiSelection",
+          "group": "6_project@1"
+        },
+        {
+          "command": "requality.forceCheckers",
+          "when": "view == requality.explorer && viewItem =~ /\\brequality\\.project\\b.*\\bready\\b/ && !listMultiSelection",
+          "group": "6_project@2"
+        },
+        {
+          "submenu": "requality.externalMenu",
+          "when": "view == requality.explorer",
+          "group": "6_project@3"
+        },
+        {
+          "command": "requality.generateReport",
+          "when": "view == requality.explorer && (viewItem =~ /\\bis\\.ReportSettings\\b/) && !(viewItem =~ /\\bis\\.ReportData\\b/)",
+          "group": "7_generate@1"
+        },
+        {
+          "command": "requality.exportReport",
+          "when": "view == requality.explorer && (viewItem =~ /\\bis\\.ReportData\\b/)",
+          "group": "7_generate@2"
+        },
+        {
+          "command": "requality.docproc.saxHeaders",
+          "when": "view == requality.explorer && (viewItem =~ /\\bis\\.Document\\b/) && !listMultiSelection",
+          "group": "7_generate@10"
+        },
+        {
+          "command": "requality.docproc.updateDocument",
+          "when": "view == requality.explorer && (viewItem =~ /\\bis\\.Document\\b/) && !listMultiSelection",
+          "group": "7_generate@11"
+        },
+        {
+          "command": "requality.docproc.textToReq",
+          "when": "view == requality.explorer && (viewItem =~ /\\bis\\.Document\\b/) && !listMultiSelection",
+          "group": "7_generate@12"
+        },
+        {
+          "command": "requality.docproc.updateFromLibreOffice",
+          "when": "view == requality.explorer && (viewItem =~ /\\bis\\.Document\\b/) && !listMultiSelection",
+          "group": "7_generate@13"
+        },
+        {
+          "command": "requality.docproc.oldMarkup",
+          "when": "view == requality.explorer && (viewItem =~ /\\bis\\.Document\\b/) && !listMultiSelection",
+          "group": "7_generate@14"
+        },
+        {
+          "command": "requality.docproc.paramExtraction",
+          "when": "view == requality.explorer && (viewItem =~ /\\bis\\.Document\\b/) && !listMultiSelection",
+          "group": "7_generate@15"
+        },
+        {
+          "command": "requality.project.build",
+          "when": "view == requality.explorer && viewItem =~ /\\brequality\\.project\\b/ && requality.shown.project.build",
+          "group": "8_build@1"
+        },
+        {
+          "command": "requality.project.refresh",
+          "when": "view == requality.explorer && viewItem =~ /\\brequality\\.(project|resource)\\b/ && requality.shown.project.refresh",
+          "group": "8_build@2"
+        },
+        {
+          "command": "requality.project.open",
+          "when": "view == requality.explorer && viewItem =~ /\\brequality\\.project\\b/ && requality.shown.project.open",
+          "group": "8_build@3"
+        },
+        {
+          "command": "requality.project.close",
+          "when": "view == requality.explorer && viewItem =~ /\\brequality\\.project\\b/ && requality.shown.project.close",
+          "group": "8_build@4"
+        },
+        {
+          "command": "requality.project.closeUnrelated",
+          "when": "view == requality.explorer && viewItem =~ /\\brequality\\.project\\b/ && requality.shown.project.closeUnrelated",
+          "group": "8_build@5"
+        },
+        {
+          "submenu": "requality.teamMenu",
+          "when": "view == requality.explorer",
+          "group": "8_x_additions@1"
+        },
+        {
+          "command": "requality.team.importProjectSet",
+          "when": "view == requality.explorer && requality.shown.team.importProjectSet",
+          "group": "8_x_additions@2"
+        },
+        {
+          "submenu": "requality.compareWithMenu",
+          "when": "view == requality.explorer",
+          "group": "8_x_additions@3"
+        },
+        {
+          "submenu": "requality.replaceWithMenu",
+          "when": "view == requality.explorer",
+          "group": "8_x_additions@4"
+        },
+        {
+          "command": "requality.restoreFromLocalHistory",
+          "when": "view == requality.explorer && requality.shown.restoreFromLocalHistory",
+          "group": "8_x_additions@5"
+        },
+        {
+          "submenu": "requality.configureMenu",
+          "when": "view == requality.explorer",
+          "group": "8_x_additions@6"
+        },
+        {
+          "submenu": "requality.checkersMenu",
+          "when": "view == requality.explorer && viewItem =~ /\\brequality\\.project\\b.*\\bready\\b/ && !listMultiSelection",
+          "group": "9_properties@1"
+        },
+        {
+          "command": "requality.properties",
+          "when": "view == requality.explorer && viewItem =~ /\\brequality\\.(project|resource)\\b/",
+          "group": "9_properties@2"
+        },
+        {
+          "command": "requality.showProperties",
+          "when": "view == requality.explorer && viewItem =~ /\\brequality\\.node\\b/ && !listMultiSelection",
+          "group": "9_properties@3"
+        }
+      ],
+      "requality.newMenu": [
+        {
+          "command": "requality.createTest",
+          "when": "(viewItem =~ /\\bis\\.Requirement\\b/ || viewItem =~ /\\bis\\.TestPurpose\\b/ || viewItem =~ /\\bis\\.TextNode\\b/) && !listMultiSelection",
+          "group": "1@1"
+        },
+        {
+          "command": "requality.createRequirement",
+          "when": "viewItem =~ /\\bnew\\.Requirement\\b/",
+          "group": "2@1"
+        },
+        {
+          "command": "requality.createTextNode",
+          "when": "viewItem =~ /\\bnew\\.TextNode\\b/",
+          "group": "2@2"
+        },
+        {
+          "command": "requality.createTestPurpose",
+          "when": "viewItem =~ /\\bnew\\.TestPurpose\\b/",
+          "group": "2@3"
+        },
+        {
+          "command": "requality.createComment",
+          "when": "viewItem =~ /\\bnew\\.Comment\\b/",
+          "group": "2@4"
+        },
+        {
+          "command": "requality.createDocFolder",
+          "when": "viewItem =~ /\\bnew\\.DocFolder\\b/",
+          "group": "2@5"
+        },
+        {
+          "command": "requality.createReportFolder",
+          "when": "viewItem =~ /\\bnew\\.ReportFolder\\b/",
+          "group": "2@6"
+        },
+        {
+          "command": "requality.createReportSettings",
+          "when": "viewItem =~ /\\bnew\\.ReportSettings\\b/",
+          "group": "2@7"
+        },
+        {
+          "command": "requality.createVirtualNode",
+          "when": "viewItem =~ /\\bnew\\.VirtualNode\\b/",
+          "group": "2@8"
+        },
+        {
+          "command": "requality.createNodeType",
+          "when": "viewItem =~ /\\bnew\\.NodeType\\b/",
+          "group": "2@9"
+        },
+        {
+          "command": "requality.new",
+          "group": "3@1"
+        }
+      ],
+      "requality.newResourceMenu": [
+        {
+          "command": "requality.newResource.project",
+          "when": "requality.shown.newResource.project",
+          "group": "1@1"
+        },
+        {
+          "command": "requality.newResource.folder",
+          "when": "requality.shown.newResource.folder",
+          "group": "2@1"
+        },
+        {
+          "command": "requality.newResource.file",
+          "when": "requality.shown.newResource.file",
+          "group": "2@2"
+        },
+        {
+          "command": "requality.newResource.other",
+          "when": "requality.shown.newResource.other",
+          "group": "3@1"
+        }
+      ],
+      "requality.topLevelMenu": [
+        {
+          "command": "requality.workingSet.topProjects",
+          "group": "1@1"
+        },
+        {
+          "command": "requality.workingSet.topWorkingSets",
+          "group": "1@2"
+        }
+      ],
+      "requality.externalMenu": [
+        {
+          "command": "requality.openExternal.moduleEditor",
+          "when": "(viewItem =~ /\\bis\\.Requirement\\b/)"
+        },
+        {
+          "command": "requality.openExternal.uniEditor",
+          "when": "(viewItem =~ /\\bis\\.Requirement\\b/)"
+        },
+        {
+          "command": "requality.openExternal.markup",
+          "when": "(viewItem =~ /\\bis\\.Document\\b/)"
+        },
+        {
+          "command": "requality.openExternal.report",
+          "when": "(viewItem =~ /\\bis\\.ReportData\\b/)"
+        }
+      ],
+      "requality.checkersMenu": [
+        {
+          "command": "requality.checkers",
+          "group": "1@1"
+        },
+        {
+          "command": "requality.resetProblems",
+          "group": "2@1"
+        }
+      ],
+      "requality.transferredStatusMenu": [
+        {
+          "command": "requality.transferredStatus"
+        }
+      ],
+      "requality.teamMenu": [
+        {
+          "command": "requality.team.applyPatch",
+          "when": "requality.shown.team.applyPatch",
+          "group": "1@1"
+        },
+        {
+          "command": "requality.team.showLocalHistory",
+          "when": "requality.shown.team.showLocalHistory",
+          "group": "4@1"
+        },
+        {
+          "command": "requality.team.shareProject",
+          "when": "requality.shown.team.shareProject",
+          "group": "9@1"
+        }
+      ],
+      "requality.compareWithMenu": [
+        {
+          "command": "requality.compareWith.eachOther",
+          "when": "requality.shown.compareWith.eachOther",
+          "group": "1@1"
+        },
+        {
+          "command": "requality.compareWith.localHistory",
+          "when": "requality.shown.compareWith.localHistory",
+          "group": "1@2"
+        },
+        {
+          "command": "requality.compareWith.clipboard",
+          "when": "requality.shown.compareWith.clipboard",
+          "group": "1@3"
+        }
+      ],
+      "requality.replaceWithMenu": [
+        {
+          "command": "requality.replaceWith.localHistory",
+          "when": "requality.shown.replaceWith.localHistory",
+          "group": "1@1"
+        },
+        {
+          "command": "requality.replaceWith.clipboard",
+          "when": "requality.shown.replaceWith.clipboard",
+          "group": "1@2"
+        },
+        {
+          "command": "requality.replaceWith.previous",
+          "when": "requality.shown.replaceWith.previous",
+          "group": "1@3"
+        }
+      ],
+      "requality.configureMenu": [
+        {
+          "command": "requality.configureProject",
+          "when": "requality.shown.configureProject"
+        }
+      ],
+      "commandPalette": [
+        {
+          "command": "requality.showView.explorer",
+          "when": "false"
+        },
+        {
+          "command": "requality.showView.properties",
+          "when": "false"
+        },
+        {
+          "command": "requality.showView.outline",
+          "when": "false"
+        },
+        {
+          "command": "requality.showView.links",
+          "when": "false"
+        },
+        {
+          "command": "requality.showView.todo",
+          "when": "false"
+        },
+        {
+          "command": "requality.showView.bookmarks",
+          "when": "false"
+        },
+        {
+          "command": "requality.showView.tasks",
+          "when": "false"
+        },
+        {
+          "command": "requality.showView.problems",
+          "when": "false"
+        },
+        {
+          "command": "requality.showView.progress",
+          "when": "false"
+        },
+        {
+          "command": "requality.showView.history",
+          "when": "false"
+        },
+        {
+          "command": "requality.showView.synchronize",
+          "when": "false"
+        },
+        {
+          "command": "requality.showView.other",
+          "when": "false"
+        },
+        {
+          "command": "requality.perspective.openOther",
+          "when": "false"
+        },
+        {
+          "command": "requality.recentFilters",
+          "when": "false"
+        },
+        {
+          "command": "requality.open",
+          "when": "false"
+        },
+        {
+          "command": "requality.showProperties",
+          "when": "false"
+        },
+        {
+          "command": "requality.properties",
+          "when": "false"
+        },
+        {
+          "command": "requality.new",
+          "when": "false"
+        },
+        {
+          "command": "requality.createRequirement",
+          "when": "false"
+        },
+        {
+          "command": "requality.createTextNode",
+          "when": "false"
+        },
+        {
+          "command": "requality.createTestPurpose",
+          "when": "false"
+        },
+        {
+          "command": "requality.createComment",
+          "when": "false"
+        },
+        {
+          "command": "requality.createDocFolder",
+          "when": "false"
+        },
+        {
+          "command": "requality.createReportFolder",
+          "when": "false"
+        },
+        {
+          "command": "requality.createReportSettings",
+          "when": "false"
+        },
+        {
+          "command": "requality.createVirtualNode",
+          "when": "false"
+        },
+        {
+          "command": "requality.createNodeType",
+          "when": "false"
+        },
+        {
+          "command": "requality.createTest",
+          "when": "false"
+        },
+        {
+          "command": "requality.addRefTo",
+          "when": "false"
+        },
+        {
+          "command": "requality.copyQId",
+          "when": "false"
+        },
+        {
+          "command": "requality.copy",
+          "when": "false"
+        },
+        {
+          "command": "requality.pasteInto",
+          "when": "false"
+        },
+        {
+          "command": "requality.pasteNear",
+          "when": "false"
+        },
+        {
+          "command": "requality.delete",
+          "when": "false"
+        },
+        {
+          "command": "requality.renameDocFolder",
+          "when": "false"
+        },
+        {
+          "command": "requality.renameProject",
+          "when": "false"
+        },
+        {
+          "command": "requality.rename",
+          "when": "false"
+        },
+        {
+          "command": "requality.showHiddenChildren",
+          "when": "false"
+        },
+        {
+          "command": "requality.hideVirtualNodes",
+          "when": "false"
+        },
+        {
+          "command": "requality.transferredStatus",
+          "when": "false"
+        },
+        {
+          "command": "requality.fixLocationsDescriptions",
+          "when": "false"
+        },
+        {
+          "command": "requality.forceCheckers",
+          "when": "false"
+        },
+        {
+          "command": "requality.deleteStatisticsFile",
+          "when": "false"
+        },
+        {
+          "command": "requality.checkers",
+          "when": "false"
+        },
+        {
+          "command": "requality.resetProblems",
+          "when": "false"
+        },
+        {
+          "command": "requality.openUniEditor",
+          "when": "false"
+        },
+        {
+          "command": "requality.openModuleEditor",
+          "when": "false"
+        },
+        {
+          "command": "requality.openReview",
+          "when": "false"
+        },
+        {
+          "command": "requality.openExternal.moduleEditor",
+          "when": "false"
+        },
+        {
+          "command": "requality.openExternal.uniEditor",
+          "when": "false"
+        },
+        {
+          "command": "requality.openExternal.markup",
+          "when": "false"
+        },
+        {
+          "command": "requality.openExternal.report",
+          "when": "false"
+        },
+        {
+          "command": "requality.findNext",
+          "when": "false"
+        },
+        {
+          "command": "requality.findPrevious",
+          "when": "false"
+        },
+        {
+          "command": "requality.docproc.saxHeaders",
+          "when": "false"
+        },
+        {
+          "command": "requality.docproc.updateDocument",
+          "when": "false"
+        },
+        {
+          "command": "requality.docproc.textToReq",
+          "when": "false"
+        },
+        {
+          "command": "requality.docproc.updateFromLibreOffice",
+          "when": "false"
+        },
+        {
+          "command": "requality.docproc.oldMarkup",
+          "when": "false"
+        },
+        {
+          "command": "requality.docproc.paramExtraction",
+          "when": "false"
+        },
+        {
+          "command": "requality.generateReport",
+          "when": "false"
+        },
+        {
+          "command": "requality.exportReport",
+          "when": "false"
+        },
+        {
+          "command": "requality.exportToOdt",
+          "when": "false"
+        },
+        {
+          "command": "requality.coverageSettings",
+          "when": "false"
+        },
+        {
+          "command": "requality.progressSettings",
+          "when": "false"
+        },
+        {
+          "command": "requality.traceabilitySettings",
+          "when": "false"
+        },
+        {
+          "command": "requality.traceSettings",
+          "when": "false"
+        },
+        {
+          "command": "requality.tvSettings",
+          "when": "false"
+        },
+        {
+          "command": "requality.selectReferencedNode.oneLink",
+          "when": "false"
+        },
+        {
+          "command": "requality.selectReferencedNode.multiLink",
+          "when": "false"
+        },
+        {
+          "command": "requality.links.changeDirection.down",
+          "when": "false"
+        },
+        {
+          "command": "requality.links.changeDirection.up",
+          "when": "false"
+        },
+        {
+          "command": "requality.links.lightLinks.on",
+          "when": "false"
+        },
+        {
+          "command": "requality.project.copy",
+          "when": "false"
+        },
+        {
+          "command": "requality.project.paste",
+          "when": "false"
+        },
+        {
+          "command": "requality.project.delete",
+          "when": "false"
+        },
+        {
+          "command": "requality.project.move",
+          "when": "false"
+        },
+        {
+          "command": "requality.project.build",
+          "when": "false"
+        },
+        {
+          "command": "requality.project.refresh",
+          "when": "false"
+        },
+        {
+          "command": "requality.project.open",
+          "when": "false"
+        },
+        {
+          "command": "requality.project.close",
+          "when": "false"
+        },
+        {
+          "command": "requality.project.closeUnrelated",
+          "when": "false"
+        },
+        {
+          "command": "requality.goInto",
+          "when": "false"
+        },
+        {
+          "command": "requality.importAsProject",
+          "when": "false"
+        },
+        {
+          "command": "requality.goToProject",
+          "when": "false"
+        },
+        {
+          "command": "requality.import",
+          "when": "false"
+        },
+        {
+          "command": "requality.export",
+          "when": "false"
+        },
+        {
+          "command": "requality.edit.copy",
+          "when": "false"
+        },
+        {
+          "command": "requality.edit.paste",
+          "when": "false"
+        },
+        {
+          "command": "requality.edit.refresh",
+          "when": "false"
+        },
+        {
+          "command": "requality.openWith",
+          "when": "false"
+        },
+        {
+          "command": "requality.showIn",
+          "when": "false"
+        },
+        {
+          "command": "requality.properties.pin",
+          "when": "false"
+        },
+        {
+          "command": "requality.properties.unpin",
+          "when": "false"
+        },
+        {
+          "command": "requality.bookmarks.show",
+          "when": "false"
+        },
+        {
+          "command": "requality.bookmarks.sortBy",
+          "when": "false"
+        },
+        {
+          "command": "requality.bookmarks.filters",
+          "when": "false"
+        },
+        {
+          "command": "requality.bookmarks.columns",
+          "when": "false"
+        },
+        {
+          "command": "requality.tasks.show",
+          "when": "false"
+        },
+        {
+          "command": "requality.tasks.groupBy",
+          "when": "false"
+        },
+        {
+          "command": "requality.tasks.sortBy",
+          "when": "false"
+        },
+        {
+          "command": "requality.tasks.filters",
+          "when": "false"
+        },
+        {
+          "command": "requality.tasks.columns",
+          "when": "false"
+        },
+        {
+          "command": "requality.synchronize.synchronizations",
+          "when": "false"
+        },
+        {
+          "command": "requality.synchronize.pin",
+          "when": "false"
+        },
+        {
+          "command": "requality.synchronize.link",
+          "when": "false"
+        },
+        {
+          "command": "requality.synchronize.removeCurrent",
+          "when": "false"
+        },
+        {
+          "command": "requality.synchronize.removeUnpinned",
+          "when": "false"
+        },
+        {
+          "command": "requality.progress.removeAllFinished",
+          "when": "false"
+        },
+        {
+          "command": "requality.progress.preferences",
+          "when": "false"
+        },
+        {
+          "command": "requality.newResource.project",
+          "when": "false"
+        },
+        {
+          "command": "requality.newResource.folder",
+          "when": "false"
+        },
+        {
+          "command": "requality.newResource.file",
+          "when": "false"
+        },
+        {
+          "command": "requality.newResource.other",
+          "when": "false"
+        },
+        {
+          "command": "requality.workingSet.recent",
+          "when": "false"
+        },
+        {
+          "command": "requality.workingSet.topProjects",
+          "when": "false"
+        },
+        {
+          "command": "requality.workingSet.topWorkingSets",
+          "when": "false"
+        },
+        {
+          "command": "requality.explorer.back",
+          "when": "false"
+        },
+        {
+          "command": "requality.explorer.forward",
+          "when": "false"
+        },
+        {
+          "command": "requality.explorer.up",
+          "when": "false"
+        },
+        {
+          "command": "requality.configureProject",
+          "when": "false"
+        },
+        {
+          "command": "requality.team.applyPatch",
+          "when": "false"
+        },
+        {
+          "command": "requality.team.showLocalHistory",
+          "when": "false"
+        },
+        {
+          "command": "requality.team.shareProject",
+          "when": "false"
+        },
+        {
+          "command": "requality.team.importProjectSet",
+          "when": "false"
+        },
+        {
+          "command": "requality.compareWith.eachOther",
+          "when": "false"
+        },
+        {
+          "command": "requality.compareWith.localHistory",
+          "when": "false"
+        },
+        {
+          "command": "requality.compareWith.clipboard",
+          "when": "false"
+        },
+        {
+          "command": "requality.replaceWith.localHistory",
+          "when": "false"
+        },
+        {
+          "command": "requality.replaceWith.previous",
+          "when": "false"
+        },
+        {
+          "command": "requality.replaceWith.clipboard",
+          "when": "false"
+        },
+        {
+          "command": "requality.restoreFromLocalHistory",
+          "when": "false"
+        },
+        {
+          "command": "requality.explorer.collapseAll",
+          "when": "config.requality.explorer.view != native"
+        }
+      ]
+    },
+    "keybindings": [
+      {
+        "command": "requality.openBindings",
+        "key": "ctrl+r",
+        "mac": "cmd+r",
+        "when": "focusedView == requality.explorer || requality.focusedView == requality.explorerView"
+      },
+      {
+        "command": "requality.findNext",
+        "key": "ctrl+k",
+        "mac": "cmd+k",
+        "when": "activeWebviewPanelId == requality.markup"
+      },
+      {
+        "command": "requality.findPrevious",
+        "key": "ctrl+shift+k",
+        "mac": "cmd+shift+k",
+        "when": "activeWebviewPanelId == requality.markup"
+      },
+      {
+        "command": "requality.delete",
+        "key": "delete",
+        "mac": "cmd+backspace",
+        "when": "focusedView == requality.explorer || requality.focusedView == requality.explorerView"
+      },
+      {
+        "command": "requality.edit.copy",
+        "key": "ctrl+c",
+        "mac": "cmd+c",
+        "when": "focusedView == requality.explorer || requality.focusedView == requality.explorerView"
+      },
+      {
+        "command": "requality.edit.paste",
+        "key": "ctrl+v",
+        "mac": "cmd+v",
+        "when": "focusedView == requality.explorer || requality.focusedView == requality.explorerView"
+      },
+      {
+        "command": "requality.edit.refresh",
+        "key": "f5",
+        "when": "focusedView == requality.explorer || requality.focusedView == requality.explorerView"
+      },
+      {
+        "command": "requality.buildAll",
+        "key": "ctrl+b",
+        "mac": "cmd+b",
+        "when": "focusedView == requality.explorer || requality.focusedView == requality.explorerView"
+      },
+      {
+        "command": "requality.find",
+        "key": "ctrl+f",
+        "mac": "cmd+f",
+        "when": "focusedView == requality.explorer || requality.focusedView == requality.explorerView"
+      },
+      {
+        "command": "requality.undo",
+        "key": "ctrl+z",
+        "mac": "cmd+z",
+        "when": "focusedView == requality.explorer || requality.focusedView == requality.explorerView || focusedView == requality.links || requality.focusedView == requality.links"
+      },
+      {
+        "command": "requality.redo",
+        "key": "ctrl+y",
+        "mac": "cmd+shift+z",
+        "when": "focusedView == requality.explorer || requality.focusedView == requality.explorerView || focusedView == requality.links || requality.focusedView == requality.links"
+      },
+      {
+        "command": "requality.properties",
+        "key": "alt+enter",
+        "when": "focusedView == requality.explorer || requality.focusedView == requality.explorerView"
+      },
+      {
+        "command": "requality.showIn",
+        "key": "alt+shift+w",
+        "when": "focusedView == requality.explorer || requality.focusedView == requality.explorerView"
+      },
+      {
+        "command": "requality.newWizard",
+        "key": "ctrl+n",
+        "mac": "cmd+n",
+        "when": "focusedView == requality.explorer || requality.focusedView == requality.explorerView"
+      },
+      {
+        "command": "requality.properties",
+        "key": "cmd+i",
+        "when": "isMac && (focusedView == requality.explorer || requality.focusedView == requality.explorerView)"
+      },
+      {
+        "command": "requality.rename",
+        "key": "f2",
+        "when": "focusedView == requality.explorer || requality.focusedView == requality.explorerView"
+      },
+      {
+        "command": "workbench.action.openView",
+        "key": "alt+shift+q q",
+        "mac": "cmd+alt+q q"
+      },
+      {
+        "command": "requality.problems.focus",
+        "key": "alt+shift+q x",
+        "mac": "cmd+alt+q x"
+      },
+      {
+        "command": "requality.outline.focus",
+        "key": "alt+shift+q o",
+        "mac": "cmd+alt+q o"
+      },
+      {
+        "command": "requality.synchronize.focus",
+        "key": "alt+shift+q y",
+        "mac": "cmd+alt+q y"
+      },
+      {
+        "command": "requality.history.focus",
+        "key": "alt+shift+q z",
+        "mac": "cmd+alt+q z"
+      }
+    ],
+    "colors": [
+      {
+        "id": "requality.decoration.linkedFrom",
+        "description": "Requality Links Explorer: nodes referencing the selection (LinksDecorator).",
+        "defaults": {
+          "light": "#ff81a3",
+          "dark": "#ff81a3",
+          "highContrast": "#ff81a3"
+        }
+      },
+      {
+        "id": "requality.decoration.linkedTo",
+        "description": "Requality Links Explorer: nodes referenced by the selection (LinksDecorator).",
+        "defaults": {
+          "light": "#3b8fc7",
+          "dark": "#abddfa",
+          "highContrast": "#abddfa"
+        }
+      },
+      {
+        "id": "requality.decoration.referenceTarget",
+        "description": "Selected reference target (SelectedRefTargetDecorator).",
+        "defaults": {
+          "light": "#808080",
+          "dark": "#a0a0a0",
+          "highContrast": "#ffffff"
+        }
+      },
+      {
+        "id": "requality.decoration.repository",
+        "description": "Nodes not connected to the repository (RepoDecorator).",
+        "defaults": {
+          "light": "#646464",
+          "dark": "#9a9a9a",
+          "highContrast": "#ffffff"
+        }
+      }
+    ],
+    "configuration": {
+      "title": "Requality",
+      "properties": {
+        "requality.java.home": {
+          "type": "string",
+          "default": "",
+          "scope": "machine",
+          "markdownDescription": "JDK/JRE (17 or newer) used to run the Requality server. Empty: `JAVA_HOME`, then `java` on `PATH`."
+        },
+        "requality.server.maxHeap": {
+          "type": "string",
+          "default": "2g",
+          "scope": "machine",
+          "description": "Maximum Java heap of the Requality server (-Xmx)."
+        },
+        "requality.libreOfficePath": {
+          "type": "string",
+          "default": "soffice",
+          "scope": "machine",
+          "description": "Path to libreoffice(v5+) soffice."
+        },
+        "requality.imageMagickPath": {
+          "type": "string",
+          "default": "",
+          "scope": "machine",
+          "description": "Path to ImageMagick."
+        },
+        "requality.globalCacheLocation": {
+          "type": "string",
+          "default": "",
+          "scope": "machine",
+          "description": "Global cache location."
+        },
+        "requality.debugLevel": {
+          "type": "integer",
+          "default": 0,
+          "minimum": 0,
+          "maximum": 10,
+          "description": "Requality core debug level (Eclipse -debug)."
+        },
+        "requality.explorer.view": {
+          "type": "string",
+          "enum": [
+            "eclipse",
+            "native"
+          ],
+          "default": "eclipse",
+          "enumDescriptions": [
+            "The view of the Eclipse plug-in (RequalityCNF): its tree with the images and colors of the explorer, its popup menu, drag and drop with Shift, Ctrl and Alt, and its key bindings.",
+            "A VS Code tree with the items of the explorer and the commands of its popup menu (VS Code reports no modifier keys of a drop: the kind of drop is picked)."
+          ],
+          "description": "How the Requality Explorer is shown. Changing it restarts the Requality server."
+        },
+        "requality.explorer.linkWithEditor": {
+          "type": "boolean",
+          "default": true,
+          "description": "Link the Requality Explorer selection with the active editor."
+        },
+        "requality.window.title": {
+          "type": "boolean",
+          "default": true,
+          "description": "Use the window title of Eclipse (workspace name, perspective, active editor, location and product, as Preferences > General > Workspace selects them) as the title of the VS Code window (the window.title setting of the workspace; a title you set there yourself is kept)."
+        },
+        "requality.explorer.filters": {
+          "type": "object",
+          "default": {},
+          "description": "Requality Explorer filters (true = hide).",
+          "properties": {
+            "documents": {
+              "type": "boolean",
+              "default": false,
+              "description": "Document Filter"
+            },
+            "requirements": {
+              "type": "boolean",
+              "default": false,
+              "description": "Requirement Filter"
+            },
+            "types": {
+              "type": "boolean",
+              "default": true,
+              "description": "Types Filter"
+            },
+            "locations": {
+              "type": "boolean",
+              "default": true,
+              "description": "Locations Filter"
+            },
+            "reportData": {
+              "type": "boolean",
+              "default": false,
+              "description": "Report Data Filter"
+            },
+            "comments": {
+              "type": "boolean",
+              "default": false,
+              "description": "Comment Filter"
+            },
+            "restrictedFolders": {
+              "type": "boolean",
+              "default": true,
+              "description": "Restricted Folders Filter"
+            },
+            "instancesFolders": {
+              "type": "boolean",
+              "default": true,
+              "description": "Instances Folder Filter"
+            },
+            "resourcesInRequalityProjects": {
+              "type": "boolean",
+              "default": true,
+              "description": "Resource in Requality Project Filter (a catalog shows its nodes, not its files)"
+            },
+            "startsWithDot": {
+              "type": "boolean",
+              "default": true,
+              "description": ".* resources"
+            },
+            "endsWithClass": {
+              "type": "boolean",
+              "default": false,
+              "description": "*.class resources"
+            },
+            "closedProjects": {
+              "type": "boolean",
+              "default": false,
+              "description": "Closed projects"
+            }
+          }
+        },
+        "requality.explorer.contentExtensions": {
+          "type": "object",
+          "default": {},
+          "description": "Requality Explorer content extensions (Filters and Customization > Content): id -> active."
+        },
+        "requality.explorer.userFilters": {
+          "type": "array",
+          "default": [],
+          "description": "Requality Explorer user filters (Filters and Customization > User filters): resources whose names match an enabled pattern are hidden.",
+          "items": {
+            "type": "object",
+            "properties": {
+              "pattern": {
+                "type": "string"
+              },
+              "enabled": {
+                "type": "boolean"
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "scripts": {
+    "clean": "node -e \"require('fs').rmSync('out',{recursive:true,force:true})\"",
+    "compile": "npm run clean && tsc -p .",
+    "watch": "tsc -watch -p .",
+    "build:server": "node scripts/gradle.js dist --console=plain -q",
+    "build": "npm run build:server && npm run compile",
+    "test:server": "node scripts/gradle.js test --console=plain",
+    "test:unit": "npm run compile && node --test \"out/test/unit/**/*.test.js\"",
+    "test:integration": "npm run compile && node out/test/runIntegration.js",
+    "test": "npm run build:server && npm run test:server && npm run test:unit && npm run test:integration",
+    "manifest": "python3 scripts/gen-manifest.py",
+    "vscode:prepublish": "node scripts/prepublish.js",
+    "package": "vsce package --githubBranch main --out requality-vscode-1.4.0.vsix",
+    "check": "tsc -p . --noEmit",
+    "package:platforms": "node scripts/package-platforms.js",
+    "media": "npm run compile && node out/test/media/run.js"
+  },
+  "dependencies": {
+    "vscode-jsonrpc": "8.2.1"
+  },
+  "devDependencies": {
+    "@types/jsdom": "21.1.7",
+    "@types/node": "22.20.5",
+    "@types/vscode": "1.95.0",
+    "@vscode/test-electron": "3.1.0",
+    "@vscode/vsce": "4.0.0",
+    "jsdom": "26.1.0",
+    "typescript": "5.9.3"
+  }
+}

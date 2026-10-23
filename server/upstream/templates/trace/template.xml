@@ -1,0 +1,18 @@
+<?xml version="1.0" ?>
+<report start="trace.ftl" order="20" id="com.unitesk.requality.reports.trace" name="Двунаправленная визуализация связей" read-only = "true" group="links">
+    <description>Для просмотра связей в двух направлениях одновременно.</description>
+    <template source="trace.ftl" location="{project_name}-trace.html" class = "com.unitesk.requality.report.TraceabilityDataSource"/>
+	<gui>
+	    <button command="com.unitesk.requality.TraceSettings" text="Open Settings"/>
+	</gui>
+	<param name="filter" type="FILTER,STRING" defaultValue="*" description="Filter for reference attribute names to be included in report. May startswith or endswith *."/>
+	<param name="attrFilter" type="LIST[STRING]" description="Attributes filter.//TODO found out what it means">
+			<defaultValue>{
+            "atype": "LIST",
+            "value": [
+                {"value": "Вид"},
+                {"value": "Производное"}
+            ]
+        }</defaultValue>
+	</param>
+</report>

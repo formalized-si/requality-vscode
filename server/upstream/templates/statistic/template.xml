@@ -1,0 +1,23 @@
+<?xml version="1.0" ?>
+<report start="progress.ftl" order="20" id="com.unitesk.requality.reports.statistic" name="Прогресс по проекту" read-only = "true" allowsCrossProject="false" group="extra" allowsGlobal="true" usesStatistics="true">
+    <description>Для анализа изменения количества требований и тестовых ситуаций на основе истории коммитов.</description>
+    <template source="progress.ftl" location="{project_name}-progress.html"/>
+    <template source="stat.ftl" location="{project_name}-stat.html"/>
+    <gui>
+    	<button command="com.unitesk.reqcoverage.BuildCoverageWizard" text="Update Сoverage Source"/>
+    	<button command="com.unitesk.requality.ProgressSettings" text="Open Settings"/>
+    </gui>    
+    <param name="dateFrom" type="DATE,STRING" description="Statistics will be filtered from this date. Example &quot;Wed Nov 24 18:39:39 MSK 2021&quot;. Not presented by default."/>
+    <param name="dateTo" type="DATE,STRING" description="Statistics will be filtered up to this date. Example &quot;Wed Nov 24 18:39:39 MSK 2021&quot;. Not presented by default."/>
+    <param name="step" defaultValue="1 week" description="Step on which data will be collected. Value may include &quot;day&quot;, &quot;week&quot;, &quot;year&quot;, &quot;month&quot; notation. Example &quot;1 week 2 day&quot;. Shoren versions like &quot;d&quot;,&quot;w&quot;,&quot;y&quot;,&quot;m&quot; are also supported."/>
+
+    <param name="coverageSettings" type="COVERAGE,LIST[STRING]" description="Coverage settings. May include coverageFilePath or pair coverageStorageType and coverageStorageSettings">
+    	<or>
+	    	<attribute name="coverageFilePath" description="Path to file with coverage info"/>
+	    	<and>
+	    		<attribute name="coverageStorageType" description="Type of coverage info source"/>
+	    		<attribute name="coverageStorageSettings" description="Coverage info source-related settings. Will depend on source type. Separator is |"/>
+	    	</and>
+    	</or>
+    </param>
+</report>

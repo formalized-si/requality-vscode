@@ -1,0 +1,315 @@
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml">
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+<title>Requirements and Text Nodes</title>
+<script type = "text/javascript">
+var constructNodeChildren = [];
+</script>
+<script type="text/javascript" src="varStorage.js" defer></script>
+<script type="text/javascript" src="consts.js"></script>
+<script type="text/javascript" src="jquery/jquery.js"></script>
+<script type="text/javascript" src="jquery/jquery.actual.js"></script>
+<script type="text/javascript" src="jquery-scrolltofixed.js"></script>
+<script type="text/javascript" src="ckeditor/ckeditor.js"></script>
+<link rel="stylesheet" type="text/css" href="searchBar.css" />
+<script type="text/javascript" src="searchBar.js" defer = "true"></script>
+
+<script type="text/javascript" src="socketsHandlersEditors.js" defer = "true"></script>
+<script type="text/javascript" src="sockets.js" defer = "true"></script>
+<script type="text/javascript" src="jseditor.js" defer = "true"></script>
+
+<script type="text/javascript" src="unieditor_hotkeys.js" defer = "true"></script>
+<script type="text/javascript" src="hotkeys.js" defer = "true"></script>
+<script type="text/javascript" src="moduleeditor_script.js" defer = "true"></script>
+<link rel="stylesheet" type="text/css" href="hotkeys.css" />
+<!-- 
+<script type="text/javascript" src="testdb.js"></script>
+<link rel="stylesheet" type="text/css" href="testdb.css" />--> 
+<style type="text/css">
+    [class*="-attribute-"] table,
+    [class*="-attribute-"] th,
+    [class*="-attribute-"] td,
+    [id*="-attribute-"] table,
+    [id*="-attribute-"] th,
+    [id*="-attribute-"] td { border: 1px solid black; }
+    [class*="-attribute-"] table,
+    [id*="-attribute-"] table { border-collapse: collapse; margin-top: 5mm }
+
+	body {
+		font-family: sans-serif;
+	}
+	div.indent {
+		border-left: solid 1px transparent;
+		margin-bottom: 0;
+		margin-right: 0;
+		display: block;
+	}
+	img.plusminus {
+		cursor: pointer;
+		margin-left: -18px;
+		float: left;
+		width: 9px;
+		height: 9px;
+	}
+	img.imgstatus {
+		cursor: pointer;
+		border: solid 1px transparent;
+		border-radius: 3px;
+		-moz-border-radius: 3px;
+		-webkit-border-radius: 3px;
+		padding: 4px;
+	}
+	.toolsPanel{
+		position: fixed;
+		top: 0;
+		left:0;
+    	width: 100%;
+    	background-color: #dbe3f6;
+		padding: 10px;
+		zIndex: 999;
+	}
+	.hiddenPoint{
+		height:0px;
+	    overflow: hidden;
+	    display:none; 
+	}
+	.dummy{
+		min-height:100px;
+		border: solid 1px gray;
+	}
+	.toolsButton{
+		border: solid 1px gray;
+		cursor: pointer;
+		border-radius: 3px;
+		-moz-border-radius: 3px;
+		-webkit-border-radius: 3px;
+		margin: 6px;
+		padding: 4px;
+		background-color: #e9f1fa;
+		background-image: linear-gradient(bottom, #dbe3f6 0%, #f7ffff 100%);
+		background-image: -moz-linear-gradient(bottom, #dbe3f6 0%, #f7ffff 100%);
+		background-image: -webkit-linear-gradient(bottom, #dbe3f6 0%, #f7ffff 100%);
+	}
+	img.imgstatus:hover {
+		background-color: #f7f7ff;
+		border-color: #c0c0c0;
+	}
+	.nodectrls, .nodectrls-virtual {
+		padding: 2px;
+		background-color: #e9f1fa;
+		background-image: linear-gradient(bottom, #dbe3f6 0%, #f7ffff 100%);
+		background-image: -moz-linear-gradient(bottom, #dbe3f6 0%, #f7ffff 100%);
+		background-image: -webkit-linear-gradient(bottom, #dbe3f6 0%, #f7ffff 100%);
+		border: solid 1px #c0c0c0;
+		border-radius: 3px;
+		-moz-border-radius: 3px;
+		-webkit-border-radius: 3px;
+	}
+	.indent{
+		margin-left: -1px;
+	}
+	.reqctrls {
+		margin-right: 3px;
+	}
+	.cmtctrls {
+		 margin: 3px 3px 0 0;
+	}
+	td.extraAttrsC{
+		width: 160px;
+		vertical-align: top;
+	}
+	span.extraAttrsC{
+		vertical-align: top;
+		float:left;
+		display: block;
+		width: 160px;
+	}
+	.extraAttrs{
+		vertical-align: top;
+		float:left;
+		display: block;
+		
+		width: 160px;
+	}
+	.menu {
+		padding: 2px;
+	}
+	.menu-item > table, .menu-item-disabled > table {
+		width: 100%;
+		border: none;
+		border-collapse: collapse;
+	}
+	.menu-item > table > tbody > tr > td, .menu-item-disabled > table > tbody > tr > td {
+		border: none;
+	}
+	.menu-item, .menu-item-disabled {
+		white-space: nowrap;
+		font-size: 75%;
+		padding: 2px;
+		border: solid 1px transparent;
+		border-radius: 3px;
+		-moz-border-radius: 3px;
+		-webkit-border-radius: 3px;
+	}
+	.menu-item {
+		cursor: pointer;
+		color: #4040c0;
+	}
+	.menu-item-disabled {
+		cursor: default;
+		color: #808080;
+	}
+	.menu-item:hover {
+		border-color: #a0a0d0;
+		background-color: #d0e0f0;
+	}
+	.menu-item > img, .menu-item-disabled > img {
+		vertical-align: text-bottom;
+	}
+	div.supported-node .nodectrls {
+		visibility: hidden;
+	}
+	div.supported-node:hover .nodectrls {
+		visibility: visible;
+	}
+	.reditable, .nonreditable, .renamable, .nonrenamable {
+		padding: 2px;
+		border: solid 1px transparent;
+		border-radius: 4px;
+		-moz-border-radius: 4px;
+		-webkit-border-radius: 4px;
+		min-height:1.2em;
+	}
+	.reditable:hover, .renamable:hover{
+		padding: 2px;
+		border: solid 1px gray;
+		border-radius: 4px;
+		-moz-border-radius: 4px;
+		-webkit-border-radius: 4px;
+		min-height:1.2em;
+	}
+	
+	.focused .reditable, .focused .renamable {
+		cursor: pointer;
+	}
+	.focused .reditable:hover, .focused .renamable:hover {
+		background-color: #f7f7ff;
+		border: solid 1px #c0c0c0;
+	}
+	.requirement {
+		min-width: '100%-';
+		border: solid 1px transparent;
+		border-radius: 4px;
+		-moz-border-radius: 4px;
+		-webkit-border-radius: 4px;
+		margin: 0.1em;
+		overflow: hidden;
+	}
+	
+	.instancer { 
+		min-width: '100%-';
+		border: solid 0px transparent;
+	}
+	.dropable {
+		background-color: #efffff;
+		border-color: #4f6f8f;
+	}
+	.disabled {
+		opacity: 0.4;
+	}
+	.reditable > p, .nonreditable > p {
+		margin: 0;
+	}
+	.textnode > .tndesc {
+		min-height: 18px;
+		min-width: '100%-';
+		padding:0px;
+		overflow: hidden;
+		margin:0px;
+	}
+	.textnode {
+		min-width: '100%-';
+		min-height: 28px;
+		margin: 0.1em;
+	}
+	
+	.supported-node:hover, .supported-node-hovered {
+		border: solid 1px #a0a0a0;
+	}
+	.unsupported-node {
+		margin: 1em;
+		padding: 0.3em;
+		border: solid 1px #004080;
+		border-radius: 4px;
+		-moz-border-radius: 4px;
+		-webkit-border-radius: 4px;
+	}
+	.focused {
+		background-color: #ffefff;
+		border: solid 1px #ff0000;
+	}
+	.focused:hover {
+		border: solid 1px #ff0000;
+	}
+	table.attributes {
+		border: solid 1px gray;
+		background: #f3f3f3;
+		border-collapse: collapse;
+	}
+	table.attributes > tbody > tr > th {
+		border: solid 1px gray;
+		background: #e0e0e0;
+	}
+	table.attributes > tbody > tr > td {
+		font-family: monospace;
+		border: solid 1px gray;
+	}
+	.linkspan {
+        font-weight: bold;
+        border: solid 1px #7f7f7f;
+        border-radius: 3px;
+        -moz-border-radius: 3px;
+        -webkit-border-radius: 3px;
+        cursor: pointer;
+        text-align: center;
+    }
+    .linkspan:hover{
+        color:#aaaaFF;
+        cursor:pointer;
+    }
+    .clickable {
+        color: #0000FF;
+        text-decoration:underline;
+        cursor: hand; 
+        cursor: pointer;
+    }
+    .editedline {
+		height: 1.2em;
+	}
+	
+	.focusedline {
+		height: 0.14em;
+		background-color: #f0f0f0;
+		border: solid 1px transparent;
+	}
+	.focusedline:hover {
+		visibility: visible;
+		border: solid 1px #ff0000;
+	}
+</style>
+
+</head>
+<body>
+<div id="contents" style="padding-top:40px; margin-left:10px;padding-bottom:10em"></div>
+<div style="height: 6em;"></div>
+<div id="toolsPanel" class="toolsPanel"><span class="toolsButton" onclick="openTemplates(selectedNode)">Templates</span> <span id="readOnlyInfo" class ="hiddenPoint">Some actions are performed, this editor is in read-only mode.</span> </div>
+<script type="text/javascript">
+   window.inited = true;
+     window.addEventListener('DOMContentLoaded',  function() {
+    	$('.toolsPanel').scrollToFixed();
+   		sendInited();
+   	 });
+</script>
+</body>
+</html>

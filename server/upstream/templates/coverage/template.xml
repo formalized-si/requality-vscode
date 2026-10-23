@@ -1,0 +1,19 @@
+<?xml version="1.0" ?>
+<report start="cov.ftl" order="40" id="com.unitesk.requality.reports.coverage" 
+name="Анализ покрытия требований" read-only = "true" group="typical">
+	<description>Для анализа трассируемости между требованиями и тестами/исходным кодом.</description>
+    <template source="cov.ftl" location="{project_name}-cov.html"/>
+    <gui>
+    	<button command="com.unitesk.reqcoverage.BuildCoverageWizard" text="Update Сoverage Source"/>
+    	<button command="com.unitesk.reqcoverage.OpenCoverageSettings" text="Open Settings"/>
+    </gui>
+    <param name="noAddTestButtons" type="BOOL" defaultValue="false" description="If true then hide all buttons Add test."/>
+    <param name="testIdFormula" defaultValue="path" description="Formula for showing text on covering test. Default value includs raw path from coverage source."/>
+    
+    <param name="coverageSettings" type="COVERAGE,LIST[STRING]" description="Coverage settings. May include coverageFilePath or pair coverageStorageType and coverageStorageSettings">
+   		<attribute name="coverageStorageType" description="Type of coverage info source" type="COVERAGE_SOURCE_ID,STRING">
+   			<paramDataSource provider="_coverageSources"/>
+   		</attribute>
+   		<attribute name="coverageStorageSettings" description="Coverage info source-related settings. Will depend on source type. Separator is ," type="COVERAGE_SOURCE_DATA,STRING"/>
+    </param>
+</report>

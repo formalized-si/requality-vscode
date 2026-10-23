@@ -1,0 +1,78 @@
+name: Verify extension
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        vscode: ['1.95.0', '1.106.0', 'stable']
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      # The Requality server (Gradle build and runtime) needs Java 17 or newer.
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 21
+      - run: npm ci
+      - run: npm run check
+      - run: npm run build
+      - run: npm run test:server
+      - run: npm run test:unit
+      - run: xvfb-run -a npm run test:integration
+        env:
+          VSCODE_TEST_VERSION: ${{ matrix.vscode }}
+          REQUALITY_IT_LOG: ${{ runner.temp }}/extension.log
+      - run: npm run package
+      - uses: actions/upload-artifact@v4
+        with:
+          name: requality-vscode-${{ matrix.vscode }}
+          path: '*.vsix'
+      # The reports of the server tests (with the output of the server) and the extension log, for a failed run.
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: test-reports-${{ matrix.vscode }}
+          path: |
+            server/build/test-results/test/*.xml
+            ${{ runner.temp }}/extension.log
+          if-no-files-found: ignore
+  # The plug-in on Windows: the server (its Windows branch reads the registry of the system with the reg tool, the test
+  # compares it with PowerShell), the renderer and the extension in VS Code for Windows.
+  verify-windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 21
+      - run: npm ci
+      - run: npm run check
+      - run: npm run build
+      - run: npm run test:server
+      - run: npm run test:unit
+      - run: npm run test:integration
+        env:
+          VSCODE_TEST_VERSION: stable
+          REQUALITY_IT_LOG: ${{ runner.temp }}/extension.log
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: test-reports-windows
+          path: |
+            server/build/test-results/test/*.xml
+            ${{ runner.temp }}/extension.log
+          if-no-files-found: ignore

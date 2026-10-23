@@ -1,0 +1,684 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml">
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+<title>LibreOffice update dialog</title>
+<script type="text/javascript" src="unieditor_hotkeys.js"></script>
+<script type="text/javascript" src="jquery/jquery.js"></script>
+<script type="text/javascript" src="jquery/jquery.actual.js"></script>
+<script type="text/javascript" src="ckeditor/ckeditor.js"></script>
+<script type="text/javascript" src="ckeditor/adapters/jquery.js"></script>
+<script type="text/javascript" src="blackbird/blackbird.js"></script>
+<link   type="text/css" rel="Stylesheet" href="blackbird/blackbird.css" />
+
+<script type="text/javascript" src="jseditor.js"></script>
+
+<script type="text/javascript" src="hotkeys.js"></script>
+<link rel="stylesheet" type="text/css" href="hotkeys.css" />
+
+<style type="text/css">
+	body {
+		font-family: sans-serif;
+	}
+	blockquote.indent {
+		border-left: solid 1px transparent;
+		padding-left: 5px;
+		margin-bottom: 0;
+		margin-right: 0;
+		display: block;
+	}
+	blockquote.collapsable {
+		border-left: dotted 1px black;
+	}
+	img.plusminus {
+		cursor: pointer;
+		margin-left: -18px;
+		float: left;
+		width: 9px;
+		height: 9px;
+	}
+	img.imgstatus {
+		cursor: pointer;
+		border: solid 1px transparent;
+		border-radius: 3px;
+		-moz-border-radius: 3px;
+		-webkit-border-radius: 3px;
+		padding: 4px;
+	}
+	.toolsPanel{
+		position: fixed;
+		top: 0;
+		left:0;
+    	width: 100%;
+    	background-color: #dbe3f6;
+		padding: 10px;
+	}
+	.toolsButton{
+		border: solid 1px gray;
+		cursor: pointer;
+		border-radius: 3px;
+		-moz-border-radius: 3px;
+		-webkit-border-radius: 3px;
+		margin: 6px;
+		padding: 4px;
+		background-color: #e9f1fa;
+		background-image: linear-gradient(bottom, #dbe3f6 0%, #f7ffff 100%);
+		background-image: -moz-linear-gradient(bottom, #dbe3f6 0%, #f7ffff 100%);
+		background-image: -webkit-linear-gradient(bottom, #dbe3f6 0%, #f7ffff 100%);
+	}
+	img.imgstatus:hover {
+		background-color: #f7f7ff;
+		border-color: #c0c0c0;
+	}
+	.nodectrls, .nodectrls-virtual {
+		padding: 2px;
+		background-color: #e9f1fa;
+		background-image: linear-gradient(bottom, #dbe3f6 0%, #f7ffff 100%);
+		background-image: -moz-linear-gradient(bottom, #dbe3f6 0%, #f7ffff 100%);
+		background-image: -webkit-linear-gradient(bottom, #dbe3f6 0%, #f7ffff 100%);
+		border: solid 1px #c0c0c0;
+		border-radius: 3px;
+		-moz-border-radius: 3px;
+		-webkit-border-radius: 3px;
+	}
+	.reqctrls {
+		margin-right: 3px;
+	}
+	.cmtctrls {
+		 margin: 3px 3px 0 0;
+	}
+	.menu {
+		padding: 2px;
+	}
+	.menu-item > table, .menu-item-disabled > table {
+		width: 100%;
+		border: none;
+		border-collapse: collapse;
+	}
+	.menu-item > table > tbody > tr > td, .menu-item-disabled > table > tbody > tr > td {
+		border: none;
+	}
+	.menu-item, .menu-item-disabled {
+		white-space: nowrap;
+		font-size: 75%;
+		padding: 2px;
+		border: solid 1px transparent;
+		border-radius: 3px;
+		-moz-border-radius: 3px;
+		-webkit-border-radius: 3px;
+	}
+	.menu-item {
+		cursor: pointer;
+		color: #4040c0;
+	}
+	.menu-item-disabled {
+		cursor: default;
+		color: #808080;
+	}
+	.menu-item:hover {
+		border-color: #a0a0d0;
+		background-color: #d0e0f0;
+	}
+	.menu-item > img, .menu-item-disabled > img {
+		vertical-align: text-bottom;
+	}
+	div.supported-node .nodectrls {
+		visibility: hidden;
+	}
+	div.supported-node:hover .nodectrls {
+		visibility: visible;
+	}
+	.reqname {
+		font-weight: bold;
+		font-size: 125%;
+	}
+	.reditable, .nonreditable, .renamable, .nonrenamable {
+		padding: 2px;
+		border: solid 1px transparent;
+		border-radius: 4px;
+		-moz-border-radius: 4px;
+		-webkit-border-radius: 4px;
+		min-height:1.2em;
+	}
+	.reditable:hover, .renamable:hover{
+		padding: 2px;
+		border: solid 1px gray;
+		border-radius: 4px;
+		-moz-border-radius: 4px;
+		-webkit-border-radius: 4px;
+		min-height:1.2em;
+	}
+	
+	.focused .reditable, .focused .renamable {
+		cursor: pointer;
+	}
+	.focused .reditable:hover, .focused .renamable:hover {
+		background-color: #f7f7ff;
+		border: solid 1px #c0c0c0;
+	}
+	.requirement {
+		min-width: 100%;
+		border: solid 1px transparent;
+		border-radius: 4px;
+		margin-right: 0.5em;
+		-moz-border-radius: 4px;
+		-webkit-border-radius: 4px;
+	}
+	
+	.instancer { 
+		min-width: 100%;
+		border: solid 0px transparent;
+	}
+	.droppable {
+		background-color: #efffff;
+		border-color: #4f6f8f;
+	}
+	.disabled {
+		opacity: 0.4;
+	}
+	.reditable > p, .nonreditable > p {
+		margin: 0;
+	}
+	.comment {
+		min-width: 100%;
+		min-height: 28px;
+		margin: 0.5em 0.5em 0.5em 3em;
+		background: #e0f0ff;
+		border: solid 1px #004080;
+		border-radius: 8px;
+		-moz-border-radius: 8px;
+		-webkit-border-radius: 8px;
+	}
+	.comment > .cmtdesc {
+		min-height: 18px;
+		margin: 2px;
+		font-size: 75%;
+		font-style: italic;
+	}
+	.textnode > .tndesc {
+		min-height: 18px;
+		min-width: 100%;
+		padding:0px;
+		margin:0px;
+	}
+	.textnode {
+		min-width: 100%;
+		min-height: 28px;
+		margin: 0.5em 0.5em 0.5em 0.5em;
+	}
+	
+	.supported-node:hover, .supported-node-hovered {
+		border: solid 1px #a0a0a0;
+	}
+	.unsupported-node {
+		margin: 1em;
+		padding: 0.3em;
+		border: solid 1px #004080;
+		border-radius: 4px;
+		-moz-border-radius: 4px;
+		-webkit-border-radius: 4px;
+	}
+	.focused {
+		background-color: #ffefff;
+		border: solid 1px #ff0000;
+	}
+	.focused:hover {
+		border: solid 1px #ff0000;
+	}
+	.status-normal {
+		color: #000000;
+	}
+	.status-complete {
+		color: #a06000;
+	}
+	.status-verified {
+		color: #00a000;
+	}
+	table.attributes {
+		border: solid 1px gray;
+		background: #f3f3f3;
+		border-collapse: collapse;
+	}
+	table.attributes > tbody > tr > th {
+		border: solid 1px gray;
+		background: #e0e0e0;
+	}
+	table.attributes > tbody > tr > td {
+		font-family: monospace;
+		border: solid 1px gray;
+	}
+	.linkspan {
+        font-weight: bold;
+        border: solid 1px #7f7f7f;
+        border-radius: 3px;
+        -moz-border-radius: 3px;
+        -webkit-border-radius: 3px;
+        cursor: pointer;
+        text-align: center;
+    }
+    .linkspan:hover{
+        color:#aaaaFF;
+        cursor:pointer;
+    }
+    .clickable {
+        color: #0000FF;
+        text-decoration:underline;
+        cursor: hand; 
+        cursor: pointer;
+    }
+	
+</style>
+
+<script type="text/javascript">
+
+
+
+
+// Custom toolbar that includes only those tools that are useful,
+// plus two custom Requality buttons (Save, Exit).
+CKEDITOR.config.toolbar_Requality = [
+	{ name: 'document',    items : [ 'htmlSource', '-', 'RequalitySave', 'RequalityExit' ] },
+	{ name: 'clipboard',   items : [ 'SelectAll', 'Cut', 'Copy', 'Paste', 'PasteText', 'PasteFromWord', '-', 'Undo', 'Redo' ] },
+//tools for linking, now includes only link to Test Purpose	
+	{ name: 'linktp',      items : [ 'LinkTestPurpose' ] },
+	'/',
+	{ name: 'basicstyles', items : [ 'Bold', 'Italic', 'Underline', 'Strike', 'Subscript', 'Superscript', '-', 'RemoveFormat', '-', 'NumberedList', 'BulletedList' ] },
+	{ name: 'links',       items : [ 'Image', 'Link', 'Unlink', '-', 'Table', 'HorizontalRule', 'SpecialChar' ] }
+];
+
+allowedTypes = ["Requirement","TextNode","Comment","TestStep","TestPurpose","TestProcedure"];
+var attributeUpdate = {
+	'coverageStatus':function(uuid,name,raw,val){
+		attributeUpdate['_default'](uuid,"coverageStatus",raw,val);
+		var node = getNodeByUUID(uuid);
+		//changeStatus(uuid,node.attributes._type.value,val,true);
+		//onChangeNode(uuid);
+	},
+	'_id':function(uuid, name, raw, val){
+		var node = getNodeByUUID(uuid);
+		node.id=raw;
+		var id = getNameOrId(node);
+		attributeUpdate['_default'](uuid,"_nameOrId",id,id);
+	},
+	'_type':function(uuid, name, raw, val){
+		var node = getNodeByUUID(uuid);
+		node.attributes._type={'value':val};
+		onChangeNode(uuid,false);
+	},
+	'_name':function(uuid, name, raw, val){
+		var node = getNodeByUUID(uuid);
+		node.attributes._name.newvalue=val;
+		node.attributes._name.value=raw;
+		var id = getNameOrId(node);
+		attributeUpdate['_default'](uuid,"_nameOrId",id,id);	
+	},
+	
+	'_default':function(uuid, name, raw, val){
+		var node = getNodeByUUID(uuid);
+		node.attributes[name]={'value':val};
+		var elem = document.getElementById(uuid+'-attribute-'+name);
+		//TODO raw
+		if(elem){
+			elem.innerHTML=val;
+		}
+	},
+	'_description':function(uuid,name,raw,val){
+		attributeUpdate['_default'](uuid,"_description",raw,val);
+		var des = getDescription(uuid);
+		attributeUpdate['_default'](uuid,"_vdescription",des,des);
+	},
+	'_textNodeType':function(uuid,name,raw,val){
+		var node = getNodeByUUID(uuid);
+		attributeUpdate['_default'](uuid,name,raw,val);
+		changeStatus(uuid,node.attributes._type.value,val,true);
+		//TODO more clever update
+		onChangeNode(uuid,false);
+	},
+	'_id':function(uuid, name, raw, val){
+		var node = getNodeByUUID(uuid);
+		node.id=val;
+		var id = getNameOrId(node);
+		attributeUpdate['_default'](uuid,"_nameOrId",id,id);
+	}
+};
+
+function toggleDescription(uuid, time, scilent) {
+	if(time === undefined)
+		time = animationPeriod;
+	var req_desc_div = $('#attribute-' + uuid+'-_vdescription,#attribute-' + uuid+"-_description");
+	var img_elem = $('#block-' + uuid).children('img.descplusminus');
+	if (req_desc_div.is(':hidden')) {
+		req_desc_div.removeClass("hiddenDesc");
+		req_desc_div.slideDown(time);
+		$(img_elem).attr('src', 'images/collapse.png').attr('alt', '[&minus;]');
+	}
+	else {
+		req_desc_div.addClass("hiddenDesc");
+		var funct = function () {
+			//if ($(all_active_elems[keyboard_focus]).is(':hidden'))
+			if(scilent!==true)
+				setFocusByUUID(uuid);
+		};
+		if(time == 0)
+			req_desc_div.hide(0, funct);
+		else
+			req_desc_div.slideUp(time, funct);
+		
+		$(img_elem).attr('src', 'images/expand.png').attr('alt', '[+]');
+	}
+}
+
+// List of HTML block constructors for different types of nodes
+window.constructNodeProcessor = {
+	'Comment': function (nodeData, uuid,deep,path) {
+		// Fill in default values for missing attributes
+		if (!nodeData.attributes._description || !nodeData.attributes._description.value)
+			nodeData.attributes._description = { 'value': '&nbsp;' };
+		nodeData.attributes._description.value = nodeData.attributes._description.value.replace(/  /g,"&nbsp;&nbsp;");
+		// Construct HTML block
+		return $(
+			'<div class="cmtwrapper" id="block-' + uuid + '">' +
+			  '<div class="comment supported-node" id="node-' + uuid + '">' +
+			    '<div class="cmtctrls nodectrls" style="float: right;">' +
+			      '<div style="text-align: right;">' +
+			        '<img src="images/menu.png" alt="[v]" />' +
+			      '</div>' +
+			      '<div class="menu" id="menu-'+uuid+'" style="display: none;">' +
+			        constructMenu('Comment', uuid) +
+			      '</div>' +
+			    '</div>' +
+			    '<div class="cmtdesc nodedesc reditable cmtdesc-'+uuid+'" id="' + uuid + '-attribute-_description" contenteditable="false">' +
+			      nodeData.attributes._description.value +
+			    '</div>' +
+			  '</div>' +
+			'</div>'
+		);
+	},
+	'TextNode': function (nodeData, uuid,deep,path){
+		if (!nodeData.attributes._description || !nodeData.attributes._description.value) {
+			// Description is empty, request all the locations assigned to this requirement
+			// and construct description by combining them together
+			if (nodeData.attributes._locations) {
+				var loc_text = '';
+				for (var i in nodeData.attributes._locations.value) {
+					try {
+						var locJSON = getNodeByQID(nodeData.attributes._locations.value[i].value);
+					}
+					catch (ex) {
+						printToConsole(ex+" ");
+						continue;
+					}
+					if (!locJSON)
+						continue;
+					var locData = locJSON;
+					if (loc_text != '')
+						loc_text += '<br />';
+					if (locData.attributes._description && locData.attributes._description.value)
+						loc_text += locData.attributes._description.value;
+				}
+				
+				nodeData.attributes._ldescription = { 'value': (loc_text == '') ? '&nbsp;' : loc_text };
+			}
+		}
+		nodeData.attributes._vdescription = {'value':getDescription(uuid)};
+	
+		// Fill in default values for missing attributes
+		if (!nodeData.attributes._vdescription || !nodeData.attributes._vdescription.value)
+			nodeData.attributes._vdescription = { 'value': '&nbsp;' };
+		nodeData.attributes._vdescription.value = nodeData.attributes._vdescription.value.replace(/  /g,"&nbsp;&nbsp;");
+
+		if (!nodeData.attributes._textNodeType || !nodeData.attributes._textNodeType.value)
+			nodeData.attributes._textNodeType = { 'value': 'text' };
+		// Construct HTML block
+		var hname = "span";
+		if (!nodeData.attributes._name)
+			nodeData.attributes._name = { 'value': nodeData.id };
+		nodeData.attributes._name.value = nodeData.attributes._name.value.replace(/  /g,"&nbsp;&nbsp;");
+		var value = nodeData.attributes._vdescription.value;
+		
+		var variable=' tndesc-'+uuid+'" id="' + uuid + '-attribute-_vdescription"';
+		if(nodeData.attributes._textNodeType.value=='header'){
+			var luid = uuid;
+			var nm = -2;
+			while(luid!=null){
+				luid = getParentUUID(luid);
+				nm++;
+			}
+			value = nodeData.attributes._name.value;
+			hname = 'h'+nm;
+			variable=' tnheader-'+uuid+'" id="' + uuid + '-attribute-_nameOrId"';
+		}
+		
+		var newNode= $(
+			'<blockquote class="indent nodewrapper" id="block-' + uuid + '">' +
+			  '<div class="textnode supported-node" id="node-' + uuid + '">' +
+				  '<table cellpadding="0" cellspacing="0" border="0" width="100%">' +
+			      '<tr>' +
+		            '<td valign="top">' +
+		            '<img src="images/' + getNodeStatus('TextNode',nodeData.attributes._textNodeType.value).icon + '" alt="' + nodeData.attributes._textNodeType.value + '" title="' + nodeData.attributes._textNodeType.value + '" class="imgstatus" id="status-' + uuid + '" class="imgstatus" onclick="javascript:execNodeCommand(\'TextNode\', \'' + uuid + '\', \'chstatus\');" />' +
+				    '</td>' +
+			        '<td width="100%">' +
+			        	'<'+hname+' style="margin:0px;padding:0px;min-width:100%-;">'+
+			        	'<div class="tndesc nodedesc reditable descr'+variable+'>'+
+				    	  value +
+					     '</div>' +
+					     '</'+hname+'>'+ 
+				    '</td>' +
+			        '<td valign="top">' +  
+			        '<div class="textnodectrls nodectrls" style="float: right;" bgcolor = red>' +
+				      '<div style="text-align: right;">' +
+				        '<img src="images/menu.png" alt="[v]" />' +
+				      '</div>' +
+				      '<div class="menu"  id="menu-'+uuid+'" style="display: none;">' +
+				        constructMenu('TextNode', uuid) +
+				      '</div>' +
+				    '</div>' +
+			        '</td>' +
+			      '</tr>' +
+			    '</table>' +
+			  '</div>' +
+			'</blockquote>'
+		);
+		var childrenNodes = {};
+		for (var i in nodeData.children) {
+			// Construct the next child subtree (for requirements) or table (for test purposes)
+			var chldNode = constructTree(nodeData.children[i]);
+			var chldType = chldNode.type;
+			if ( synonim[chldType] )
+				chldType = synonim[chldType];
+			if (!childrenNodes[chldType]) {
+				var wrapperConstructor = constructNodeWrapperProcessor[chldType];
+				if (wrapperConstructor)
+					childrenNodes[chldType] = wrapperConstructor(uuid);
+				else
+					childrenNodes[chldType] = $('<div />');
+			}
+			childrenNodes[chldType].append(chldNode);
+		}
+		var hasChildren=hasVisibleChildren(uuid);
+		// Now append children nodes blocks to the current requirement node
+		for (var i = 0; i < childrenNodesOrder.length; ++i) {
+			var chldType = childrenNodesOrder[i];
+			if (childrenNodes[chldType]) {
+				newNode.append(childrenNodes[chldType]);
+				if(chldType == "Generic" && hasChildren){
+                    newNode.addClass('collapsable');
+                    newNode.prepend($('<img src="images/collapse.png" alt="[&minus;]" class="plusminus" onclick="javascript:toggleChildren(\'' + uuid + '\');" />'));
+				}
+				// Or remove "Add child requirement" command from non-leaves
+                if (chldType == 'TestPurpose')
+                    $(newNode.find('.menu-item-addreqchld')[0]).remove();
+			}
+		}
+		return newNode;
+	},
+	'Requirement': function (nodeData, uuid,deep,path) {
+		if (!nodeData.attributes._description || !nodeData.attributes._description.value) {
+			// Description is empty, request all the locations assigned to this requirement
+			// and construct description by combining them together
+			if (nodeData.attributes._locations) {
+				var loc_text = '';
+				for (var i in nodeData.attributes._locations.value) {
+					try {
+						var locJSON = getNodeByQID(nodeData.attributes._locations.value[i].value);
+					}
+					catch (ex) {
+						printToConsole(ex+" ");
+						continue;
+					}
+					if (!locJSON)
+						continue;
+					var locData = locJSON;
+					if (loc_text != '')
+						loc_text += '<br />';
+					if (locData.attributes._description && locData.attributes._description.value)
+						loc_text += locData.attributes._description.value;
+				}
+				
+				nodeData.attributes._ldescription = { 'value': (loc_text == '') ? '&nbsp;' : loc_text };
+			}
+		}
+		nodeData.attributes._vdescription = {'value':getDescription(uuid)};
+		// Fill in default values for missing attributes
+		if (!nodeData.attributes._name)
+			nodeData.attributes._name = { 'value': nodeData.id };
+		if (!nodeData.attributes.coverageStatus || !nodeData.attributes.coverageStatus.value)
+			nodeData.attributes.coverageStatus = { 'value': 'in process' };
+		nodeData.attributes._vdescription.value = nodeData.attributes._vdescription.value.replace(/  /g,"&nbsp;&nbsp;"); 
+		nodeData.attributes._name.value = nodeData.attributes._name.value.replace(/  /g,"&nbsp;&nbsp;");
+		// Create the block for requirement
+		var editable_prefix = (((readOnlyMode & EDIT_MODE_REQ_RO) == 0) ? '' : 'non');
+		// Remove "Delete requirement" where we cannot delete node
+		var candel = canDeleteNode(uuid);
+		var editable_prefix2 = '';
+        if (!candel && !editable_prefix)
+            editable_prefix2 = 'non';
+        if(!nodeData.attributes._name.newvalue)
+        	nodeData.attributes._name.newvalue=nodeData.attributes._name.value;
+        var newNode = $(
+			'<blockquote class="indent nodewrapper" id="block-' + uuid + '">' +
+			  '<div class="requirement supported-node" id="node-' + uuid + '">' +
+			    '<table cellpadding="0" cellspacing="0" border="0" width="100%" class="reqname_wrap">' +
+			      '<tr>' +
+		            '<td>' +
+		            '<img src="images/' + getNodeStatus('Requirement',nodeData.attributes.coverageStatus.value).icon + '" alt="' + nodeData.attributes.coverageStatus.value + '" title="' + nodeData.attributes.coverageStatus.value + '" class="imgstatus" id="status-' + uuid + '" class="imgstatus" onclick="javascript:execNodeCommand(\'Requirement\', \'' + uuid + '\', \'chstatus\');" />' +
+		            '</td>' +
+			        '<td width="100%">' +
+			          '<div class="reqname nodetitle ' + editable_prefix2 + editable_prefix + 'renamable ' + getNodeStatus('Requirement',nodeData.attributes.coverageStatus.value).className + ' reqname-'+uuid+'" id="' + uuid + '-attribute-_nameOrId" contenteditable="false" raw="'+nodeData.attributes._name.value+'">' +
+			            nodeData.attributes._name.newvalue +
+			          '</div>' +
+			        '</td>' +
+			        '<td>' +
+			          '<div class="reqctrls nodectrls">' +
+			            '<div style="text-align: right;">' +
+			              '<img src="images/menu.png" alt="[v]" />' +
+			            '</div>' +
+			            '<div class="menu"  id="menu-'+uuid+'" style="display: none;">' +
+			              constructMenu('Requirement', uuid) +
+			            '</div>' +
+			          '</div>' +
+			        '</td>' +
+			      '</tr>' +
+			    '</table>' +
+			    '<div class="reqdesc nodedesc ' + editable_prefix + 'reditable reqdesc-'+uuid+'" id="' + uuid + '-attribute-_vdescription" contenteditable="false">' +
+			      nodeData.attributes._vdescription.value +
+			    '</div>' +
+			  '</div>' +
+			'</blockquote>'
+		);
+
+		// Enumerate all children objects and recursively construct the rest of the tree
+		var childrenNodes = {};
+		for (var i in nodeData.children) {
+			// Construct the next child subtree (for requirements) or table (for test purposes)
+			var chldNode = constructTree(nodeData.children[i]);
+			var chldType = chldNode.type;
+			if ( synonim[chldType] )
+				chldType = synonim[chldType];
+			if (!childrenNodes[chldType]) {
+				var wrapperConstructor = constructNodeWrapperProcessor[chldType];
+				if (wrapperConstructor)
+					childrenNodes[chldType] = wrapperConstructor(uuid);
+				else
+					childrenNodes[chldType] = $('<div />');
+			}
+			childrenNodes[chldType].append(chldNode);
+		}
+		// Now append children nodes blocks to the current requirement node
+		var hasChildren=hasVisibleChildren(uuid);
+		for (var i = 0; i < childrenNodesOrder.length; ++i) {
+			var chldType = childrenNodesOrder[i];
+			if (childrenNodes[chldType]) {
+				newNode.append(childrenNodes[chldType]);
+				if (chldType == "Generic" && hasChildren) {
+                    newNode.addClass('collapsable');
+                    // Remove "Add Test Purpose" command from non-leaves
+					newNode.prepend($('<img src="images/collapse.png" alt="[&minus;]" class="plusminus" onclick="javascript:toggleChildren(\'' + uuid + '\');" />'));
+				}
+				// Or remove "Add child requirement" command from non-leaves
+                if (chldType == 'TestPurpose')
+                    $(newNode.find('.menu-item-addreqchld')[0]).remove();
+			}
+		}
+        // Remove "Add sibling requirement" command from root node
+		var rootNode = getStartNode();
+		return newNode;
+	},
+	"VirtualNode": function(nodeData,uuid,deep,path){
+		// Create the block for requirement
+		var editable_prefix = (((readOnlyMode & EDIT_MODE_REQ_RO) == 0) ? '' : 'non');
+		// Remove "Delete requirement" where we cannot delete node
+		var candel = canEditNode(uuid);
+		var editable_prefix2 = '';
+        if (!candel && !editable_prefix)
+            editable_prefix2 = 'non';
+        var newNode = $(
+			  '<div class="nodewrapper" id="block-'+uuid+'"><div class="instancer supported-node" id="node-' + uuid + '">' +
+			  '</div></div>'
+		);
+
+		// Enumerate all children objects and recursively construct the rest of the tree
+		var childrenNodes = {};
+		for (var i in nodeData.children) {
+			// Construct the next child subtree (for requirements) or table (for test purposes)
+			var chldNode = constructTree(nodeData.children[i]);
+			var chldType = chldNode.type;
+			if ( synonim[chldType] )
+				chldType = synonim[chldType];
+			if (!childrenNodes[chldType]) {
+				var wrapperConstructor = constructNodeWrapperProcessor[chldType];
+				if (wrapperConstructor)
+					childrenNodes[chldType] = wrapperConstructor(uuid);
+				else
+					childrenNodes[chldType] = $('<div />');
+			}
+			childrenNodes[chldType].append(chldNode);
+		}
+		// Now append children nodes blocks to the current requirement node
+		for (var i = 0; i < childrenNodesOrder.length; ++i) {
+			var chldType = childrenNodesOrder[i];
+			if (childrenNodes[chldType]) 
+				newNode.append(childrenNodes[chldType]);
+		}
+        // Remove "Add sibling requirement" command from root node
+		return newNode;
+	}
+};
+
+</script>
+</head>
+<body>
+<div id="contents" style="padding-top:30px;padding-bottom:10em"></div>
+<div style="height: 6em;"></div>
+<script type="text/javascript">
+	$('.clickable').live('mousedown', function (event) {
+	    	event.stopPropagation();
+	        event.stopImmediatePropagation();
+	        event.preventDefault();
+	        saveEditor();
+	    });
+		
+</script>
+<div id="toolsPanel" class="toolsPanel"><span class="toolsButton" onclick="openTemplates(selectedNode)">Templates</span> </div>
+</body>
+</html>

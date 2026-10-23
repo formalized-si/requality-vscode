@@ -1,0 +1,331 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<?NLS TYPE="org.eclipse.help.toc"?>
+<toc label="Requality">
+	<topic label="Requality: glossary" href="docs/manual/glossary.en.html#glossary">
+
+</topic>
+	<topic label="Requality: general information" href="docs/manual/general.en.html#general">
+		<topic label="What is Requality" href="docs/manual/general.en.html#destination">
+ </topic>
+		<topic label="About team" href="docs/manual/general.en.html#developer">
+ </topic>
+		<topic label="Requality installation instructions" href="docs/manual/general.en.html#installation">
+			<topic label="System requirements" href="docs/manual/general.en.html#system_requirements">
+ </topic>
+			<topic label="Requality installation" href="docs/manual/general.en.html#requality_installation">
+ </topic>
+			<topic label="Requality plugins" href="docs/manual/general.en.html#requality_plugins">
+				<topic label="Plugin installation by update-site" href="docs/manual/general.en.html#plugin_installation">
+ </topic>
+				<topic label="Requality Coverage Tools" href="docs/manual/general.en.html#coverage_plugin">
+ </topic>
+				<topic label="Requality GIT Connector" href="docs/manual/general.en.html#gitconnector_plugin">
+ </topic>
+				<topic label="Requality API provider" href="docs/manual/general.en.html#apiprovider_plugin">
+ </topic>
+ </topic>
+ </topic>
+		<topic label="Requality perspective" href="docs/manual/general.en.html#requality_perspective">
+ </topic>
+	</topic>
+	
+	<topic label="Requality: user guide" href="docs/manual/manual.en.html#requality_manual">
+		<topic label="Working with projects" href="docs/manual/manual.en.html#projects_main">
+			<topic label="Creating Requality project" href="docs/manual/manual.en.html#project_create">
+  </topic>
+			<topic label="Requality project settings" href="docs/manual/manual.en.html#project_settings">
+				<topic label="Nodes appearance settings in the Requality project" href="docs/manual/manual.en.html#project_sorting_settings">
+  </topic> 
+				<topic label="'Checker Rules' settings for Requality project" href="docs/manual/manual.en.html#project_checker_rules">
+  </topic>
+				<topic label="Setting up mandatory attributes for Requality project" href="docs/manual/manual.en.html#project_mandatory_settings">
+  </topic>
+				<topic label="Setting up links in the Requality project" href="docs/manual/manual.en.html#project_references_settings">
+  </topic>
+				<topic label="Setting up auto-generated identifiers in the Requality project" href="docs/manual/manual.en.html#project_seqid_settings">
+  </topic>
+ </topic>
+			<topic label="Edit Requality project properties" href="docs/manual/manual.en.html#project_edit">
+				<topic label="Working with attributes table of the project" href="docs/manual/manual.en.html#project_attributes">
+  </topic>
+				<topic label="Semi-automatic extraction of the 'ENUM_DEFINITION' attribute" href="docs/manual/manual.en.html#enum_def_extraction">
+  </topic>
+  </topic>
+			<topic label="Revision history of a Requality project" href="docs/manual/manual.en.html#project_history">
+  </topic>
+		</topic>
+		
+		<topic label="Documents" href="docs/manual/manual.en.html#documents">
+			<topic label="Import document" href="docs/manual/manual.en.html#import">
+  </topic>
+			<topic label="Delete document" href="docs/manual/manual.en.html#delete_document">
+  </topic>
+			<topic label="Update document" href="docs/manual/manual.en.html#doc_update">
+  </topic>
+			<topic label="Create document folder" href="docs/manual/manual.en.html#create_doc_folder">
+  </topic>
+			<topic label="Delete document folder" href="docs/manual/manual.en.html#delete_doc_folder">
+  </topic>
+		</topic>
+		
+		<topic label="Requirements" href="docs/manual/manual.en.html#requirements">
+			<topic label="Create requirement" href="docs/manual/manual.en.html#create_req">
+  </topic>
+			<topic label="Create requirement by copying" href="docs/manual/manual.en.html#create_req_by_copypaste">
+  </topic>			
+			<topic label="Delete requirement" href="docs/manual/manual.en.html#delete_req">
+  </topic>
+			<topic label="Create requirement by selecting location" href="docs/manual/manual.en.html#create_req_location">
+  </topic>
+			<topic label="Add location to requirement" href="docs/manual/manual.en.html#add_loc_to_req">
+  </topic>
+			<topic label="Delete location in document editor" href="docs/manual/manual.en.html#delete_loc_from_editor">
+  </topic>
+			<topic label="Delete location in Properties view" href="docs/manual/manual.en.html#delete_loc_from_properties">
+  </topic>
+			<topic label="Auto-mark locations in document" href="docs/manual/manual.en.html#document_processor">
+  </topic>
+			<topic label="Edit requirement parameters" href="docs/manual/manual.en.html#req_parameters_edit">
+  </topic>
+			<topic label="Revision history of requirement" href="docs/manual/manual.en.html#revisions">
+  </topic>
+			<topic label="Transferring locations to new document version" href="docs/manual/manual.en.html#update_doc">
+  </topic>
+			<topic label="Generate test for requirement" href="docs/manual/manual.en.html#add_test_requirement">
+  </topic>
+			<topic label="Bulk operations on requirements" href="docs/manual/manual.en.html#massops">
+  </topic>
+		</topic>
+		
+		<topic label="Node templates" href="docs/manual/manual.en.html#node_templates_work">
+			<topic label="Templates editor" href="docs/manual/manual.en.html#templates_editor">
+  </topic>
+			<topic label="Create template" href="docs/manual/manual.en.html#create_node_template">
+  </topic>
+			<topic label="Delete template" href="docs/manual/manual.en.html#delete_node_template">
+  </topic>
+			<topic label="Edit template" href="docs/manual/manual.en.html#edit_node_template">
+  </topic>
+			<topic label="Select active template" href="docs/manual/manual.en.html#set_active_template">
+  </topic>
+		</topic>
+		
+		<topic label="Text nodes" href="docs/manual/manual.en.html#textnode">
+			<topic label="Create text node" href="docs/manual/manual.en.html#create_textnode">
+  </topic>
+			<topic label="Create text node by copying" href="docs/manual/manual.en.html#create_textnode_by_copypaste">
+  </topic>
+			<topic label="Delete text node" href="docs/manual/manual.en.html#delete_textnode">
+  </topic>
+			<topic label="Edit text node" href="docs/manual/manual.en.html#textnode_parameters_edit">
+  </topic>
+			<topic label="Revision history of text node" href="docs/manual/manual.en.html#textnode_revisions">
+  </topic>
+		</topic>
+		
+		<topic label="Test purposes" href="docs/manual/manual.en.html#purpose">
+			<topic label="Create test purpose" href="docs/manual/manual.en.html#create_purpose">
+  </topic>
+			<topic label="Create test purpose by copying" href="docs/manual/manual.en.html#create_testpurpose_by_copypaste">
+  </topic>
+			<topic label="Edit test purpose parameters" href="docs/manual/manual.en.html#purpose_edit">
+  </topic>
+			<topic label="Revision history of test purpose" href="docs/manual/manual.en.html#testpurpose_revisions">
+  </topic>
+			<topic label="Delete test purpose" href="docs/manual/manual.en.html#delete_purpose">
+  </topic>
+			<topic label="Generate test for test purpose" href="docs/manual/manual.en.html#add_test_test_purpose">
+  </topic>
+		</topic>
+		
+		<topic label="Reports" href="docs/manual/manual.en.html#reports">
+			<topic label="Standard types of reports" href="docs/manual/manual.en.html#reports_list">
+  </topic>
+			<topic label="Add and delete report template" href="docs/manual/manual.en.html#report_template_add_delete">
+  </topic>			
+			<topic label="Create report settings" href="docs/manual/manual.en.html#create_report_settings">
+  </topic>
+			<topic label="Edit report settings parameters" href="docs/manual/manual.en.html#reportsettings_edit">
+  </topic>
+			<topic label="Multipart documents" href="docs/manual/manual.en.html#reports_multipart_docs">
+				<topic label="Split the report at first level headings" href="docs/manual/manual.en.html#reports_multipart_first_lvl">
+  </topic>
+				<topic label="Split the report at arbitrary internal level headings" href="docs/manual/manual.en.html#reports_multipart_random_lvl">
+  </topic>
+  </topic>
+			<topic label="Reports for the typical tasks" href="docs/manual/manual.en.html#reports_typical_tasks">
+				<topic label="Report 'Requirements view' ('Чтение требований')" href="docs/manual/manual.en.html#report_tableview">
+  </topic>
+				<topic label="Report 'Checking Design Rules' ('Проверка правил оформления')" href="docs/manual/manual.en.html#report_problems">
+  </topic>
+				<topic label="Report 'Requirements coverage analysis' ('Анализ покрытия требований')" href="docs/manual/manual.en.html#report_coverage">
+  </topic>
+				<topic label="Report 'Document generation (ODT)' ('Генерация документов (ODT)')" href="docs/manual/manual.en.html#report_ODT">
+  </topic>
+  </topic>
+			<topic label="EXPERIMENTAL REPORT TEMPLATES" href="docs/manual/manual.en.html#reports_experimental">
+				<topic label="Highlighting requirements" href="docs/manual/manual.en.html#reports_highlight_requirements">
+					<topic label="Report 'Document model' ('Анализ покрытия выделенных требований')" href="docs/manual/manual.en.html#report_documentmodel">
+  </topic>
+  </topic>
+				<topic label="Analysis of links between requirements" href="docs/manual/manual.en.html#reports_links_analysis">
+					<topic label="Report 'Custom visualization of relationships between requirements' ('Настраиваемая визуализация связей между требованиями')" href="docs/manual/manual.en.html#report_traceability">
+  </topic>
+  </topic>
+				<topic label="Other reports" href="docs/manual/manual.en.html#reports_others">
+					<topic label="Report 'Progress' ('Прогресс по проекту')" href="docs/manual/manual.en.html#report_progress">
+  </topic>
+  </topic>
+  </topic>
+			<topic label="Delete report settings" href="docs/manual/manual.en.html#reportsettings_delete">
+  </topic>
+			<topic label="Generate report" href="docs/manual/manual.en.html#report_generate">
+  </topic>
+			<topic label="Open and edit report" href="docs/manual/manual.en.html#report_open">
+  </topic>
+			<topic label="Export report to file system" href="docs/manual/manual.en.html#report_to_filesystem">
+  </topic>
+			<topic label="Delete report" href="docs/manual/manual.en.html#delete_report">
+  </topic>
+			<topic label="Create report folder" href="docs/manual/manual.en.html#create_report_folder">
+  </topic>
+			<topic label="Delete report folder" href="docs/manual/manual.en.html#delete_report_folder">
+  </topic>
+			<topic label="Rename report folder" href="docs/manual/manual.en.html#reportfolder_rename">
+  </topic>
+		</topic>
+		
+		<topic label="Comments" href="docs/manual/manual.en.html#comment">
+			<topic label="Create comment" href="docs/manual/manual.en.html#create_comment">
+  </topic>
+			<topic label="Create comment by copying" href="docs/manual/manual.en.html#create_comment_by_copypaste">
+  </topic>
+			<topic label="Edit Comment" href="docs/manual/manual.en.html#edit_comment">
+  </topic>
+			<topic label="Revision history of comment" href="docs/manual/manual.en.html#comment_history">
+  </topic>
+			<topic label="Delete Comment" href="docs/manual/manual.en.html#delete_comment">
+  </topic>
+		</topic>
+		
+		<topic label="Identification of nodes" href="docs/manual/manual.en.html#all_ids">
+			<topic label="Unique IDs of requirements tree nodes" href="docs/manual/manual.en.html#seqid">
+  </topic>
+		</topic>
+		
+		<topic label="Node sorting in Requality project" href="docs/manual/manual.en.html#nodes_sort">
+			<topic label="Sorting settings of Requality project" href="docs/manual/manual.en.html#nodes_sort_edit">
+  </topic>
+		</topic>
+		
+		<topic label="Working with links between nodes of the requirements tree" href="docs/manual/manual.en.html#references">
+			<topic label="Creating links between requirements tree nodes" href="docs/manual/manual.en.html#reference_create">
+				<topic label="Creating links by manual setting the 'REFERENCE' attribute" href="docs/manual/manual.en.html#reference_create_by_attribute">
+  </topic>
+				<topic label="Creating a link using the '0, 1, *' button" href="docs/manual/manual.en.html#reference_create_by_button">
+  </topic>
+  </topic>			
+			<topic label="Edit name of an incoming link" href="docs/manual/manual.en.html#inreference_name_edit">
+  </topic>
+			<topic label="View links of a requirements tree node" href="docs/manual/manual.en.html#linksexplorer">
+  </topic>
+		</topic>
+
+		<topic label="Terms" href="docs/manual/manual.en.html#terms">
+			<topic label="Create a link to a term" href="docs/manual/manual.en.html#term_links">
+  </topic>
+			<topic label="View links for terms in Requality Links Explorer" href="docs/manual/manual.en.html#linksexplorer_terms">
+  </topic>
+		</topic>
+
+		<topic label="Work in Module Editor" href="docs/manual/manual.en.html#ModuleEditor_work">
+			<topic label="Open Module Editor" href="docs/manual/manual.en.html#ModuleEditor_open">
+  </topic>
+		</topic>
+		
+		<topic label="Work in UniEditor" href="docs/manual/manual.en.html#unieditor">
+			<topic label="Open UniEditor" href="docs/manual/manual.en.html#open_unieditor">
+  </topic>
+			<topic label="Add new requirements in UniEditor" href="docs/manual/manual.en.html#add_req_unieditor">
+  </topic>
+			<topic label="Delete requirement in UniEditor" href="docs/manual/manual.en.html#delete_req_unieditor">
+  </topic>
+			<topic label="Edit requirement in UniEditor" href="docs/manual/manual.en.html#edit_req_unieditor">
+  </topic>
+			<topic label="Add new text node to UniEditor" href="docs/manual/manual.en.html#add_textnode_unieditor">
+  </topic>
+			<topic label="Delete text node in UniEditor" href="docs/manual/manual.en.html#delete_textnode_unieditor">
+  </topic>
+			<topic label="Edit text node in UniEditor" href="docs/manual/manual.en.html#edit_textnode_unieditor">
+  </topic>
+			<topic label="Add new test purpose in UniEditor" href="docs/manual/manual.en.html#add_purpose_unieditor">
+  </topic>
+			<topic label="Delete test purpose in UniEditor" href="docs/manual/manual.en.html#delete_purpose_unieditor">
+  </topic>
+			<topic label="Edit test purpose in UniEditor" href="docs/manual/manual.en.html#edit_purpose_unieditor">
+  </topic>
+			<topic label="Add comment in UniEditor" href="docs/manual/manual.en.html#add_comment_unieditor">
+  </topic>
+			<topic label="Delete comment in UniEditor" href="docs/manual/manual.en.html#delete_comment_unieditor">
+  </topic>
+			<topic label="Edit comment in UniEditor" href="docs/manual/manual.en.html#edit_comment_unieditor">
+  </topic>
+		</topic>
+		
+		<topic label="Review" href="docs/manual/manual.en.html#review">
+			<topic label="Open Review" href="docs/manual/manual.en.html#open_review">
+  </topic>
+			<topic label="Edit statuses of the requirements and test purposes in Review" href="docs/manual/manual.en.html#edit_statuses_review">
+  </topic>
+		</topic>
+		
+		<topic label="Keyboard in UniEditor, Review and Module Editor: hot keys" href="docs/manual/manual.en.html#unieditor_hot_keys">
+ </topic>
+		<topic label="Virtual Nodes" href="docs/manual/manual.en.html#virtual_nodes">
+			<topic label="Create virtual node" href="docs/manual/manual.en.html#create_vn">
+  </topic>
+			<topic label="Edit virtual node parameters" href="docs/manual/manual.en.html#vn_parameters">
+  </topic>
+			<topic label="Hide virtual node" href="docs/manual/manual.en.html#hide_vn">
+  </topic>
+			<topic label="Show virtual node" href="docs/manual/manual.en.html#show_vn">
+  </topic>
+		</topic>
+		<topic label="Search in the Requality project tree" href="docs/manual/manual.en.html#tree_search">
+ </topic>		
+		<topic label="Checking the project tree" href="docs/manual/manual.en.html#checkers">
+ </topic>
+ 
+ 		<topic label="Working with an external data storage (Repository)" href="docs/manual/manual.en.html#repository_work">
+			<topic label="Procedures for publishing to and downloading data from the repository" href="docs/manual/manual.en.html#repository_publish_update">
+				<topic label="Initial uploading a project to a local repository" href="docs/manual/manual.en.html#first_publish_local">
+ </topic>
+				<topic label="Initial uploading a project to a remote repository" href="docs/manual/manual.en.html#first_publish_remote">
+ </topic>
+  </topic>
+			<topic label="Revision history" href="docs/manual/manual.en.html#history">
+				<topic label="View revision history for the Requality project" href="docs/manual/manual.en.html#history_view_for_project">
+ </topic>
+				<topic label="View revision history for requirement tree nodes" href="docs/manual/manual.en.html#history_view_for_node">
+ </topic>
+ </topic>
+ </topic>
+ 
+		<topic label="Import-export of Requality requirements catalog into ReqIF format" href="docs/manual/manual.en.html#reqif">
+			<topic label="Export Requality requirements catalog into ReqIF" href="docs/manual/manual.en.html#reqif_export">
+ </topic>
+			<topic label="Import requirements catalog from ReqIF" href="docs/manual/manual.en.html#reqif_import">
+ </topic>
+ </topic>
+ 
+		<topic label="Export changes from a Requality project to a DOORS module" href="docs/manual/manual.en.html#requality_to_doors">
+ </topic>
+ 		<topic label="Troubleshooting Guide" href="docs/manual/manual.en.html#troubleshooting">
+			<topic label="Interproject links don't work" href="docs/manual/manual.en.html#troubleshooting_links">
+ </topic>
+ </topic>
+		<topic label="Guidelines for requirements development according to DO-178C" href="docs/manual/manual.en.html#req_dev_guideline">
+ </topic>
+
+	</topic>
+</toc>

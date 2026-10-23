@@ -1,0 +1,225 @@
+/*
+ * Copyright 2015 ISP RAS (http://www.ispras.ru), UniTESK Lab (http://www.unitesk.com)
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+package com.unitesk.requality.vscode.port.eclipse.views.properties;
+
+import java.util.HashSet;
+import java.util.Set;
+
+import com.unitesk.requality.vscode.ui.runtime.WorkspaceJob;
+import com.unitesk.requality.vscode.ui.runtime.IProgressMonitor;
+import com.unitesk.requality.vscode.ui.runtime.IStatus;
+import com.unitesk.requality.vscode.ui.runtime.Status;
+import com.unitesk.requality.vscode.ui.jface.fieldassist.ControlDecoration;
+import com.unitesk.requality.vscode.ui.jface.fieldassist.FieldDecoration;
+import com.unitesk.requality.vscode.ui.jface.fieldassist.FieldDecorationRegistry;
+import com.unitesk.requality.vscode.ui.swt.SWT;
+import com.unitesk.requality.vscode.ui.swt.events.FocusAdapter;
+import com.unitesk.requality.vscode.ui.swt.events.FocusEvent;
+import com.unitesk.requality.vscode.ui.swt.events.FocusListener;
+import com.unitesk.requality.vscode.ui.swt.events.ModifyEvent;
+import com.unitesk.requality.vscode.ui.swt.events.ModifyListener;
+import com.unitesk.requality.vscode.ui.swt.layout.GridData;
+import com.unitesk.requality.vscode.ui.swt.layout.GridLayout;
+import com.unitesk.requality.vscode.ui.swt.widgets.Composite;
+import com.unitesk.requality.vscode.ui.swt.widgets.Text;
+import com.unitesk.requality.vscode.ui.tabbed.TabbedPropertySheetPage;
+import com.unitesk.requality.vscode.ui.tabbed.TabbedPropertySheetWidgetFactory;
+
+import com.unitesk.requality.core.attribute.Attribute;
+import com.unitesk.requality.core.model.TreeNode;
+import com.unitesk.requality.core.operation.ChangesSet;
+import com.unitesk.requality.core.tree.ITreeLogic.IdContainsWrongChars;
+import com.unitesk.requality.core.tree.ITreeLogic.IdEmpty;
+import com.unitesk.requality.core.tree.ITreeLogic.SameIdExistsInChildren;
+import com.unitesk.requality.vscode.port.eclipse.api.EclipseAPI;
+import com.unitesk.requality.vscode.port.eclipse.views.panels.AttributesPanel;
+import com.unitesk.requality.vscode.port.eclipse.views.panels.NameEditPanel;
+import com.unitesk.requality.nodetype.Requirement;
+import com.unitesk.requality.nodetype.VirtualNode;
+
+public class InstancerMainPropertySection extends TreeNodePropertiesTab {
+  private VirtualNode instancer;
+  private Text instancerID; // Test Case Number
+  private AttributesPanel attribPane; // Attributes
+  private ControlDecoration testPurposeIDDecorator;
+  private NameEditPanel instancerName;
+
+
+  @Override
+  public void createControls(Composite parent, TabbedPropertySheetPage aTabbedPropertySheetPage) {
+    super.createControls(parent, aTabbedPropertySheetPage);
+    TabbedPropertySheetWidgetFactory wf = getWidgetFactory();
+
+    parent.addFocusListener(
+        new FocusListener() {
+          @Override
+          public void focusLost(FocusEvent e) {}
+
+          @Override
+          public void focusGained(FocusEvent e) {}
+        });
+    parent.setLayout(new GridLayout(2, false));
+    parent.setLayoutData(new GridData(GridData.FILL_BOTH));
+
+    wf.createLabel(parent, "Id:").setLayoutData(new GridData(GridData.HORIZONTAL_ALIGN_END));
+
+    instancerID = wf.createText(parent, "", SWT.BORDER);
+    instancerID.setLayoutData(new GridData(GridData.FILL_HORIZONTAL));
+    testPurposeIDDecorator = createDecorator(instancerID);
+    testPurposeIDDecorator.hide();
+    instancerID.addModifyListener(
+        new ModifyListener() {
+          @Override
+          public void modifyText(ModifyEvent e) {
+            try {
+              if (instancer == null || instancerID.isDisposed()) return;
+              testPurposeIDDecorator.show();
+              if (instancer
+                  .getTreeDB()
+                  .getTreeLogic()
+                  .isIdValidExc(instancer, instancerID.getText().trim())) {
+                testPurposeIDDecorator.hide();
+              } else {
+                if (instancerID.getText().trim().equals("")) {
+                  testPurposeIDDecorator.setDescriptionText("Virtual Node Id should not be empty");
+                } else {
+                  testPurposeIDDecorator.setDescriptionText(
+                      "Virtual Node Id is not correct or Element with the same Id already exists");
+                }
+                testPurposeIDDecorator.show();
+              }
+            } catch (SameIdExistsInChildren e1) {
+              testPurposeIDDecorator.setDescriptionText("Element with same Id already exists");
+            } catch (IdEmpty e1) {
+              testPurposeIDDecorator.setDescriptionText("Virtual Node Id is empty");
+            } catch (IdContainsWrongChars e1) {
+              testPurposeIDDecorator.setDescriptionText(
+                  "Virtual Node Id contains wrong character - " + e1.getWrongCharacter());
+            }
+          }
+        });
+    instancerID.addFocusListener(
+        new FocusAdapter() {
+          public void focusLost(FocusEvent e) {
+            if (updating) return;
+            if (instancer == null || instancerID.isDisposed()) return;
+            String newId = instancerID.getText().trim();
+            instancerID.setText(newId);
+            if (instancer.getId().equals(newId)) {
+              return;
+            }
+            if (instancer.getQualifiedId().equals(Requirement.getTypeRootQId())) 
+              return;
+            final VirtualNode instancer = InstancerMainPropertySection.this.instancer;
+            final Text instancerID = InstancerMainPropertySection.this.instancerID;
+            WorkspaceJob j = new WorkspaceJob("Update instancer settings "+(instancer!=null?instancer.getUserVisibleName():"")){
+
+              @Override
+              public IStatus runInWorkspace(IProgressMonitor monitor) {
+                if(instancer == null)
+                  return Status.CANCEL_STATUS;
+                boolean drop = false;
+                if (instancer.getTreeDB().getTreeLogic().isIdValid(instancer, newId)) {
+                  boolean start = instancer.getTreeDB().startTransaction("Update Virtual Node", true);
+                  if(start) {
+                    try {
+                      instancer.setId(newId);
+                      instancer.commitAttributes();
+                      if(start) {
+                        start = false;
+                        instancer.getTreeDB().commit();
+                      }
+                    }finally {
+                      if(start)
+                        instancer.getTreeDB().rollback();
+                    }
+                  }else
+                    drop = true;
+                }else
+                  drop = true;
+                if(drop)
+                {
+                  EclipseAPI.getDisplay().asyncExec(new Runnable(){
+                    @Override
+                    public void run() {
+                      if(isDisposed || instancerID.isDisposed() || instancer == null)
+                        return;
+                      instancerID.setText(instancer.getId()); 
+                    }
+                  });
+                }
+                return Status.OK_STATUS;
+              }
+              
+            };
+            j.schedule();
+      }
+    });
+
+    wf.createLabel(parent, "Name:").setLayoutData(new GridData(GridData.HORIZONTAL_ALIGN_END));
+
+    instancerName = new NameEditPanel(parent, SWT.BORDER); // Test Case Number
+
+    attribPane = new AttributesPanel(fsid, parent);
+    GridData gridData = new GridData(GridData.FILL_BOTH);
+    gridData.horizontalSpan = 2;
+    attribPane.getControl().setLayoutData(gridData);
+  }
+
+  private ControlDecoration createDecorator(Text text) {
+    ControlDecoration controlDecoration = new ControlDecoration(text, SWT.LEFT | SWT.TOP);
+    FieldDecoration fieldDecoration =
+        FieldDecorationRegistry.getDefault().getFieldDecoration(FieldDecorationRegistry.DEC_ERROR);
+    controlDecoration.setImage(fieldDecoration.getImage());
+    return controlDecoration;
+  }
+
+  @Override
+  protected void setTreeNode(TreeNode node) {
+    if (!(node instanceof VirtualNode) || isDisposed) {
+      return;
+    }
+    instancer = (VirtualNode) node;
+    instancerID.setText(instancer.getId());
+    testPurposeIDDecorator.hide();
+    String text = instancer.getName();
+    if (text == null) text = "";
+    instancerName.setTreeNode(instancer);
+    attribPane.setNode(instancer, isDisposed);
+  }
+
+  @Override
+  protected boolean affectedByAttribute(String a) {
+    return true;
+  }
+
+  private static Set<String> ids = new HashSet<>();
+  static{
+    ids.add(TreeNode.ATTR_ID);
+    ids.add(TreeNode.ATTR_NAME);
+  }
+  @Override
+  public boolean requireUpdate(TreeNode source, ChangesSet<Attribute> what) {
+    for(String s:what.getAll())
+      if(ids.contains(s) || !s.startsWith("_"))
+        return true;
+    return false;
+  };
+  @Override
+  public boolean isSelectionSource() {
+    return true;
+  }
+}

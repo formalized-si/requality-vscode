@@ -1,0 +1,1517 @@
+﻿<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN"
+      "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml">
+<head>
+  <meta http-equiv="content-type" content="text/html; charset=UTF-8" />
+  <title>Requality: glossary</title>
+  <style type="text/css" title="Requality theme">
+body {
+    font-size: 12pt;
+    font-family: Times, serif;
+    font-weight: normal;
+    font-style: normal;
+    color: black;
+    background-color: white;
+    line-height: 1em;
+    margin-left: 2em;
+    margin-right: 2em;
+   }
+
+/* paragraphs */
+p  {
+    padding: 0;
+    margin-top: 0em;
+    margin-bottom: 0em;
+    text-align: justify;
+    text-indent: 0em;
+   }
+
+/* headings */
+h1 {
+    background-color: #e8e1e1;
+    font-size: 150%;
+    font-weight: bold;
+    font-style: normal;
+    font-variant: normal;
+    text-align: center;
+    padding: 0;
+    margin-top: .7em;
+    margin-bottom: 2em;
+   }
+h2 {
+	background-color: #e8e1e1;
+    font-size: 130%;
+    font-weight: bold;
+    font-style: normal;
+    padding: 0;
+    margin-top: .7em;
+    margin-bottom: .7em;
+   }
+h3 {
+	background-color: #f5f3f3;
+    font-size: 100%;
+    font-weight: bold;
+    font-style: normal;
+    padding: 0;
+    margin-top: .5em;
+    margin-bottom: .5em;
+   }
+h4 {
+    font-size: 100%;
+    font-weight: bold;
+    font-style: normal;
+    padding: 0;
+    margin-top: .3em;
+    margin-bottom: .3em;
+   }
+
+/* lists */
+ul, ol {
+    padding: 0 0 0 15px;
+    margin-top: .1em;
+    margin-bottom: .1em;
+   }
+ul ul, ol ol, ul ol, ol ul {
+    margin-top: .1em;
+    margin-bottom: .1em;
+   }
+li {
+    padding: 0;
+    margin-top: .1em;
+    margin-bottom: .1em;
+    text-align: justify;
+   }
+li p {
+    margin-top: .1em;
+    margin-bottom: .1em;
+   }
+
+/* inline */
+strong {
+    font-weight: bold;
+   }
+code {
+    font-family: Courier New, Courier, monospace;
+   }
+ins {
+    background-color: inherit;
+    text-decoration: underline;
+   }
+del {
+    text-decoration: line-through;
+   }
+
+   
+dt {
+	font-weight: bold;
+	}
+/* anchors */
+a[href] {
+    color: purple;
+    text-decoration: underline;
+   }
+
+/* end */
+  </style>
+</head>
+
+<body>
+<h1><a id="glossary"></a>Requality: glossary</h1>
+
+<h2>A</h2>
+<dl>
+<dt><a name="glossary_node_template_active"></a>Active node template (active template)</dt>
+<dd>- <a href="glossary.en.html#glossary_node_template"><em>'node template'</em></a> that has been set as active 
+for this node type. If a template is selected as active, then when creating new nodes of this 
+type, all nodes will be created by this template by default. Initially, an empty template is 
+selected for all project nodes, where all parameters are set by default. ( See 
+<a href="glossary.en.html#glossary_templates_editor"><em>'Templates editor'</em></a>. ) There can 
+be only one active template for one node type. The active template is marked with 
+bold font in the list of templates in the <a href="glossary.en.html#glossary_templates_editor"><em>
+'Templates editor'</em></a> view.</dd>
+<p><br/></p>
+
+<dt><a name="glossary_attributes_table"></a>Attributes table (attributes)</dt>
+<dd>
+<p>– is a set of parameters - attributes - of any <em>'Requality'</em> project node. These parameters describe different properties of the node.</p>
+<ul> 
+	<li>Attributes are set in <em>'Properties view'</em>.</li>
+	<li>Every attribute has name, type, value, scope. Also attribute could have a values generator.</li>
+	<li>Attributes could be set manually or generated automatically by the generator, parameters of generator should be set manually  by a user.</li>
+	<li>Attribute could be inherited from the parent node, in this case it is marked by an arrow-symbol.</li>
+	<li>Attributes could be used in predicates, in nodes description, in nodes reusing and nodes iteration.</li>
+	<li>There are some attributes that are set automatically, for example, date of report generation.</li>
+	<li>Some attributes should have pre-defined names, usually these 
+	attributes are generated automatically with the help of wizards (eg attribute <em>'coverageFilePath'</em> of <em>'Report Settings'</em> node, 
+	that sets a path to coverage information source file).</li>
+	<li>For different node types attributes differ.</li>
+</ul>
+<p><br/></p>
+<img alt="Attributes table - common view" src="images/AttributesTable_en.png" />
+<p><br/></p>
+<p>Attributes are presented in a table with columns: <em>'Name'</em>, <em>'Type'</em>, <em>'Value'</em>, <em>'Scope'</em> and 
+<em><a href="glossary.en.html#glossary_generator">'Generator'</a></em> (attribute values generator).</p>
+<ul>
+<li>Attribute name should be unique for the one node. It can't be empty and can't begin or end with spaces.</li>
+<li>Attribute type is set in <em>'Type'</em> column. By default available types are: <em>'INT'</em>, 
+		<em>'FLOAT'</em>, <em>'BOOL'</em>, <em>'STRING'</em>, <em>'LIST'</em> and <em>'REFERENCE'</em>. 
+But if in the project there is global <em>'ENUM_DEFINITION'</em> attribute it's name with prefix &#9402; 
+will be shown in the drop-down list in the <em>'Type'</em> column as available Enum-type (see <a href="glossary.en.html#glossary_enum">'Enumerated attribute type (Enum)'</a>).</li>
+<li>Attribute value is set in <em>'Value'</em> column.</li>
+<li>Attribute scope is set in <em>'SCOPE'</em> column. It can be one of 3 following values: <em>'DIRECT_CHILDREN'</em>, <em>'LOCAL'</em>, <em>'SUBTREE'</em>.
+	  <ul>
+	  	<li><strong>LOCAL</strong> - value applies only to the current element.</li>
+	  	<li><strong>DIRECT_CHILDREN</strong> - value applies only to the direct children nodes of the current element.</li>
+	  	<li><strong>SUBTREE</strong> - value applies to all the children nodes of the current element subtree.</li>
+	  </ul>
+	  </li>
+	<li>By the way, attribute with the same name can be redefined in a child-node. In this case new defined value is more actual for this node than inherited one.
+	<p>NOTE! Column <em>'SCOPE'</em> is missing in the attributes table of the project node, by default scope of these attributes is whole the project tree.</p> </li>
+<li>Attribute values generator should be set in <em>'Generator'</em> column. How it works you can see (<a href="glossary.en.html#glossary_generator">here</a>).</li>
+</ul>
+</dd>
+<p><br/></p>
+<dt><a name="glossary_attributes_value_generator"></a>Attributes value generator</dt>
+<dd>
+	<p> See <a href="glossary.en.html#glossary_generator">'Generator'</a>. </p>
+</dd>
+</dl>
+<p><br/></p>
+
+<h2>C</h2>
+<dl>
+<dt><a name="glossary_clone"></a>Clone, clone-node</dt>	
+<dd>
+	<p>- is a child node of a <a href="glossary.en.html#glossary_virtual_node"><em>virtual node</em></a>
+	, created based on other node (so called <a href="glossary.en.html#glossary_reused_node"><em>reused node</em></a>) 
+	of requirements tree by properties of the virtual node (see 
+	<a href="glossary.en.html#glossary_vnode_parameters"><em>'Virtual node properties'</em></a>).  By default
+	 clone gets a type and properties of the reused node. But its properties can be changed by user.
+	  In <em>'Requality Explorer'</em> 
+	view an icon the clone-node is marked by an additional image of the letter <em>'V'</em>.</p>
+	<p><br/></p>
+			<img alt="Virtual node and subtree of clone-nodes" src="images/ClonePic.png" />
+</dd>
+<p><br/></p>
+	
+<dt><a name="glossary_comment"></a>Comment</dt>
+<dd>
+	<p>- is an entity that contains some text comment and refers to the requirement, text node or 
+		test purpose. 
+	One requirement/text node/test purpose may have several comments.</p>
+</dd>
+<p><br/></p>
+
+
+<dt><a name="glossary_comment_properties"></a>Comment properties</dt>
+<dd>
+<p>- are comment parameters that are specified and could be set in the <em>'Properties'</em> view. 
+(They can also be viewed and edited in a shortened form in the 'Parameters editing window'.) </p>
+<p>For Comment node <em>'Properties'</em> view contains three tabs:</p>
+<ol>
+  <li><a name="glossary_comment_main"></a><strong>Main tab</strong> contains the following parameters
+   of comment:
+    <ul>
+      <li><a name="glossary_comment_id"></a><strong>Id</strong> – comment identifier. The identifier is unique among
+       the children of the one parent. Couldn't be changed manually.</li>
+      <li><a name="glossary_comment_name"></a><strong>Name</strong> – name of the comment. It shouldn't be unique.
+       Name is empty by default. Name could be changed manually.</li>
+      <li><a name="glossary_comment_author"></a><strong>Author</strong> – author of the comment. By default this 
+      field is filled in accordance with the settings of the operating system.</li>
+	  <li><a name="glossary_comment_text"></a><strong>Field for text of the comment</strong>. Is empty by default.
+	   Could be changed manually.</li>
+    </ul>
+    <br/>
+	<img alt="Main tab of Properties view for comment" src="images/CommentMain.png" />
+	<br/>
+  </li>
+  <li><a name="glossary_comment_history"></a><strong>History tab</strong> contains information about the history of all <a href="glossary.en.html#glossary_revision">'revisions'</a>
+   related to this comment. The contents of the tab are similar to the contents of the 'History' tab for the requirement
+    (see <a href="glossary.en.html#glossary_requirement_properties">'Requirement parameters'</a>).
+  <br/>
+  </li>
+  <li><a name="glossary_comment_source"></a><strong>Source tab</strong> contains only json-code:
+    <ul>
+      <li><a name="glossary_report_json"></a><strong>json</strong> – low-level representation of the comment 
+	  as an entity. Is not editable.</li>
+    </ul>
+<br/>
+<img alt="Source tab of Properties view for comment" src="images/CommentSource.png" />
+  </li>
+</ol>
+</dd>
+
+<p><br/></p>
+
+<dt><a name="glossary_coverage_file"></a>Coverage file</dt>
+<dd>
+<p>- XML-document that sets a coverage of requirements and 
+test purposes by other elements (test for example). It is used to generate some kind of reports.</p>
+<p>File format:</p>
+<pre>
+&lt;?xml version="1.0" encoding="UTF-8"?&gt;
+&lt;coverageInfo&gt; 
+  &lt;reqcoverage qid="unique_id_of_requirement_or_test_purpose"&gt;
+    &lt;covered_by uri="path_to_covering_element" [hits="1"]/&gt;
+  &lt;/reqcoverage&gt;
+  &lt;reqcoverage qid="unique_id_of_requirement_or_test_purpose"&gt;
+    &lt;covered_by uri="path_to_covering_element"/&gt;
+  &lt;/reqcoverage&gt;
+  &lt;error [name="error_name"] testuri="uri_of_covered_by_element" [uri="link_to_error_description"]&gt;
+      [&lt;violates qid=unique_id_of_requirement_or_test_purpose"/&gt;]*
+      [&lt;description [format="error_description_format"]&gt;error_description&lt;/description&gt;]
+  &lt;/error&gt;
+&lt;/coverageInfo&gt;
+</pre>
+<p>Here:</p>
+<p>Square brackets denote optional parameters.</p>
+<ol>
+<li>
+<strong>coverageInfo</strong> - can be only one instance in the file. It contains multiple XML-elements <strong>reqcoverage</strong> (one or more) and <strong>error</strong> (can be absent, one or more)
+</li>
+<li>
+<strong>reqcoverage</strong> - child-element for <strong>coverageInfo</strong>. Should be specified for every covered Requality-element. (Uncovered nodes are not specified at all.) 
+Contains nested XML-elements <strong>covered_by</strong> (one or more). Every nested <strong>covered_by</strong> element should match one test procedure or test. 
+<strong>reqcoverage</strong> element has attribute <strong>qid</strong>.
+</li>
+<li>
+<strong>qid</strong> - is <strong>user-visible-name(element)</strong> or <strong>qualifying-id(element)</strong> of the covered element:
+<ul>
+<li>
+<strong>user-visible-name(element)</strong> - is element name (if exists, i.e. if for this element name field in Properties view is not empty),
+otherwise it is specified as user-visible-name(element.parent)/id, i.e. first specify user-visible-name of parent element, then specify element id (use '/' as delimeter).
+For example: 
+"TR-FMF-01-01-002/TR-FMF-01-01-002_T01"
+</li>
+<li>
+<strong>qualifying-id(element)</strong> - is full path to the element beginning with root node (Requirements), '/' is used as a delimeter.
+For example:
+"Requirements/01/MyRequirement01"
+</li>
+</ul>
+</li>
+<li>
+<strong>covered_by</strong> - child element for <strong>reqcoverage</strong>. There could be several covered_by 
+elements inside <strong>reqcoverage</strong>, it depends on how many test procedures or 
+tests cover corresponding Requality-element. Every <strong>covered_by</strong> element matches one covering 
+Requality-element. <strong>covered_by</strong> has attributes: <strong>uri</strong> and <strong>hits</strong>.
+</li>
+<li>
+<strong>uri</strong> -  is attribute of <strong>covered_by</strong> XML-element, it specifies a 
+path to the test described in this <strong>covered_by</strong> element. For example:"file:///home/user/work/test1.c#12"
+</li>
+<li>
+<strong>hits</strong> - attribute of <strong>covered_by</strong> XML-element, it is optional. Indicates how many times this <strong>reqcoverage</strong> requirement is linked to in <strong>covered_by</strong> test.
+</li>
+<li>
+<strong>error</strong> - element to describe error resulting from the test. Includes one <strong>description</strong> element with error description. Includes one or more 
+optional <strong>violates</strong> elements if it is possible to define which exactly requirements are violated by this error. <strong>error</strong> element has attribute 
+<strong>testuri</strong> and two optional attributes: <strong>name</strong> and <strong>uri</strong>.
+</li>
+<li>
+<strong>testuri</strong> - path to test described in <strong>covered_by</strong> element
+</li>
+<li>
+<strong>name</strong> - optional parameter, it is used to show displayed error name. If error name is not defined then "error"+error_index_number is used as <strong>name</strong>.
+</li>
+<li>
+<strong>uri</strong> - optional parameter, path to file with more information about the error.
+</li>
+<li>
+<strong>violates</strong> - optional element, corresponds to requirement that is violated by the error. Every <strong>violates</strong> element corresponds to one violated 
+requirement. <strong>violates</strong> element has attribute <strong>qid</strong>. If violates is not defined the error will not be shown in a report.
+</li>
+<li>
+<strong>qid</strong> -  is <strong>user-visible-name(element)</strong> or <strong>qualifying-id(element)</strong> of covered element(for more details see description of <strong>reqcoverage</strong> element above).
+</li>
+<li>
+<strong>description</strong> - optional element, text description of the error. Has optional <strong>format</strong> attribute.
+</li>
+<li>
+<strong>format</strong> - format of error description. Can be "html" or "plain". In case of "plain" all html tags will be shown as plain text.
+</li>
+<li>
+<strong>error_description</strong> is a text of error description. For "html" format it is allowed to use html tags for text formatting.
+</li>
+</ol>
+</dd>
+</dl>
+<p><br/></p>
+	
+<h2>D</h2>
+<dl>
+<dt><a name="glossary_document"></a>Document</dt>
+<dd><p>– is a xhtml-document that contains requirements written in a free form. Formed based on a requirements document imported into 
+	the <a href="glossary.en.html#glossary_project">'Requality project'</a>. The user selects text fragments in the document and assigns them to requirements.</p></dd>
+</dl>
+<p><br/></p>
+
+<h2>E</h2>
+<dl>
+<dt><a name="glossary_enum"></a>Enumerated attribute type (Enum)</dt>
+<dd>
+<p>– is attribute type, defines a list of available attribute values. <em>'Enum'</em> 
+type can be set manually in <em>'Properties'</em> view of <em>'Requality'</em> project 
+(see <a href="glossary.en.html#glossary_project_properties">'Project 'Requality' properties'</a>) as ordinar attribute of project node:</p>
+<ul>
+<li>The name of this attribute will be considered as the name of <em>'Enum'</em>-type.</li>
+<li><em>'ENUM_DEFINITION'</em> should be set as a type of this attribute.</li>
+<li>The value of this attribute is a list of values. It can be set manually with the help of values editor 
+or by using additional option of attribute extraction (from all project nodes).
+<ol>
+<li>The editor is opened by clicking in <em>'Value'</em> cell. All available values and comments (if needed) are listed in the editor window. 
+This is a view of the Enum values editor window:
+	<br/>
+	<br/>
+	<img alt="Values editor for Enum values assignment" src="images/ENUMEditor_en.png"/>
+	<br/>
+	<br/>
+</li>
+<li><em>'Enum'</em> extraction process is started by <em>'Extract enum definition from attributes'</em> button in the <em>'Properties'</em> view opened for project node. 
+Here user can choose one of attributes used in project tree nodes. And select new type name (by default it will be the name of the selected attribute). 
+At the end all this attribute values turns into the list of Enum-type values. And all attributes that were collected for <em>'Enum'</em>-type, will get 
+the name of the newly created enumerated type as the name and preserve their values.
+</li>
+</ol></li>
+<li>Attribute <em>'ENUM_DEFINITION'</em> is not inherited by other project nodes as usual project attribute. But it sets <em>'Enum'</em>-type 
+and this type is shown in the list of available values for all attributes in the project (to avoid confusion, it is displayed with a prefix &#9402;).</li>
+</ul>
+</dd>
+</dl>
+<p><br/></p>
+
+<h2>F</h2>
+<dl>
+<dt><a name="glossary_foreignid"></a>ForeignID</dt>
+<dd><p>– is an unique numeric identifier of a node in the requirements tree, which is specified in the <em>'ForeignID'</em> attribute.
+ The user ensures its presence independently. ForeingID is also used as predefined attribute name 
+ for <a href="glossary.en.html#glossary_seqid">SeqID</a>. </p>
+</dd>
+<p><br/></p>
+
+<dt><a name="glossary_fullname"></a>FullName</dt>
+<dd><p>– path to the node identifying the node. Contains a listing of all parent nodes in order, starting from the root node
+	 <em>'Requirements'</em> and ending with the node under consideration. In this listing, nodes are specified by their names, or by
+	  identifiers if there is no name defined. The separator is <em>'/'</em>.</p>
+</dd>
+</dl>
+<p><br/></p>
+
+<h2>G</h2>
+<dl>
+<dt><a name="glossary_generator"></a>Generator or Attribute value generator</dt>
+<dd>
+<p>- is a special functionality to generate a list of attribute values automatically.</p>
+<p>Any node of <em>Requality</em> project (besides folders and documents) has a table of attributes in <em>Main</em> tab of <em>'Properties'</em> view. There is a column <em>Generator</em> in 
+the table. You can open <em>Attribute value generator</em> wizard by clicking in a cell in this column.</p>
+<p><strong>Attribute value generator</strong> wizard window contains the following parameters:</p>
+<ul>
+	<li><a name="glossary_origin"></a><strong>Origin</strong> – element of requirements tree in which the generator is described. 
+	Couldn't be edited manually. Generally it shows the node for which this attribute values generator has been opened. 
+	But if considered attribute has been inherited from other node this node will be shown in Origin field.
+	</li>
+	<li><a name="glossary_attrgentype"></a><strong>Attr.gen.type </strong> – a method of how to generate attribute. 
+	There are three methods of attribute generation: <em>'RANDOM'</em>, <em>'BY_FORMULA'</em>, <em>'CYCLE'</em>.
+	<ul>
+		<li><strong>RANDOM</strong> - random generation. If this method is selected three editable fields appear: 
+		<em>'Min'</em> (minimum value of random set), 
+		<em>'Max'</em> (maximum value of random set) and <em>'Count'</em> (number of generated values).
+	  	<ul>
+			<li>By default all these values are set to 0.</li>
+	  		<li>These values could be edited manually.</li>
+			<li><em>'Max'</em> value should be not less than <em>'Min'</em> value, 
+			but if user sets values conversely field values change places with each other.</li>
+	  		<li>Changes in these fields effect on <em>'Preview'</em> field.</li>
+			<li>Also if <em>'RANDOM'</em> is set button <em>'Generate new set'</em> appears. 
+			Pushing this button generates new set of values in the <em>'Preview'</em> field.</li>
+		</ul>
+		<br/>
+			<img alt="Generators tab of Properties view, RANDOM generation method is selected" src="images/VNRandom.png" />
+		<p><br/></p>
+		</li>
+		<li><strong>BY_FORMULA</strong> - generation of values in accordance with a defined formula. If this method is selected <em>'Formula'</em> field appears.
+		<ul>
+	  		<li>By default <em>'Formula'</em> field is empty. Could be edited manually.</li>
+	  		<li>Formula should be written as JavaScript expression. The node attributes could be used as expression variables.</li>
+	  		<li>Example: set in <em>'Formula'</em> field value: <em>'element'+_i</em>, where <em>i</em> is other attribute of the node with value <em>'IValue'</em>, 
+	  		generator will generate value <em>element_IVALUE</em>.</li>
+		</ul>
+	  	<br/>
+		<img alt="Generators tab of Properties view, BY_FORMULA generation method is selected" src="images/VNByFormula.png" />
+		<p><br/></p>
+		</li>
+	  	<li><strong>CYCLE</strong> - generates values by iterating cycle From-To(by initial state, final state and step). 
+		If this method is selected three editable fields appear: <em>'From'</em>, <em>'To'</em> and <em>'Step'</em>.
+		<ul>
+			<li>By default all these values are set to 0.</li> 
+			<li>These values could be edited manually.</li>
+			<li><em>'To'</em> value should be not less than <em>'From'</em> value, 
+			but if user sets values conversely field values change places with each other.</li>
+			<li>Changes in these fields effect on <em>'Preview'</em> field.</li>
+		</ul>
+	  		<br/>
+			<img alt="Generators tab of Properties view, CYCLE generation method is selected" src="images/VNCycle.png" />
+			<p><br/></p>
+		</li>
+	  </ul>
+	  </li>
+	  <li><a name="glossary_preview "></a><strong>Preview </strong> - a field which displays a set of values generated by the selected method. 
+	  The content of this field is the result of setting generator parameters. It is empty by default. Editing is possible indirectly by 
+	  changing generator parameters. (see <a href="glossary.en.html#glossary_attrgentype">editing of <em>'Attr.gen.type'</em> field</a>).
+	  </li>
+    </ul>
+</dd>
+</dl>
+<p><br/></p>
+
+<h2>L</h2>	
+<dl>
+<dt><a name="glossary_list_values_editor"></a>List values editor</dt>
+<dd>
+<p>- editor of the values ​​of the attribute of the <em>'LIST'</em> type. If the <em>'Properties'</em> window of a node contains an attribute of 
+the <em>'LIST'</em> type, then the <em>'List Value Editor'</em> is used to set and edit its values. </p> 
+<p>The editor opens in a special window, which contains the following two elements:</p>
+<ul>
+<li>drop-down menu to select type (<em>'INT', 'FLOAT', 'BOOL', 'STRING', 'LIST', 'REFERENCE'</em>).</li>
+<li>list of values. Could be edited manually. Order of the list could be changed with the help of arrows on the right.
+<br/><br/>
+		<img alt="List values editor" src="images/ListValuesEditor.png" />
+	<br/><br/></li>
+</ul>
+</dd>
+<p><br/></p>
+
+<dt><a name="glossary_location"></a>Location</dt>
+<dd>
+<p>– is a part of the document 
+  that has been marked by user as belonging to any requirement. So the location means both 
+  the marked part of the document and a link in requirement properties to this part of the 
+  document. One location could belong to several requirements 
+  in one project simultaneously.
+</p>
+</dd>
+</dl>
+<p><br/></p>
+ 
+<h2>M</h2>
+<dl>
+<dt><a name="glossary_mandatory_attributes"></a>Mandatory attributes</dt>
+<dd>
+<p>- these are attributes that are automatically specified for existing and newly created elements of the requirements tree in accordance with the
+	 <a href="glossary.en.html#glossary_project">'Requality project'</a> settings. Mandatory attributes may vary for different types of nodes.
+	  All <a href="glossary.en.html#glossary_system_attributes">'system attributes'</a> are mandatory.
+	  <a href="glossary.en.html#glossary_user_attributes">'User attributes'</a> may become mandatory in accordance with the settings . 
+</p>
+</dd>
+<p><br/></p>
+<dt><a name="glossary_markup"></a>Markup Editor</dt>
+<dd>
+<p>- is a view in the <em>'Requality'</em> perspective, it's a document editor. It is used to mark requirements fragments in the documents.
+</p>
+<p><br/>
+<img alt="'Markup Editor' view" src="images/MarkupEditorView.png"/></p>
+</dd>
+<p><br/></p>
+
+<dt><a name="glossary_moduleeditor"></a>Module Editor</dt>
+<dd>
+<p>– is a view in the <em>'Requality'</em> perspective, it's a visual editor to present requirements and text nodes as plain document view. 
+It's designed to develop documentation by requirements creation. In contrast to <a href="glossary.en.html#glossary_unieditor"><em>'UniEditor'</em></a> and 
+<a href="glossary.en.html#glossary_review"><em>'Review'</em></a> editors in this editor nodes are shown without tabspaces, such approach allows to show requirements catalog 
+in more compact view, but it doesn't allow easy way to see the hierarchy. To analyse requirements hierarchy in the view it's recommended to use requirements tree in 
+<a href="glossary.en.html#glossary_explorer"><em>'Requality Explorer'</em></a> view.
+</p>
+<p><br/>
+<img alt="'Module Editor' view" src="images/ModuleEditorView.png"/></p>
+</dd>
+</dl>
+<p><br/></p>
+
+<h2>N</h2>
+<dl>
+<dt><a name="glossary_nameorid"></a>Nameorid</dt>
+<dd>
+<p>– a parameter used to define the identifier or name of some node of the requirements tree. If the node has a name, then <em>'nameorid'</em> is the name
+	 of the node, otherwise <em>'nameorid'</em> is its identifier. Can be used, for example, as a parameter in requirements descriptions. In this case, it should
+	  be written with an underscore at the beginning: '_nameorid'.</p>
+</dd>
+<p><br/></p>
+
+<dt><a name="glossary_node_parameters"></a>Node properites</dt>
+<dd><p>– these are node properties, a set of attributes that characterize the node. The full list of node parameters can be viewed and edited in the
+	 <a href="glossary.en.html#glossary_properties"><em>'Properties'</em></a> view window of the Requality perspective. 
+	 A shortened list of parameters is in a special <em>'parameter editing window'</em>, which opens when creating and editing nodes 
+	 in the <a href="glossary.en.html#glossary_moduleeditor"><em>'Module Editor'</em></a>,  <a href="glossary.en.html#glossary_unieditor"><em>'UniEditor'</em></a>
+	 and  <a href="glossary.en.html#glossary_review"><em>'Review'</em></a> editors. Some attributes may be 
+	 <a href="glossary.en.html#glossary_mandatory_attributes"><em>'mandatory'</em></a>, they are configured in the Requality project settings.
+	 The attributes that are specified in the attribute table are user-defined, since their presence is determined by the user, unlike all
+	 other system attributes.</p>
+</dd>
+<p><br/></p>
+
+<dt><a name="glossary_node_template"></a>Node template</dt>
+<dd>
+<p>– is an entity corresponding to one of node types (<em>'Comment'</em>, <em>'Report Settings'</em>, <em>'Requirement'</em>, <em>'Test Purpose'</em>, 
+<em>'Text Node'</em>, <em>'Virtual Node'</em>) of the <em>'Requality'</em> project. It works as a template to create new nodes of the same type.</p>
+<ul>
+<li>Node template properties (see <a href="glossary.en.html#glossary_template_properties"><em>'node template properties'</em></a>) are similar to properties of the ordinary same type node.</li> 
+<li>Node template parameters can be set by a user.</li>
+<li>When creating new node by the node template this new node gets all parameters of the template node.</li>
+<li>There could be many templates of the same type node in one project. But there is the only one active node template - 
+the template that is used by default.</li>
+<li>The user can set <a href="glossary.en.html#glossary_node_template_active"><em>'active template'</em></a> for every node type except for the folders and reports.</li>
+<li>By default the active node template is blank, i.e. all its parameters has default values (see <a href="glossary.en.html#glossary_templates_editor"><em>'Templates editor'</em></a>).</li>
+</ul>
+</dd>
+<p><br/></p>
+
+<dt><a name="glossary_template_properties"></a>Node template properties</dt>
+<dd>
+<p>– are a set of the node template (<a href="glossary.en.html#glossary_node_template"><em>'node template'</em></a>) parameters. Properties of some type node template are similar to properties of this type node. 
+Parameters are specified and could be set in the <em>'Properties'</em> view (can also be viewed and edited in abbreviated form in the 'parameter editing window').</p>
+</dd>
+</dl>
+<p><br/></p>
+
+<h2>O</h2>
+<dl>	
+<dt><a name="glossary_outline"></a>Outline</dt>
+<dd> 
+<p>- a view in the <em>'Requality'</em> perspective that displays the list of the document locations.
+</p>
+</dd>
+</dl>
+<p><br/></p>
+
+<h2>P</h2>
+<dl>
+<dt><a name="glossary_revision"></a>Project revision, Project version</dt>
+<dd>
+<p>- the state of the project and all its nodes, saved in the repository.
+</p>
+</dd>
+<p><br/></p>
+	
+<dt><a name="glossary_properties"></a>Properties</dt>
+<dd>
+<p>- is a view in the <em>'Requality'</em> perspective that displays the parameters of the selected object (requirement, <em><a href="glossary.en.html#glossary_document">document</a></em>, test purpose, <em><a href="glossary.en.html#glossary_report">report</a></em>, comment).</p>
+</dd>
+</dl>
+<p><br/></p>
+
+<h2>R</h2>
+<dl>	
+<dt><a name="glossary_attribute_type_reference"></a>REFERENCE attribute type</dt>
+<dd>
+<p>- is a special attribute type of requirements, virtual nodes and test purposes, which allows to link its node 
+to some other node of the same <a href="glossary.en.html#glossary_project"><em>'Requality project'</em></a> catalog. <em>'REFERENCE'</em> attribute
+could be added in <a href="glossary.en.html#glossary_properties"><em>'Properties'</em></a> 
+view in <em>'Main'</em> tab in <em>'Attributes'</em> table. It's a usual attribute of <em>'REFERENCE'</em> type, 
+that has a value - target node to link to.</p>
+<p>
+<br/>
+<img alt="'REFERENCE' type attribute in 'Properties' view" src="images/ReferenceTypeExample.png"/>
+</p>
+<p><br/></p>
+<p><br/></p>
+<p>The name of this attribute is the name of the link.</p>
+<p>The nodes linking is represented in <a href="glossary.en.html#glossary_links_explorer"><em>'Requality Links Explorer'</em></a> view. 
+In this view links are available in both sides – both from node with created attribute:</p>
+<p>
+<br/>
+<img alt="'Requality Links Explorer view, outbound link to linked node" src="images/LinkFromFirstEntity.png"/>
+</p>
+<p><br/></p>
+<p><br/></p>
+<p>and from linked node indicated in the <em>'Value'</em> field of the <em>REFERENCE</em> attribute of first node:</p>
+<p><br/>
+<img alt="'Requality Links Explorer view, inbound link to linking node" src="images/LinkFromSecondEntity.png"/>
+</p>
+</dd>
+<p><br/></p>
+
+<dt><a name="glossary_link"></a>Reference, reference between the nodes of requirement tree</dt>
+<dd>
+<p>- is a unidirectional named relationship between two nodes in the Requality project requirements tree. The
+	 link originates from the referencing node and enters the target node. It is set in the target node's attribute
+	  table as an attribute of type <em><a href="glossary.en.html#glossary_attribute_type_reference">'REFERENCE'</a></em>
+	  and is displayed for both nodes (referring and target) in the 
+	  <em><a href="glossary.en.html#glossary_links_explorer">'Requality Links Explorer'</a></em> window 
+	  (for the referencing node as an outgoing link, for the target node as an incoming link). The name of this
+	  attribute is the name of the outgoing link in the referencing node and, unless otherwise specified in 
+	  the project properties, is the name of the incoming link in the target node. When a new link is created,
+	  the name of the incoming link in the target node is the same as the name of the corresponding outgoing
+	  link in the referencing node. However, the Requality project has several predefined link names that have
+	  different incoming and outgoing link names.</p>
+</dd>
+<p><br/></p>
+
+<dt><a name="glossary_related_to_requirement"></a>Referred requirement</dt>
+<dd>
+<p>- target requirement referred to by other requirement (<a href="glossary.en.html#glossary_related_requirement">related requirement</a>).</p>
+</dd>
+<p><br/></p>
+
+<dt><a name="glossary_related_requirement"></a>Related requirement</dt>
+<dd>
+<p>- initial requirement related to other requirement. Related requirement has <em><a href="glossary.en.html#glossary_attribute_type_reference">'REFERENCE'</a></em> type attribute, which specifies the requirement that is being reffered to (<a href="glossary.en.html#glossary_related_to_requirement">referred requirement</a>).
+</p>
+</dd>
+<p><br/></p>
+
+<dt><a name="glossary_report"></a>Report</dt>
+	<dd>
+	<p>– an entity representing a ready-made generated report. The report is generated based on the settings specified
+		 in the 'Report settings' node (see <em><a href="glossary.en.html#glossary_report_settings">'Report settings'</a></em>) 
+		 and cannot be generated again. It has a read-only set of parameters that allow you to find out by what 
+		 settings this report was generated. You can only change the report name. By default, the report name 
+		 contains information about the date and time of generation.
+	</p>
+	<br/>
+	<p>
+		A report can consist of several reports if it is generated for several linked projects at once. In this case,
+		 at the top of the report there will be a line with a list of 
+		 <em><a href="glossary.en.html#glossary_link">links</a></em> for these projects. When you click on
+		 such a link, the report for the corresponding project will be opened in the same window.
+	</p>
+	<br/>
+	<p>
+		Each report at the beginning contains a summary table with brief information about itself. It includes such
+		 data as the date and time of generation, the version of the tool at the time of report generation, the 
+		 name of the initiator of the generation (as specified in the operating system settings), and a reference 
+		 to the repository if the project is under version control.
+	</p>
+</dd>
+	
+<p><br/></p>	
+<dt><a name="glossary_report_settings"></a>Report Settings</dt>
+<dd>
+	<p>– is an object that allows generating report that contains a summary of the project (number of verified and 
+		not verified requirements, test purposes coverage of requirements, requirements coverage of document, etc.).
+		 It has a set of parameters that influences the content and form of the report and defines a source of report
+		  data. The main parameter for generating a report is 
+		  <em><a href="glossary.en.html#glossary_report_template">'Report Template'</a></em>.
+		   Several reports could be generated based on a single Report Settings node. Changing Report Settings 
+		   does not affect the reports that have been
+		   already generated.</p>
+</dd>
+<p><br/></p>
+<dt><a name="glossary_report_settings_properties"></a>Report Settings properties</dt>
+<dd>
+<p>- are <em><a href="glossary.en.html#glossary_report">'Report'</a></em> Settings properties that are
+ specified and could be set in the <em><a href="glossary.en.html#glossary_properties">'Properties'</a></em> view.
+ (They can also be viewed and edited in a shortened form in the 'Parameters editing window '). </p>
+<br/>
+<p>For Report Settings node <em>'Properties'</em> view contains three tabs:</p>
+<ol>
+  <li><a name="glossary_report_data"></a><strong>Report Settings tab</strong> contains the following report parameters:
+     <ul>
+	 <li><a name="glossary_report_settings_Id"></a><strong>Id</strong> - Report Settings identifier. The identifier 
+	 is unique among the children of the one report folder. It could be changed manually. </li>
+      <li><a name="glossary_root_requirement"></a><strong>Root requirement</strong> – ​​the requirement for which the
+       report will be generated. Only this node and all its children nodes (requirements and comments) will be
+        considered in this report . In case of additional plug-ins for Requality, nodes of other types could be 
+        included in the report. Could be changed manually.  </li>
+      <li><p><a name="glossary_template"></a><strong>Template</strong> – report template, according to which 
+      the appearance and content of the report are modified. The report template is changed manually: selected
+       from the list of available report templates. It is a 
+       <em><a href="glossary.en.html#glossary_system_attributes">'system attribute'</a></em>.
+       The following report templates are available by default:</p> 
+       
+		<ul>
+			<li><strong>Reports for solving typical problems</strong>
+			<ul type="disc">
+				<li><em>'Requirements View'('Чтение требований')</em> - to show all requirements and text nodes as a table.</li>
+				<li><a href="glossary.en.html#glossary_problems_report"><em>'Checking Design Rules'
+					('Проверка правил оформления')</em></a> is a report containing information about violations of the requirements design rules, including those described in the ' Checker rules ' settings.</li>
+				<li><em>'Requirements Coverage Analysis'('Анализ покрытия требований')</em> contains information about
+				 the coverage of requirements and test situations by other elements (for example, tests). 
+				 To generate, you need to specify the source of coverage information. You can read more about the
+				  <em>'Requirements Coverage Analysis'</em> report <a href="glossary.en.html#glossary_coverage_report">here</a>.</li>
+			</ul>
+			<p><br/></p>
+			</li>
+			<li><strong>Export</strong>
+			<ul type="disc">
+				<li><em>'Export project to XML'('Экспорт проекта в XML')</em> - exports the <em><a href="glossary.en.html#glossary_project">Requality project</a></em> as an XML document, intended for using the report with other tools.</li>
+			</ul>
+			<p><br/></p>
+			</li>
+		</ul>
+		<p><strong>EXPERIMENTAL</strong></p>
+		<ul>
+			<li><strong>Requirements markup</strong>
+			<ul type="disc">
+				<li><em>'Requirements Extraction Analysis' ('Анализ выделения требований', experimental functionality)</em>
+				 (экспериментальная функциональность) - this report downloads all available <em><a href="glossary.en.html#glossary_document">documents</a></em>
+				and their markup, designed to analyze the requirements markup in imported documents.</li>
+				<li><a href="glossary.en.html#glossary_document_model_report"><em>'Document model \ Requirements markup coverage analysis'</em></a>
+				 ('Анализ покрытия выделенных требований', experimental functionality)  is similar to the 
+				 <a href="glossary.en.html#glossary_coverage_report"><em>'Requirements Coverage Analysis'</em></a> template, but provides coverage information about document fragments.</li>
+			</ul>
+			<p><br/></p>
+			</li>
+			<li><strong>Traceability</strong>
+			<ul type="disc">
+				<li><a href="glossary.en.html#glossary_traceability_report"><em>'Custom visualization of relationships between requirements'</em></a>
+				  ('Настраиваемая визуализация связей между требованиями', experimental functionality) - a report with
+				  <em><a href="#glossary_link">links</a></em> between related nodes of the <em><a href="#glossary_project">Requality project</a></em>. 
+				Designed to view links according to the specified settings.</li>
+				<li><em>'Bi-directional Relationship Visualization'</em>  ('Двунаправленная визуализация связей', experimental functionality) -
+				 This report is designed to show relationships in both directions (outgoing and incoming) simultaneously.</li>
+			</ul>
+			<p><br/></p>
+			</li>
+			<li><strong>Design rules development</strong>
+			<ul type="disc">
+				<li><em>'Debug Design Rules</em> ('Отладка правил оформления', experimental functionality) - 
+				this report is designed to debug requirements design rules, it allows you to examine nodes where
+				 the rules written for the project produce a result other than <em>'true'</em> or <em>'false'</em>, 
+				 that is, they may be written incorrectly.</li>
+			</ul>
+			<p><br/></p>
+			</li>
+			<li><strong>Rest</strong>
+			<ul type="disc">
+				<li><em>'Export to LORequality'</em> ('Экспорт в LORequality', experimental functionality) - this report is intended for exchanging requirements with LibreOffice . </li>
+				<li><a href="glossary.en.html#glossary_progress_report"><em>'Progress' / 'Project progress'</em></a> 
+				('Прогресс по проекту', experimental functionality)- this report is designed to analyze the change
+				 in the number of requirements and test cases based on the commit history, allows you to view 
+				 statistics on the number of requirements and test cases in different <a href="glossary.en.html#glossary_revision">revisions</a>, 
+				 uploaded to the repository for this project.</li>
+			</ul>
+			<p><br/></p>
+			</li>
+		</ul>
+		</li>
+      <li><a name="glossary_report_settings_attributes"></a><strong>Attributes</strong> – the attributes of the
+       Report Settings, are set in the table. More about attributes table you can read 
+       <a href="glossary.en.html#glossary_attributes_table">here</a>. If it's required to set coverage data source 
+       for report generation this data will be added to attributes table as value of <em>'coverageFilePath'</em> attribute. 
+       The attribute table could be changed manually. Information about the source of coverage data could be added
+        to the table as attribute <em>'coverageFilePath'</em>. To set or edit this attribute there is button 
+        <em>'Update Coverage Source'</em>. The button appears on the tab if report generation requires coverage data. </li>
+	 </ul>
+     <p><br/></p>
+	 <img alt="Properties view for Report Settings" src="images/ReportSettingsProperties.png"/>
+	 <p><br/></p>
+  </li>
+  <li><a name="glossary_report_history"></a><strong>History tab</strong> contains information about the history
+   of all <em><a href="glossary.en.html#glossary_revision">'revisions'</a></em> related to this Report Settings
+   node. The contents of the tab are similar to the contents of the 'History' tab for a requirement 
+   (see <em><a href="glossary.en.html#glossary_requirement_properties">'Requirement Settings'</a></em>).</li>
+  <li><a name="glossary_report_source"></a><strong>Source tab</strong> contains only json-code:
+    <ul>
+      <li><a name="glossary_report_json"></a><strong>json</strong> – low-level representation of the report as an entity. Is read-only. </li>
+    </ul>
+  </li>
+</ol>
+</dd>
+<p><br/></p>
+
+
+<dt><a name="glossary_progress_report"></a>Report by 'Progress' template ('Прогресс по проекту')</dt>
+<dd>
+<p>- presents project statistics from different Git revisions.</p>
+<p>The report consists of two pages:</p>
+<ol>
+<li>First page contains following diagrams:
+<ul>
+<li>Diagram shows total number of nodes: requirements (not leaf and leaf nodes), test purposes.</li>
+<li>Coverage diagram.</li>
+<li>Diagram shows ratio of requirements number an test purposes number.</li>
+</ul>
+</li>
+<li>Second page contains total spreadsheet with numeric characteristics for revisions: number of requirements, 
+test purposes, number and ratio of covered and not-covered requirements.</li>
+</ol>
+<p><br/>
+To create the report the user could set report settings (required time period and time step between revisions)
+and also user can set the coverage source, where to take coverage data from.
+</p>
+</dd>
+<p><br/></p>
+
+<dt><a name="glossary_document_model_report"></a>Report by template 'Document model' ('Анализ покрытия выделенных требований')</dt>
+<dd>
+	<p>-a <em><a href="glossary.en.html#glossary_report">report</a></em> on coverage about coverage of <em>'locations'</em> 
+	in document by other elements (for example, tests), specified using an additional source of coverage information.
+	 There can be two such sources:</p>
+<ol>
+<li><strong>File with coverage information written in a specific format</strong></li>
+<li><strong>Automatic search for files containing identifiers of requirements or test situations covered by them.</strong>
+When using this source, a search is performed on projects selected by the user in the workspace to find files 
+with the specified extension. The extension is specified by the user. For the specified files, the file contents
+ are checked line by line for compliance with the regular expression described by the user. As a result of such
+ search, the tool receives a set of covered elements and information about the covering files. 
+</li>
+</ol>
+</dd>
+<p><br/></p>
+
+<dt><a name="glossary_coverage_report"></a>Report by template 'Requirements Coverage Analysis' ('Анализ покрытия требований')</dt>
+<dd>
+	<p>-a <em><a href="glossary.en.html#glossary_report">report</a></em> on coverage of requirements and test 
+	purposes by other elements (for example, tests), specified using an additional source of coverage information.
+	 There can be two such sources:</p>
+<ol>
+<li><strong>File with coverage information written in a specific format</strong></li>
+<li><strong>Automatic search for files containing identifiers of requirements or test situations covered by them.</strong>
+When using this source, a search is performed on projects selected by the user in the workspace to find files 
+with the specified extension. The extension is specified by the user. For the specified files, the file contents
+ are checked line by line for compliance with the regular expression described by the user. As a result of such
+ search, the tool receives a set of covered elements and information about the covering files. 
+</li>
+</ol>
+</dd>
+<p><br/></p>
+
+
+<dt><a name="glossary_traceability_report"></a>Report by the template 'Custom visualization of relationships between requirements' ('Настраиваемая визуализация связей между требованиями', experimental functionality)</dt>
+<dd>
+<p>-a <em><a href="glossary.en.html#glossary_report">report</a></em> with links between related nodes of the 
+	<em><a href="glossary.en.html#glossary_project">Requality project</a></em> directory.</p>
+	<br/>
+	<p>The report consists of two pages. The first contains information about direct links, 
+		the second about inverse links. By default, the first page opens; to go to the second, 
+		click on the link with the name of the inverse relationship (set in the project properties).
+		 To go back to the first page, click on the name of the relationship.
+	</p>
+</dd>
+
+<p><br/></p>
+
+<dt><a name="glossary_problems_report"></a>Report on the 'Checking Design Rules' template  (Отчет по шаблону 'Проверка правил оформления')</dt>
+<dd>
+<p>-a <em><a href="glossary.en.html#glossary_report">report</a></em> in the form of a table containing a list of nodes 
+in which the 'Checker rules' rules are violated, and information about which rules are violated in each such node.</p>
+</dd>
+
+<p><br/></p>
+
+
+<dt><a name="glossary_report_parameters"></a>Report parameters</dt>
+<dd>
+<p>- are <em><a href="glossary.en.html#glossary_report">'Report'</a></em> parameters that are specified (mostly during
+ <em><a href="glossary.en.html#glossary_report_settings">'Report Settings'</a></em> generation) and accessible in the
+ <em><a href="glossary.en.html#glossary_properties">'Properties'</a></em> view. </p>
+<p>Report parameters are identical to <em><a href="glossary.en.html#glossary_report_settings_properties">'Report Settings parameters'</a></em> 
+(except for the <em>'date'</em> attribute), but are read-only (except for the 'Id' parameter).</p>
+<ul>
+<li>The <strong><a name="glossary_report_settings_Id"></a>Id</strong> parameter in this case is the report identifier,
+ located on the <em><a href="glossary.en.html#glossary_report_settings_properties">'Report Settings'</a></em> tab of 
+ the <em><a href="glossary.en.html#glossary_properties">'Properties'</a></em> window. By default, it includes the
+  identifier of the <em><a href="glossary.en.html#glossary_report_settings_properties">'Report Settings'</a></em>, 
+  on the basis of which this report was generated, and the date and time of generation. However,  it can be manually
+   edited by the user.</li>
+<li>The <em><a href="glossary.en.html#glossary_attributes_table">attribute table</a></em> contains the <strong>date</strong> attribute, which is automatically created when the report is generated and contains information about the date and time of report generation.</li>
+</ul>
+<p><img alt="Properties view for Report" src="images/ReportProperties.png"/>
+</p>
+</dd>
+
+<p><br/></p>
+
+<dt><a name="glossary_report_template"></a>Report template</dt>
+<dd>
+<p>
+– this is the main setting that determines the contents and appearance of the <em><a href="glossary.en.html#glossary_report">report</a></em>. 
+It is specified in the <em><a href="glossary.en.html#glossary_report_settings">'Report settings'</a></em> node. For example, the data can be
+presented as a list or a table. You can include all nodes of the 'Requirements' tree in the report or only nodes of a certain type. <strong>Requality</strong>
+has a set of built-in report templates that are available by default. If you use plugins for <strong>Requality</strong>, the list of available 
+templates can be expanded. You can also add and delete your own report templates. The report template itself is described in a separate file 
+in the file system.
+</p>
+</dd>
+<p><br/></p>
+<dt><a name="glossary_explorer"></a>Requality Explorer</dt>
+<dd>
+<p>- is a view in the <em>'Requality'</em> perspective, that displays all content of the 
+<em><a href="glossary.en.html#glossary_project">'Requality project'</a></em> (<em><a href="glossary.en.html#glossary_document">documents</a></em>,
+ requirements, <em><a href="glossary.en.html#glossary_report">reports</a></em>, comments).</p>
+<p><br/>
+<img alt="Requality Explorer view" src="images/ReqExplorerStructureRequality_en.png"/>
+</p>
+</dd>
+<p><br/></p>
+
+<dt><a name="glossary_links_explorer"></a>Requality Links Explorer</dt>
+<dd>
+<p> – is a view in the Requality 
+ perspective, which displays the project catalog nodes of the
+ <em><a href="glossary.en.html#glossary_project">Requality project</a></em> linked to the 
+ selected node by the <em><a href="glossary.en.html#glossary_attribute_type_reference">'reference link'</a></em>
+ specified in the 'REFERENCE' type attribute. In this window you can view both outgoing and 
+ incoming references together and separately, sort their display by name, and enable highlighting 
+ of linked nodes in the <em><a href="glossary.en.html#glossary_explorer">'Requality Explorer'</a></em>
+  view.
+</p>
+</dd>
+
+<p><br/></p>	
+
+
+<dt><a name="glossary_project"></a>Requality project</dt>
+<dd>
+<p>- is an <em>Eclipse</em> project created using <em>Requality</em> plug-in. It contains 
+<em><a href="glossary.en.html#glossary_document">documents</a></em>, 
+<em><a href="glossary.en.html#glossary_requirement">requirements</a></em>, 
+<em><a href="glossary.en.html#glossary_report">reports</a></em> and other entities.</p>
+</dd>
+
+<p><br/></p>
+
+<dt><a name="glossary_project_properties"></a>Requality project properties</dt>
+<dd>
+<p>– properties of the <em><a href="glossary.en.html#glossary_project">Requality project</a></em>, 
+set as parameters of the root node of the project. Set in the <em><a href="glossary.en.html#glossary_properties">'Properties'</a></em> 
+window.</p>
+<p>For a project, the 'Properties' window contains 3 tabs:</p>
+<ol>
+	<li><strong>Tab 'Main'</strong>
+		<ul>
+			<li><em>'Extract enum definitions from attributes'</em> button opens a dialog box for extracting an enumeration type from existing project attributes. See <em><a href="#glossary_enum">'Enumerated attribute type
+			 (Enum)'</a></em> for details.</li>
+			<li><em>'Attributes'</em>- project attributes, presented in a table. The attribute table 
+			(see <em><a href="#glossary_attributes_table">'Attributes table'</a></em>) of a project is similar to the attribute tables of 
+			other project nodes, except that the 'Scope' column is missing. All project attributes are considered global by default, 
+			that is, they are inherited by the entire project tree. In the project attribute table, attributes of the <em>'ENUM_DEFINITION'</em> 
+			type can be specified, which are used to specify an enumerated type for use in other project attributes. For more information 
+			about the enumerated type, see <em><a href="#glossary_enum">Enumerated Attribute Type (Enum)</a></em>.
+			</li>
+		</ul>
+		<p><br/></p>
+        <img alt="The Main tab of the Properties view for the Requality project" src="images/ProjectPropertiesMain.png"/>
+        <p><br/></p>
+	</li>
+	<li><strong>The History tab</strong> contains information about the history of all <a href="#glossary_revision">revisions</a> in the project.
+	This tab contains the change history table - this is a table containing information about all revisions of the project 
+	requirements tree elements that were saved to the repository using the <em>'Repository'</em> menu. Each save of changes to 
+	the repository corresponds to one row:
+	<ul>
+		<li>the first cell contains the text of the comment for this change,</li>
+		<li>the second cell contains system <a href="#glossary_revision">revision</a> name (for a regular user this information is not important),</li>
+		<li>in the third cell - the name of the user who uploaded the version to the repository,</li>
+		<li>in the fourth - the date when the version was uploaded to the repository.</li>
+	</ul>
+	Double-clicking on a particular version line opens a perspective for comparing the state of the project at that time with its current local state.
+	<p><br/></p>
+<img alt="The History tab of the Properties window for the Requality project" src="images/ProjectPropertiesHistory.png"/>
+<p><br/></p>
+	</li>
+	<li><strong>'Templates' tab</strong>- the contents of this tab are completely identical to those of the <em>'Templates Editor'</em> view 
+	and have the same functionality. See <a href="#glossary_templates_editor">Templates Editor</a> for details.
+			<p><br/></p>
+			<img alt="The Templates tab of the Properties window for the Requality project" src="images/ProjectPropertiesTemplates.png"/>
+			<p><br/></p>
+	</li>
+</ol>
+</dd>
+<p><br/></p>
+
+<dt><a name="glossary_requirement"></a>Requirement</dt>
+<dd>
+<p>– is an entity 
+  that contains a description of some requirement, and links to those parts of the 
+  document that reference to this requirement.</p>
+  <ul>
+  <li>A requirement can have <em><a href="glossary.en.html#glossary_subrequirement">'sub-requirements (child requirements)'</a></em>. </li>
+  <li>The requirement may have no description 
+  and no links to the document. Such requirements are usually used for organization 
+  of the hierarchical structure of requirements, acting as parent nodes.</li>
+  <li>Only requirements 
+  without child-requirements in the hierarchy can have test purposes.</li>
+  <li>Every requirement
+  has a set of parameters that specify its content and properties (see <a href="glossary.en.html#glossary_requirement_properties"><em>'Requirement properties'</em></a>).</li>
+  <li>Requirement can be converted to a <a href="glossary.en.html#glossary_textnode"><em>'Text Node'</em></a> keeping all parameters.</li>
+  </ul>
+</dd>
+  <p><br/></p>
+  
+<dt><a name="glossary_requirement_properties"></a>Requirement properties</dt>
+<dd>
+<p>- are requirement parameters that are specified and could be set in the <em>'Properties'</em> view. 
+(They can also be viewed and edited in a shortened form in the <em>'Parameters editing window'</em>).</p>
+<p>For requirements <em>'Properties'</em> view contains five tabs:</p>
+<ol>
+  <li><a name="glossary_main"></a><strong>Main tab</strong> contains the following requirement parameters:
+    <ul>
+      <li><a name="glossary_id"></a><strong>Id</strong> - requirement identifier. The identifier is unique 
+	  among the children of the one parent. It could be changed manually.</li>
+      <li><a name="glossary_name"></a><strong>Name</strong> – name of the requirement. It shouldn't be unique. 
+	  Name is empty by default. Name could be changed manually.</li>
+<li><a name="glossary_type"></a><strong>Type</strong> – node type. For requirement it is always <em>'Requirement'</em>. 
+This field has a drop-down list and allows to switch node type to Text node ('Text' or 'Header').</li>
+      <li><a name="glossary_attributes"></a><strong>Attributes</strong> – the attributes of the requirement. Are represented in a table. 
+Read more here: <a href="glossary.en.html#glossary_attributes_table">'Attributes table'</a>.</li>
+    </ul>
+    <br/>
+	<img alt="Main tab in Properties view for requirement" src="images/ReqPropertiesMain.png"/>
+	<br/>
+	<br/>
+  </li>
+  <li><a name="glossary_description"></a><strong>Description tab</strong> contains the following requirement parameters:
+    <ul>
+      <li><a name="glossary_alternative_description"></a><strong>Alternative Description</strong> –
+        - alternative text of the requirement, that specifies and supplements the text of the selected fragments. 
+		It could be changed manually.</li>
+      <li><a name="glossary_locations"></a><strong>Locations</strong> - the list of locations of the requirement, 
+	  grouped by documents. Manually you can only delete locations.</li>
+    </ul>
+    <p><br/>
+	<img
+    alt="Description tab in Properties view for requirement"
+    src="images/ReqPropertiesDescription_en.png" width="429" height="267" />
+	<br/>
+	<br/></p>
+  </li>
+  <li><p><a name="glossary_history"></a><strong>History tab</strong> contains information about the history of all 
+  <em><a href="#glossary_revision">revisions</a></em> related to this requirement. The user cannot edit anything 
+  on this tab directly, only when saving the next <em><a href="glossary.en.html#glossary_revision">version</a></em> to the repository. 
+  The tab contains the following information:</p></li>
+<ul>
+	<li><strong>The version history table</strong> is a table containing information about all versions of a given requirement. Each version has one row, which contains the text of the comment for this version, the system version number, the name of the user who uploaded the version to the repository, and the date it was uploaded to the repository. The top row corresponds to the latest version synchronized with the repository. Then, from top to bottom, the versions are listed in descending order, from newest to oldest. Double-clicking on the row of a specific version opens a comparison window, which displays information about the differences between this version of the requirement in question and its current local version. The local version currently in the workspace is marked in green. This is especially important to see if the project has been <em><a href="manual.en.html#switch_version">switched to an old version</a></em>.
+	</li>
+</ul>
+<br/>
+<p><img src="images/RequirementHistory.png" alt="The History tab of the Properties window for a requirement"/></p>
+<br/>
+  
+  <li><a name="advanced"></a><strong>Advanced tab</strong> contains:
+    <ul>
+      <li><a name="glossary_predicate"></a><strong>Predicate</strong> – a predicate, defines what requirements 
+	  will be included in reports. Predicate is inherited from the parent requirements by default. 
+	  Could be changed manually.</li>
+    </ul>
+    <br/>
+	<img
+    alt="Advanced tab in Properties view for requirement"
+    src="images/ReqPropertiesAdvanced.png"/>
+	<br/>
+	<br/>
+  </li>
+  <li><a name="glossary_source"></a><strong>Source tab</strong> contains only json-code:
+    <ul>
+      <li><strong>json</strong> – low-level representation of the requirement as entity. Couldn't not be edited.</li>
+    </ul>
+<br/>
+<img alt="Source tab in Properties view for requirement" src="images/ReqPropertiesSource.png" width="617" height="267"/>
+  </li>
+</ol>
+</dd>
+
+<p><br/></p>
+
+<dt><a name="glossary_reused_node"></a>Reused node</dt>
+<dd>
+<p>- any node of requirements tree, that is set as target for iteration in virtual node properties (see <em>'Target'</em> in <a href="glossary.en.html#glossary_vnode_parameters"><em>'Virtual node properties'</em></a>. Clone-nodes (see <a href="glossary.en.html#glossary_clone"><em>'Clone'</em></a>) of this virtual node are created based on the reused node. But it doesn't influence on the reused node itself.  Changes of reused node or its subtree are influence on the clone-nodes.<br/><br/></p>
+</dd>
+
+<p><br/></p>
+<dt><a name="glossary_review"></a>Review</dt>
+<dd>
+<p>- is a view in the <em>'Requality'</em> perspective, it's a visual editor for requirements, test purposes and comments. 
+It is designed for viewing rather than editing, so it has limited functionality. It allows only adding, editing and deleting 
+comments and changing the status of requirements and test purposes. In contrast to <a href="glossary.en.html#glossary_unieditor"><em>'UniEditor'</em></a> it allows setting statuses 
+of the requirements and test purposes into the value <em>'verified'</em>.</p>
+<p><br/>
+<img alt="Review view" src="images/ReviewView.png"/>
+<br/><br/>
+</p>
+</dd>
+</dl>
+<p><br/></p>
+
+<h2>S</h2>
+<dl>
+<dt><a name="glossary_seqid"></a>SeqID</dt>
+<dd>
+<p> – is a unique identifier of the requirements tree node within the project. It is an attribute of the requirements 
+tree node (requirement, text node, comment, etc.) and is a number. In some cases, this number may have a user-defined prefix, but it does not exist 
+by default. The name of the attribute is specified in <em>'SeqID'</em> project parameter by the user, by default it is <em>'ForeignID'</em>. The 
+uniqueness of the identifier lies in the fact that only one requirements tree node in the project can have such an identifier throughout its 
+entire life cycle, and even if this node is deleted, no other node will receive the same identifier while the mechanism is enabled. In order 
+for the mechanism for supporting auto-generated identifiers in the <strong>Requality</strong> project to work and their uniqueness to be tracked, 
+it must be enabled in the project settings (by default, the mechanism is not enabled when creating a new project). 
+Otherwise, such attributes are considered as regular attributes of the node, and the uniqueness of their values ​​is not guaranteed. When the 
+auto-generation of identifiers is enabled, all nodes of requirements tree that were already in the project receive an attribute with 
+the specified name and a unique value. If some nodes already had an attribute with this name, it is considered as <em>'SeqID'</em>, and its 
+value will be reserved for this node. All new nodes will receive this attribute with an automatically assigned value. After disabling the 
+mechanism of auto-generated identifiers, all attributes (regardless of the source, including manual one assigned before the activation) 
+will be deleted. 
+</p>
+</dd>
+<p><br/></p>
+
+<dt><a name="glossary_subrequirement"></a>Sub-requirement, or child requirement</dt>
+<dd>
+<p>- is a child node for some other <em><a href="glossary.en.html#glossary_requirement">requirement</a></em> in the project hierarchy. 
+If a parent requirement R contains N subrequirements RC _1, ..., RC _ N, then the requirements RC _1, ..., RC _ N 
+are said to represent a decomposition of requirement R. In other words, the target system satisfies requirement R if 
+and only if it satisfies all requirements RC _1, ..., RC _ N.<br/></p>
+</dd>
+<p><br/></p>
+
+<dt><a name="glossary_system_attributes"></a>System attributes</dt>
+<dd>
+<p>
+- these are <em><a href="glossary.en.html#glossary_project_properties">parameters of the Requality project</a></em> node that exist 
+for nodes by default, the 
+user cannot create them, delete or change their data type, but, as a rule, the value can 
+be edited. Sometimes the value cannot be edited either, for example, some system attributes 
+of <a href="glossary.en.html#glossary_report">a report</a> cannot be edited, because they 
+contain information about the initial settings on which this report was generated. System attributes can be edited in <em>'Node Properties'</em> 
+(see <em><a href="glossary.en.html#glossary_requirement_properties">'Requirement Properties'</a></em> 
+as an example). It is necessary to distinguish between <em>'system attributes'</em> and 
+<em>'user attributes'</em>, and also keep in mind that there are 
+<em><a href="glossary.en.html#glossary_mandatory_attributes">'mandatory attributes'</a></em>.
+</p>
+</dd>
+</dl>
+<p><br/></p>
+
+<h2>T</h2>
+<dl>
+<dt><a name="glossary_templates_editor"></a>Templates editor</dt>
+<dd>
+<p> - is an editor for node templates (see <a href="glossary.en.html#glossary_node_template">'Node template'</a>). 
+Allows to create, delete, edit node templates and set active templates. Can be opened from editors: <em>'Module Editor'</em>, <em>'UniEditor'</em>, <em>'Review'</em>.</p>
+<p>Contains fields:</p>
+<ul>
+	<li><strong>Select Node Type</strong> - drop-down list to select node type. It specifies the type of nodes to work with in the templates editor view. 
+	So if <em>'Requirement'</em> type has been selected in this list then only requirement templates will be shown in the list of existed 
+	templates and every new template will be created for requirement node type.
+	</li>
+	<li><strong>Create template</strong> - a button to create new template.
+	</li>
+	<li><strong>Extract template</strong> - a button to create new template based on an existing node.
+	</li>
+	<li><strong>List of templates</strong> - a list of available templates for the node type selected on <em>'Select Node Type'</em> drop-down list.
+	</li>
+	<li><strong>Edit</strong> - a button to open editor for the template selected in the <em>'List of templates'</em> field.
+	</li>
+	<li><strong>Remove</strong> - a button to delete the template selected in the <em>'List of templates'</em> field.
+	</li>
+	<li><strong>Set as active</strong> - a button to set selected in the <em>'List of templates'</em> template active 
+	(see <a href="glossary.en.html#glossary_node_template_active">'Active node template'</a>). 
+	Blank template - <em>'Empty'</em> - is active by default.
+	Active template is marked with bold font in the <em>'List of templates'</em> field.
+	</li>
+</ul>
+<p><br/></p>
+<p><img alt="Templates editor" src="images/TemplatesEditor.png" />
+<br/></p>
+</dd>
+<p><br/></p>
+
+<dt><a name="glossary_term"></a>Term, term relation</dt>
+<dd>
+<p>
+– is a concept in <strong>Requality</strong> that denotes the presence of a special one-to-many directed 
+relationship <em>'Term - Term referrers'</em> between several nodes, where one of these nodes 
+is considered to be the place where the term is defined, and all the others are places 
+where it is used. This relationship is specified not by an attribute of type <em>'Reference'</em>, 
+but by special attributes named <em>'def-term'</em> (in the node where the term is defined) 
+and <em>'usedef'</em> (in the nodes where the term is used). The name of a term aim to be 
+unique within a project.
+</p>
+</dd>
+<p><br/></p>
+
+<dt><a name="glossary_purpose"></a>Test purpose</dt>
+<dd>
+<p>– is an entity that contains
+  the description of the test cases and expected results. Test purpose belongs only to the requirement 
+  that has no requirements-children. Every test purpose has a set of parameters that specify its 
+  content and properties. One requirement could have several test purposes.<br/></p>
+</dd>
+<p><br/></p>  
+<dt><a name="glossary_purpose_properties"></a>Test purpose properties</dt>
+<dd>
+<p>- test purpose parameters that are specified and could be set in the <em>'Properties'</em> view. 
+(They can also be viewed and edited in a shortened form in the <em>'parameter editing window'</em>).</p>
+<p>For test purposes <em>'Properties'</em> view contains five tabs:</p>
+<ol>
+  <li><strong>Main tab</strong> contains the following test purpose parameters:
+    <ul>
+	<li><strong>Id</strong> – test purpose identifier. The identifier is unique for all test situations 
+	of the one requirement. It could be changed manually.</li>
+	<li><strong>Name</strong> – test purpose name. The identifier can be not unique. Is empty by default. Can be changed manually.</li>
+	<li><strong>Status</strong> - test purpose status. It could be: <em>'in
+        process'</em>, <em>'complete'</em> or <em>'verified'</em>.
+        Could be changed manually.</li>
+	<li><strong>Author</strong> - an author of the test purpose. Could be changed manually.</li>
+	<li><strong>Attributes</strong> – the attributes of the test purpose. Are represented in a table. 
+	Read more about attributes table <a href="glossary.en.html#glossary_attributes_table">here</a>.
+	</li>
+    </ul>
+	 <p><br/></p>
+	 <img alt="'Main' tab in 'Properties' view for test purpose" src="images/PurposePropertiesMain.png" />
+	 <p><br/></p>
+  </li>
+  <li><strong>Description tab</strong> contains the following test purpose parameters:
+    <ul>
+      <li><strong>Test purpose description</strong> - a description text of the test purpose. Could be changed 
+	  manually.</li>
+      <li><strong>Expected results</strong> - result expected for the test purpose.</li>
+    </ul>
+	 <p><br/></p>
+	 <img alt="'Description' tab in 'Properties' view for test purpose" src="images/PurposePropertiesDescription.png" />
+	 <p><br/></p>
+  </li>
+  <li><a name="glossary_history_testpurpose"></a><strong>History tab</strong> contains information about the history of all <em><a href="#glossary_revision">revisions</a></em> 
+  related to this test purpose. The contents of the tab are similar to the contents of the 
+  <em>'History'</em> tab for the requirement (see <em><a href="#glossary_requirement_properties">'Requirement Properties'</a></em>).
+	 <p><br/></p>
+  </li>
+  
+  <li><strong>Advanced tab</strong> contains:
+    <ul>
+      <li><strong>Predicate</strong> – a predicate, defines what test purposes will be included in reports. 
+	  Predicate is inherited from the parent requirements by default. Could be changed manually.</li>
+    </ul>
+	 <p><br/></p>
+	 <img alt="Advanced tab in Properties view for test purpose" src="images/PurposePropertiesAdvanced.png" />
+	 <p><br/></p>
+  </li>
+  <li><strong>Source tab</strong> contains only json-code:
+    <ul>
+      <li><strong>json</strong> – low-level representation of the test purpose as entity. Couldn't be edited.</li>
+    </ul>
+	 <p><br/></p>
+	 <img alt="Source tab in Properties view for test purpose" src="images/PurposePropertiesSource.png" />
+	 <p><br/></p>
+  </li>
+</ol>
+</dd>
+<p><br/></p>	
+<dt><a name="glossary_textnode"></a>Text Node</dt>
+<dd>
+<p>is an entity that contains some text. It is designed to store and display the notes and comments included in documents. 
+Such text is a part of document but is not a system requirement.</p>
+<ul> 
+<li>The text node is similar to <em>'Requirement'</em> but is not a <em>'Requirement'</em> node, and it will not be shown in report 
+about requirement coverage or report about coverage by requirements.</li>
+<li>Text node has a set of parameters which defines its content and properties (see <a href="glossary.en.html#glossary_textnode_properties"><em>'Text node properties'</em></a>).</li> 
+<li>There are two formats of the text node: simple text (<em>'text'</em>) and header text (<em>'header'</em>). 
+The format of the text node affects on how it looks like in <em>'UniEditor'</em> and <em>'Module Editor'</em> editors.</li> 
+<li>Text node can be converted to a <a href="glossary.en.html#glossary_requirement"><em>'Requirement'</em></a> keeping all parameters.</li>
+</ul>
+</dd>
+<p><br/></p>
+<dt><a name="glossary_textnode_properties"></a>Text node properties</dt>
+<dd>
+<p>- are text node parameters that are specified and could be set in the <em>'Properties'</em> view. (They can also be viewed and edited in a shortened form in the 'parameter editing window').</p>
+<p>For text nodes <em>'Properties'</em> view contains five tabs:</p>
+<ol>
+  <li><a name="glossary_main_textnode"></a><strong>Main tab</strong> contains the following text node parameters:
+    <ul>
+		<li><a name="glossary_id_textnode"></a><strong>Id</strong> - text node identifier. The identifier is unique 
+	  among the children of the one parent. It could be changed manually.</li>
+		<li><a name="glossary_name_textnode"></a><strong>Name</strong> – name of the text node. It shouldn't be unique. 
+	  Name is empty by default. Name could be changed manually.</li>
+		<li><a name="glossary_type"></a><strong>Type</strong> – text node type. 
+			For text node the type can be <em>'Text'</em> (for plain text), 
+			or <em>'Header'</em> (for header). This field has a drop-down list and allows to change one text node type to another 
+	(<em>'Text'</em> to <em>'Header'</em> and revert) or change text node to <em>'Requirement'</em>).</li>
+		<li><a name="glossary_attributes_textnode"></a><strong>Attributes</strong> – text node attributes, are presented in a table. 
+	Read more <a href="glossary.en.html#glossary_attributes_table">here</a>.</li>
+    </ul>
+    <br/>
+	<img alt="'Main' tab of 'Properties' view for text node" src="images/TextNodePropertiesMain.png"/>
+	<br/>
+	<br/>
+  </li>
+  <li><a name="glossary_description_textnode"></a><strong>Description tab</strong> contains the following text node parameters:
+    <ul>
+      <li><a name="glossary_description_textnode"></a><strong>Description</strong> –
+        text of the text node. Can be edited manually.</li>
+    </ul>
+    <p><br/>
+	<img
+    alt="'Description' tab of 'Properties' view for text node"
+    src="images/TextNodePropertiesDescription.png"/>
+	<br/>
+	<br/></p>
+  </li>
+  <li><a name="glossary_history_textnode"></a><strong>History tab</strong> contains information about the history of all <em><a href="#glossary_revision">revisions</a></em> 
+  related to this text node. The contents of the tab are similar to the contents of the 
+  <em>'History'</em> tab for the requirement (see <em><a href="#glossary_requirement_properties">'Requirement Properties'</a></em>).
+	 <p><br/></p>
+  </li>
+  <li><a name="advanced_textnode"></a><strong>Advanced tab</strong> contains:
+    <ul>
+      <li><a name="glossary_predicate_textnode"></a><strong>Predicate</strong> – a predicate, defines what text node 
+	  will be included in reports. Predicate is inherited from the parent node by default. 
+	  Could be changed manually.</li>
+    </ul>
+    <br/>
+	<img
+    alt="'Advanced' tab of 'Properties' view for text node"
+    src="images/TextNodePropertiesAdvanced.png"/>
+	<br/>
+	<br/>
+  </li>
+  <li><a name="glossary_source_textnode"></a><strong>Source tab</strong> contains only json-code:
+    <ul>
+      <li><strong>json</strong> – low-level representation of the text node as entity. Couldn't not be edited.</li>
+    </ul>
+<br/>
+<img alt="'Source' node of 'Properties' view for text node" src="images/TextNodePropertiesSource.png"/>
+  </li>
+</ol>
+</dd>
+</dl>
+<p><br/><br/></p>
+	
+<h2>U</h2>	
+<dl>
+<dt><a name="glossary_unieditor"></a>UniEditor</dt>
+<dd>
+<p>- is a view in the <em>'Requality'</em> perspective, it's a visual editor for requirements, test purposes and comments. 
+Allows adding, editing and modifying requirements, test purposes and comments, and also allows changing statuses of 
+the requirements and test purposes. In contrast to the  <a href="glossary.en.html#glossary_review"><em>'Review'</em></a> 
+editor it doesn’t allow to set statuses of the requirements and test purposes into the value <em>'verified'</em>.</p>
+<p><br/></p>
+<img alt="UniEditor view" src="images/UniEditorView.png"/>
+</dd>
+<p><br/></p>
+	
+<dt><a name="glossary_update_processor_tasks"></a>Update Processor Tasks</dt>
+<dd>
+<p>- is a view in the <em>'Requality'</em> perspective, it is used after transferring locations to new document version. 
+It allows to check transfer correctness manually. And it allows manual transfer of locations have not been transferred automaticallty. 
+This view shows a list of all the requirements and status of every requirement transfer:</p>
+<ul>
+<li><strong>'Verify'</strong> – all requirement locations have been transferred, user should only verify the correctness of the transfer.</li>
+<li><strong>'Add Locations'</strong> – requirement locations have been transferred partially, user should find analogues of not-transferred 
+locations or make sure new document doesn't contain these locations.</li>
+<li><strong>'Find Locations'</strong> – none of requirement fragments has been transferred. User should find analogues of not-transferred 
+locations or make sure new document doesn't contain these locations or the requirement in a whole.</li>
+</ul>
+<p><br/>
+<img alt="Update Processor Tasks view" src="images/UpdateProcessorTasksView.png"/>
+</p>
+</dd>
+<p><br/></p>
+
+<dt><a name="glossary_user_attributes"></a>User-defined attributes</dt>
+<dd><p>- are <em><a href="glossary.en.html#glossary_node_parameters">node parameters</a></em> defined 
+by user (unlike a <em><a href="glossary.en.html#glossary_system_attributes"> system attributes</a></em>): 
+an user can create they, remove, define the type and value. User-defined attributes are set in  
+attributes table (see <em><a href="glossary.en.html#glossary_attributes_table">attributes table</a></em>).
+It is better to distinguish a <em>user-defined attributes</em> from <em>system</em> 
+(see <em><a href="glossary.en.html#glossary_system_attributes"> system attributes</a></em>) one 
+and also take into account that an <em>user-defined attribute</em> may also become  
+a <em>mandatory</em>.</p>
+</dd>
+<p><br/></p>
+
+<dt><a name="glossary_UserVisibleId"></a>UserVisibleId, UVId</dt>
+<dd><p>- special designation of a node for its identification.</p>
+<ul>
+<li>If the node in question has no name, then <em>'UVId'</em> is defined as <em>'UVId of the parent node'</em>/<em>'node ID'</em>.</li>
+<li>If there is a name and an <em>'ignoreName'</em> attribute is defined (see <a href="glossary.en.html#glossary_attributes_table">Attributes table</a>) with value <em>'true'</em>, 
+then <em>'UVId'</em> is defined as <em>'UVId of parent node'/'node name'</em>.</li>
+<li>If the name is present and the <em>'ignoreName'</em> attribute is missing or has the value <em>'false'</em>, then <em>'UVId'</em> is defined as the <em>'node name'</em>.</li>
+</ul>
+</dd>
+
+<dt><a name="glossary_UUId"></a>UUId</dt>
+<dd><p>- a unique and unchangeable intra-system (within <strong>Requality</strong>) identifier of any node of the Requality project. It is a 128-bit number. 
+When the identifier <em>'Id'</em> of a node changes, its <em>'UUId'</em> does not change, although it should be noted that Requality understands such an operation 
+as deleting an old node (with the old identifier <em>'Id'</em>) and creating a new one (with a new identifier <em>'Id'</em>).</p>
+</dd>
+</dl>
+<p><br/></p>
+
+<h2>V</h2>
+<dl>
+<dt><a name="glossary_virtual_node"></a>Virtual Node</dt>
+<dd>
+<p>- is an element of <em>'Requality'</em> project catalog, it is used for reusing of the elements of requirements catalog. Using virtual node allows 
+you to automatically create a subtree of clone-nodes (see <a href="glossary.en.html#glossary_clone"><em>'Clone'</em></a>) that are similar to already existing subtree of requirements catalog.</p>
+<p>To reuse nodes you should select the method of clone-nodes iteration and then select target node to reuse (see <a href="glossary.en.html#glossary_vnode_parameters"><em>'Virtual node properties'</em></a>). There are two methods of iteration:</p>
+<ul>
+<li><strong>'Reuse'</strong> — copies of the target node with its subtree are added to the virtual node as children.</li>
+<li><strong>'Base element'</strong> - copies of direct children of the target node with their subtree are added to the virtual node as children.</li>
+</ul>
+<p>For <em>'Reuse'</em> method there is also <em>'It.vars'</em> setting related to number of clones calculation. The setting allows to use list variables to create several clones of one node with different variable values.</p>
+<p>In the project tree virtual node is shown as a node of requirements tree, it's a child of the node for which you want to define a subtree of clone-nodes.</p>
+<p>Virtual node could be hidden (not shown) in the project tree. In the hidden mode in the project you can see only children of this 
+virtual node (clone-nodes) but not itself.</p>
+<p><br/></p>
+<img alt="Project tree contains virtual node" src="images/REVirtualNode.png" />
+</dd>
+<p><br/></p>
+
+<dt><a name="glossary_vnode_parameters"></a>Virtual node properties</dt>
+<dd>
+<p>- parameters of virtual node, that could be defined in <em>'Properties'</em> view. (They can also be viewed and edited in a shortened form in the 'parameter editing window').</p>
+<p>For virtual nodes <em>'Properties'</em> view contains 4 tabs:</p>
+<ol>
+  <li><a name="glossary_vnode_main"></a><strong>Main tab</strong> contains the following parameters:
+    <ul>
+      <li><a name="glossary_vnode_id"></a><strong>Id</strong> – virtual node identifier. The identifier is unique among the children of the one parent. 
+	  It could be changed manually.</li>
+      <li><a name="glossary_vnode_name"></a><strong>Name</strong> – name of the virtual node. It shouldn't be unique. Name is empty by default. Name could be changed manually</li>
+      <li><a name="glossary_vnode_attributes"></a><strong>Attributes</strong> – virtual node attributes, set in the attributes table. 
+	  Read more about the attributes table <a href="glossary.en.html#glossary_attributes_table">here</a>.</li>
+    </ul>
+    <br/>
+	<img alt="Main tab of Properties view for virtual node" src="images/VNMain.png" />
+	<br/>
+	<br/>
+  </li>
+  <li><a name="glossary_vnode_iteration"></a><strong>Iteration tab</strong> contains the following parameters:
+    <ul>
+      <li><a name="glossary_vnode_target"></a><strong>Target</strong> – is a target element which is processed by the virtual node. 
+	  It could be a requirement or a test purpose, but this parameter isn't specified by default. <em>'Target'</em> is one of Requality project nodes. If a parent-requirement of virtual 
+	  node has a child test purpose then only test purpose (not requirement) could be the <em>'Target'</em> in this case.</li>
+	  <li><a name="glossary_vnode_iteration_method"></a><strong>Iteration method</strong> – 
+	  is a way how to use virtual node. Could have two values (specified in a drop-down list): 
+	  <ul>
+	  <li><strong>Reuse</strong> - common description (patter) is used, its copies will be added to the virtual node.
+	  <br/>
+<img alt="Iteration tab of Properties view for virtual node, Reuse method is selected" src="images/VNReuse.png" />
+<br/>
+<br/>
+	  </li>
+	  <li><strong>Base element</strong> - base element method, copies of target element's direct children will be added to the virtual node.
+	  	  <br/>
+<img alt="Iteration tab of Properties view for virtual node, Base element method is selected" src="images/VNBaseElement.png" />
+<br/>
+<br/>
+	  </li>
+	  </ul>	  
+	  </li>
+	  <li><a name="glossary_vnode_it_vars"></a><strong>It.vars</strong> – iterated variables. 
+	  This parameter is shown in the tab only if <em>'Reuse'</em> method is selected.
+	  No one iterated variable is set by default. There could be several It.vars. It.vars could be added or removed by 
+	  corresponding add and remove buttons. It.var could be selected in a drop-down list which contains a list of 
+	  available attributes. Only attribute of the virtual node (from the Attributes table) that has type List, could be added as It.var.
+	  </li>	  
+    </ul>
+<br/>
+  </li>
+  <li><a name="glossary_vnode_history"></a><strong>History tab</strong> contains information about the history of all <a href="glossary.en.html#glossary_revision">'revisions'</a>
+   related to this virtual node. The contents of the tab are similar to the contents of the 'History' tab for the requirement
+    (see <a href="glossary.en.html#glossary_requirement_properties">'Requirement parameters'</a>).
+  <br/>
+  </li>
+  <li><a name="glossary_vnode_source"></a><strong>Source tab</strong> contains only json-code:
+    <ul>
+      <li><strong>json</strong> – low-level representation of the requirement as entity. Couldn't not be edited.</li>
+    </ul>
+<br/>
+<img alt="Source tab of Properties view for virtual node" src="images/VNSource.png" />
+<br/>
+<br/>
+  </li>
+</ol>
+</dd>
+</dl>
+
+</body>
+</html>

@@ -1,0 +1,48 @@
+<?xml version="1.0" ?>
+<report start="trace.ftl" order="10" id="com.unitesk.requality.reports.traceability" name="Настраиваемая визуализация связей между требованиями" read-only = "true" group="links">
+    <description>Для просмотра связей в соответствии с заданными настройками.</description>
+    <template source="trace.ftl" location="{project_name}-trace.htm" class = "com.unitesk.requality.report.TraceabilityDataSource"/>
+    <template source="tracerev.ftl" location="{project_name}-tracerev.htm" class = "com.unitesk.requality.report.TraceabilityDataSource"/>
+    <gui>
+	    <button command="com.unitesk.requality.TraceabilitySettings" text="Open Settings"/>
+	</gui>
+	<param name="toggleEnabled" type="BOOL" defaultValue="true" description="If true then collapse\expand function will be enabled with corresponding buttons."/>
+    <param name="traceabilitySettings" type="TRACEABILITY,LIST[LIST[STRING]]" description="Settings for traceability report //TODO add more info">
+			<defaultValue>{
+            "atype": "LIST",
+            "elements_type": "LIST",
+            "value": [
+                {"value": [
+                    {"value": "<b>[1]</b> [3]"},
+                    {"value": "<div style='margin-left:20px'>[2] [4]</div>"}
+                ]},
+                {"value": [
+                    {"value": "{user-visible-name}"},
+                    {"value": ""},
+                    {"value": ""},
+                    {"value": ""}
+                ]},
+                {"value": [
+                    {"value": "{user-visible-name}"},
+                    {"value": "{this-page}#{value}"},
+                    {"value": "<span style='color: red;'>{value}</span>"},
+                    {"value": "{user-visible-name}"}
+                ]},
+                {"value": [
+                    {"value": "{revert-attribute-name}"},
+                    {"value": "{next-page}#{value}"},
+                    {"value": ""},
+                    {"value": ""}
+                ]},
+                {"value": [
+                    {"value": "{revert-attribute-name}"},
+                    {"value": "{next-page}#{value}"},
+                    {"value": ""},
+                    {"value": ""}
+                ]}
+            ]
+        }</defaultValue>
+    </param>
+    
+</report>
+

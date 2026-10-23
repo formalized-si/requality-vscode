@@ -1,0 +1,360 @@
+[
+  {
+    "id": "requality.mainMenu.file",
+    "label": "File",
+    "items": [
+      {
+        "id": "requality.newWizard",
+        "label": "New...",
+        "group": "1_new@1",
+        "eclipseCommand": "org.eclipse.ui.newWizard"
+      },
+      {
+        "id": "requality.openProjectsFromFileSystem",
+        "label": "Open Projects from File System...",
+        "group": "2_open@1",
+        "eclipseCommand": "org.eclipse.e4.ui.importer.openDirectory"
+      },
+      {
+        "id": "requality.rename",
+        "label": "Rename",
+        "group": "4_edit@1",
+        "eclipseCommand": null
+      },
+      {
+        "id": "requality.edit.refresh",
+        "label": "Refresh",
+        "group": "4_edit@2",
+        "eclipseCommand": "org.eclipse.ui.file.refresh"
+      },
+      {
+        "id": "requality.fileImport",
+        "label": "Import...",
+        "group": "5_import@1",
+        "eclipseCommand": "org.eclipse.ui.file.import"
+      },
+      {
+        "id": "requality.fileExport",
+        "label": "Export...",
+        "group": "5_import@2",
+        "eclipseCommand": "org.eclipse.ui.file.export"
+      },
+      {
+        "id": "requality.properties",
+        "label": "Properties",
+        "group": "6_properties@1",
+        "eclipseCommand": "org.eclipse.ui.file.properties"
+      }
+    ]
+  },
+  {
+    "id": "requality.mainMenu.edit",
+    "label": "Edit",
+    "items": [
+      {
+        "id": "requality.undo",
+        "label": "Undo",
+        "group": "1_undo@1",
+        "eclipseCommand": "org.eclipse.ui.edit.undo"
+      },
+      {
+        "id": "requality.redo",
+        "label": "Redo",
+        "group": "1_undo@2",
+        "eclipseCommand": "org.eclipse.ui.edit.redo"
+      },
+      {
+        "id": "requality.edit.copy",
+        "label": "Copy",
+        "group": "2_edit@1",
+        "eclipseCommand": "org.eclipse.ui.edit.copy"
+      },
+      {
+        "id": "requality.edit.paste",
+        "label": "Paste",
+        "group": "2_edit@2",
+        "eclipseCommand": "org.eclipse.ui.edit.paste"
+      },
+      {
+        "id": "requality.delete",
+        "label": "Delete Selection",
+        "group": "2_edit@3",
+        "eclipseCommand": "org.eclipse.ui.edit.delete"
+      },
+      {
+        "id": "requality.findNext",
+        "label": "Find Next",
+        "group": "3_find@1",
+        "eclipseCommand": "org.eclipse.ui.edit.findNext"
+      },
+      {
+        "id": "requality.findPrevious",
+        "label": "Find Previous",
+        "group": "3_find@2",
+        "eclipseCommand": "org.eclipse.ui.edit.findPrevious"
+      },
+      {
+        "id": "requality.addBookmark",
+        "label": "Add Bookmark",
+        "group": "4_additions@1",
+        "eclipseCommand": "org.eclipse.ui.edit.addBookmark"
+      },
+      {
+        "id": "requality.addTask",
+        "label": "Add Task...",
+        "group": "4_additions@2",
+        "eclipseCommand": "org.eclipse.ui.edit.addTask"
+      }
+    ]
+  },
+  {
+    "id": "requality.mainMenu.navigate",
+    "label": "Navigate",
+    "items": [
+      {
+        "id": "requality.goInto",
+        "label": "Go Into",
+        "group": "1_go@1",
+        "eclipseCommand": null
+      },
+      {
+        "id": "requality.mainMenu.navigate.goTo",
+        "label": "Go To",
+        "group": "1_go@2",
+        "items": [
+          {
+            "id": "requality.explorer.back",
+            "label": "Back",
+            "group": "1_go@1",
+            "eclipseCommand": null
+          },
+          {
+            "id": "requality.explorer.forward",
+            "label": "Forward",
+            "group": "1_go@2",
+            "eclipseCommand": null
+          },
+          {
+            "id": "requality.explorer.up",
+            "label": "Up One Level",
+            "group": "1_go@3",
+            "eclipseCommand": null
+          },
+          {
+            "id": "requality.goToResource",
+            "label": "Go to Resource...",
+            "group": "2_resource@1",
+            "eclipseCommand": "org.eclipse.ui.navigate.goToResource"
+          }
+        ]
+      },
+      {
+        "id": "requality.showIn",
+        "label": "Show In...",
+        "group": "2_show@1",
+        "eclipseCommand": null
+      }
+    ]
+  },
+  {
+    "id": "requality.mainMenu.project",
+    "label": "Project",
+    "items": [
+      {
+        "id": "requality.project.open",
+        "label": "Open Project",
+        "group": "1_open@1",
+        "eclipseCommand": null
+      },
+      {
+        "id": "requality.project.close",
+        "label": "Close Project",
+        "group": "1_open@2",
+        "eclipseCommand": null
+      },
+      {
+        "id": "requality.buildAll",
+        "label": "Build All",
+        "group": "2_build@1",
+        "eclipseCommand": "org.eclipse.ui.project.buildAll"
+      },
+      {
+        "id": "requality.project.build",
+        "label": "Build Project",
+        "group": "2_build@2",
+        "eclipseCommand": null
+      },
+      {
+        "id": "requality.clean",
+        "label": "Clean...",
+        "group": "2_build@3",
+        "eclipseCommand": "org.eclipse.ui.project.cleanAction"
+      },
+      {
+        "id": "requality.buildAutomatically",
+        "label": "Build Automatically",
+        "group": "2_build@4",
+        "eclipseCommand": "org.eclipse.ui.project.buildAutomatically"
+      },
+      {
+        "id": "requality.projectProperties",
+        "label": "Project Properties",
+        "group": "3_properties@1",
+        "eclipseCommand": null
+      }
+    ]
+  },
+  {
+    "id": "requality.mainMenu.window",
+    "label": "Window",
+    "items": [
+      {
+        "id": "requality.mainMenu.window.showView",
+        "label": "Show View",
+        "group": "1_views@1",
+        "items": [
+          {
+            "id": "requality.showView.bookmarks",
+            "label": "Bookmarks",
+            "group": "1_views@1",
+            "eclipseCommand": "org.eclipse.ui.views.showView"
+          },
+          {
+            "id": "requality.showView.history",
+            "label": "History",
+            "group": "1_views@2",
+            "eclipseCommand": "org.eclipse.ui.views.showView"
+          },
+          {
+            "id": "requality.showView.outline",
+            "label": "Outline",
+            "group": "1_views@3",
+            "eclipseCommand": "org.eclipse.ui.views.showView"
+          },
+          {
+            "id": "requality.showView.problems",
+            "label": "Problems",
+            "group": "1_views@4",
+            "eclipseCommand": "org.eclipse.ui.views.showView"
+          },
+          {
+            "id": "requality.showView.progress",
+            "label": "Progress",
+            "group": "1_views@5",
+            "eclipseCommand": "org.eclipse.ui.views.showView"
+          },
+          {
+            "id": "requality.showView.properties",
+            "label": "Properties",
+            "group": "1_views@6",
+            "eclipseCommand": "org.eclipse.ui.views.showView"
+          },
+          {
+            "id": "requality.showView.explorer",
+            "label": "Requality Explorer",
+            "group": "1_views@7",
+            "eclipseCommand": "org.eclipse.ui.views.showView"
+          },
+          {
+            "id": "requality.showView.links",
+            "label": "Requality Links Explorer",
+            "group": "1_views@8",
+            "eclipseCommand": "org.eclipse.ui.views.showView"
+          },
+          {
+            "id": "requality.showView.synchronize",
+            "label": "Synchronize",
+            "group": "1_views@9",
+            "eclipseCommand": "org.eclipse.ui.views.showView"
+          },
+          {
+            "id": "requality.showView.tasks",
+            "label": "Tasks",
+            "group": "1_views@10",
+            "eclipseCommand": "org.eclipse.ui.views.showView"
+          },
+          {
+            "id": "requality.showView.todo",
+            "label": "Update Processor Tasks",
+            "group": "1_views@11",
+            "eclipseCommand": "org.eclipse.ui.views.showView"
+          },
+          {
+            "id": "requality.showView.other",
+            "label": "Other...",
+            "group": "2_other@1",
+            "eclipseCommand": "org.eclipse.ui.views.showView"
+          }
+        ]
+      },
+      {
+        "id": "requality.mainMenu.window.perspective",
+        "label": "Perspective",
+        "group": "1_views@2",
+        "items": [
+          {
+            "id": "requality.mainMenu.window.perspective.open",
+            "label": "Open Perspective",
+            "group": "1_open@1",
+            "items": [
+              {
+                "id": "requality.perspective.openOther",
+                "label": "Other...",
+                "group": "2_other@1",
+                "eclipseCommand": "org.eclipse.ui.perspectives.showPerspective"
+              }
+            ]
+          },
+          {
+            "id": "requality.perspective.customize",
+            "label": "Customize Perspective...",
+            "group": "2_customize@1",
+            "eclipseCommand": "org.eclipse.ui.window.customizePerspective"
+          },
+          {
+            "id": "requality.perspective.saveAs",
+            "label": "Save Perspective As...",
+            "group": "2_customize@2",
+            "eclipseCommand": "org.eclipse.ui.window.savePerspective"
+          },
+          {
+            "id": "requality.perspective.reset",
+            "label": "Reset Perspective...",
+            "group": "2_customize@3",
+            "eclipseCommand": "org.eclipse.ui.window.resetPerspective"
+          },
+          {
+            "id": "requality.perspective.close",
+            "label": "Close Perspective",
+            "group": "3_close@1",
+            "eclipseCommand": "org.eclipse.ui.window.closePerspective"
+          },
+          {
+            "id": "requality.perspective.closeAll",
+            "label": "Close All Perspectives",
+            "group": "3_close@2",
+            "eclipseCommand": "org.eclipse.ui.window.closeAllPerspectives"
+          }
+        ]
+      },
+      {
+        "id": "requality.preferences",
+        "label": "Preferences",
+        "group": "9_preferences@1",
+        "eclipseCommand": null
+      }
+    ]
+  },
+  {
+    "id": "requality.mainMenu.help",
+    "label": "Help",
+    "items": [
+      {
+        "id": "requality.help",
+        "label": "Requality Manual",
+        "group": "1_help@1",
+        "eclipseCommand": null
+      }
+    ]
+  }
+]

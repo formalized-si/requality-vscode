@@ -1,0 +1,145 @@
+.fragment {
+    background-color: yellow;
+    cursor: pointer;
+}
+
+.fragment.even{
+    background-color: gold;
+    cursor: pointer;
+}
+
+img.fragment,obj.fragment{
+    border: 3px solid yellow;
+}
+img.fragment.even,obj.fragment.even{
+    border: 3px solid gold;
+}
+img.fragment:hover,obj.fragment:hover{
+    border: 3px solid #9e9e02;
+}
+img.fragment.even:hover,obj.fragment.even:hover{
+    border: 3px solid #cfcf00;
+}
+
+img.fragment-active,obj.fragment-active{
+    border: 3px solid #8ddbd4 !important;
+}
+.fragment:hover {
+    background-color: #9e9e02;
+}
+.fragment.even:hover {
+    background-color: #cfcf00;
+}
+
+.fragment-checked {
+    background-color: #0de7d0 !important;
+}
+.fragment-active {
+    background-color: #8ddbd4 !important;
+}
+
+
+  #req-context-menu {
+    position: fixed;
+    z-index: 10000;
+    width: 300px;
+    background: #1b1a1a;
+    border-radius: 5px;
+    transform: scale(0);
+    transform-origin: top left;
+  }
+
+  #req-context-menu.menuvisible {
+    transform: scale(1);
+    transition: transform 200ms ease-in-out;
+  }
+
+  #req-context-menu .req-menu-item {
+    padding: 8px 10px;
+    font-size: 12px;
+    color: #eee;
+    cursor: pointer;
+    border-radius: inherit;
+  }
+  #req-context-menu .req-menu-item:hover {
+    background: #343434;
+  }
+
+.hiddenPoint{
+    padding: 0px;
+    height:0px;
+    overflow: hidden;
+    border-radius: none;
+}
+
+#page_segment {
+    height: 85vh;
+}
+
+.location-item {
+    cursor: pointer;
+    font-weight: bold;
+    color: #8242c8;
+}
+.location-checked {
+    background-color: #b0abc8;
+}
+.requirement-item {
+    color: #8242c8;
+    cursor: pointer;
+}
+
+.requality_text {
+    background-color: #FFFFBB;
+    position: relative;
+}
+
+.requality_text_active {
+    background-color: #BBFFFF;
+    position: relative;
+}
+
+.requality_node{
+	background-color: #FFFFBB;
+}
+.requality_node_active{
+	background-color: #BBFFFF;
+}
+span.requality_node, img.requality_node {
+    border: 3px solid #FFFFBB;
+}
+
+span.requality_node_active, img.requality_node_active {
+    border: 3px solid #BBFFFF;
+}
+
+.requality_link_invisible {
+    display: none;
+}
+
+.requality_link_visible {
+    display: block;
+	position: absolute; 
+    top: -1em; 
+    left: 0; 
+    background-color:#cff;
+    border:1px solid #0cf;
+    z-index: 5;
+}
+
+.requality_id {
+}
+
+.requality_link {
+}
+
+/*
+.requality_text:hover .requality_link {
+    display: block;
+    position: absolute; 
+    top: -1em; 
+    left: 0; 
+    background-color:#cff;
+    border:1px solid #0cf;
+}
+*/

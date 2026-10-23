@@ -1,0 +1,305 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<?NLS TYPE="org.eclipse.help.toc"?>
+<toc label="Requality">
+	<topic label="Requality: глоссарий " href="docs/manual/glossary.ru.html#glossary">
+
+</topic>
+	<topic label="Requality: основная информация" href="docs/manual/general.ru.html#general">
+		<topic label="Назначение инструмента" href="docs/manual/general.ru.html#destination">
+ </topic>
+		<topic label="Информация о разработчике" href="docs/manual/general.ru.html#developer">
+ </topic>
+		<topic label="Инструкция по установке Requality" href="docs/manual/general.ru.html#installation">
+			<topic label="Системные требования" href="docs/manual/general.ru.html#system_requirements">
+  </topic>
+			<topic label="Установка Requality" href="docs/manual/general.ru.html#requality_installation">
+  </topic>
+			<topic label="Плагины к Requality" href="docs/manual/general.ru.html#requality_plugins">
+				<topic label="Установка плагина через update-site" href="docs/manual/general.ru.html#plugin_installation">
+   </topic>
+				<topic label="Requality Coverage Tools" href="docs/manual/general.ru.html#coverage_plugin">
+   </topic>				
+				<topic label="Requality GIT Connector" href="docs/manual/general.ru.html#gitconnector_plugin">
+   </topic>
+				<topic label="Requality API provider" href="docs/manual/general.ru.html#apiprovider_plugin">
+   </topic>
+			</topic>
+		</topic>
+		<topic label="Перспектива Requality" href="docs/manual/general.ru.html#requality_perspective">
+ </topic>
+	</topic>
+	<topic label="Requality: руководство пользователя" href="docs/manual/manual.ru.html#general">
+		<topic label="Работа с проектами" href="docs/manual/manual.ru.html#projects_main">
+			<topic label="Создание проекта Requality" href="docs/manual/manual.ru.html#project_create">
+  </topic>
+			<topic label="Настройки проекта Requality" href="docs/manual/manual.ru.html#project_settings">
+				<topic label="Настройка отображения узлов в проекте Requality" href="docs/manual/manual.ru.html#project_sorting_settings">
+   </topic>
+				<topic label="Настройка правил проверки ('Checker Rules') в проекте Requality" href="docs/manual/manual.ru.html#project_checker_rules">
+   </topic>
+				<topic label="Настройка обязательных атрибутов в проекте Requality" href="docs/manual/manual.ru.html#project_mandatory_settings">
+   </topic>
+				<topic label="Настройка ссылок в проекте Requality" href="docs/manual/manual.ru.html#project_references_settings">
+   </topic>
+				<topic label="Настройка автогенерируемых идентификаторов в проекте Requality" href="docs/manual/manual.ru.html#project_seqid_settings">
+   </topic>
+			</topic>
+			<topic label="Редактирование параметров проекта Requality" href="docs/manual/manual.ru.html#project_properties">
+				<topic label="Работа с таблицей атрибутов проекта" href="docs/manual/manual.ru.html#project_attributes">
+   </topic>
+				<topic label="Полуавтоматическое извлечение атрибута 'ENUM_DEFINITION'" href="docs/manual/manual.ru.html#enum_def_extraction">
+   </topic>
+  </topic>
+			<topic label="История ревизий в проекте Requality" href="docs/manual/manual.ru.html#project_history">
+  </topic>
+		</topic>
+		<topic label="Работа с документами" href="docs/manual/manual.ru.html#document_work">
+			<topic label="Импортирование документа" href="docs/manual/manual.ru.html#document_import">
+  </topic>
+			<topic label="Удаление документа" href="docs/manual/manual.ru.html#document_delete">
+  </topic>
+			<topic label="Обновление документа" href="docs/manual/manual.ru.html#document_update">
+  </topic>
+			<topic label="Создание папок документов" href="docs/manual/manual.ru.html#document_folder_create">
+  </topic>
+			<topic label="Удаление папки документов" href="docs/manual/manual.ru.html#document_folder_delete">
+  </topic>
+		</topic>
+		<topic label="Работа с требованиями" href="docs/manual/manual.ru.html#requirements_main">
+			<topic label="Создание требования" href="docs/manual/manual.ru.html#requirement_create">
+  </topic>
+			<topic label="Создание требования путем копирования" href="docs/manual/manual.ru.html#requirement_create_by_copy">
+  </topic>
+			<topic label="Удаление требования" href="docs/manual/manual.ru.html#requirement_delete">
+  </topic>
+			<topic label="Создание требования при выделении фрагмента текста" href="docs/manual/manual.ru.html#requirement_create_by_location">
+  </topic>
+			<topic label="Добавление фрагмента текста к требованию" href="docs/manual/manual.ru.html#location_add_to_requirement">
+  </topic>
+			<topic label="Удаление фрагмента в редакторе документа" href="docs/manual/manual.ru.html#location_delete_in_markupeditor">
+  </topic>
+			<topic label="Удаление фрагмента в окне Properties" href="docs/manual/manual.ru.html#location_delete_in_propertiesview">
+  </topic>
+			<topic label="Автоматическая разметка фрагментов требований в документе" href="docs/manual/manual.ru.html#location_authomark">
+  </topic>
+			<topic label="Редактирование параметров требования" href="docs/manual/manual.ru.html#requirement_params_edit">
+  </topic>
+			<topic label="История ревизий требования" href="docs/manual/manual.ru.html#revisions">
+  </topic>
+			<topic label="Перенос фрагментов требований в новую версию документа" href="docs/manual/manual.ru.html#document_update_processor">
+  </topic>
+			<topic label="Генерация теста для требования" href="docs/manual/manual.ru.html#add_test_to_requirement">
+  </topic>
+			<topic label="Массовые операции на требованиях" href="docs/manual/manual.ru.html#massops">
+  </topic>
+		</topic>
+		<topic label="Работа с шаблонами узлов" href="docs/manual/manual.ru.html#node_template_work">
+			<topic label="Редактор шаблонов" href="docs/manual/manual.ru.html#template_editor">
+  </topic>
+			<topic label="Создание шаблона" href="docs/manual/manual.ru.html#template_create">
+  </topic>
+			<topic label="Удаление шаблона" href="docs/manual/manual.ru.html#template_delete">
+  </topic>
+			<topic label="Редактирование шаблона" href="docs/manual/manual.ru.html#template_edit">
+  </topic>
+			<topic label="Установка активного шаблона" href="docs/manual/manual.ru.html#template_active_set">
+  </topic>
+		</topic>
+		<topic label="Работа с текстовыми узлами" href="docs/manual/manual.ru.html#textnodes">
+			<topic label="Создание текстового узла" href="docs/manual/manual.ru.html#textnode_create">
+  </topic>
+			<topic label="Создание текстового узла путем копирования" href="docs/manual/manual.ru.html#textnode_copy">
+  </topic>
+			<topic label="Удаление текстового узла" href="docs/manual/manual.ru.html#textnode_delete">
+  </topic>
+			<topic label="Редактирование параметров текстового узла" href="docs/manual/manual.ru.html#textnode_edit">
+  </topic>
+			<topic label="История ревизий текстового узла" href="docs/manual/manual.ru.html#textnode_revisions">
+  </topic>
+		</topic>
+		<topic label="Работа с тестовыми ситуациями" href="docs/manual/manual.ru.html#test_purposes">
+			<topic label="Создание тестовой ситуации" href="docs/manual/manual.ru.html#testpurpose_create">
+  </topic>
+			<topic label="Создание тестовой ситуации путем копирования" href="docs/manual/manual.ru.html#testpurpose_create_by_copy">
+  </topic>
+			<topic label="Редактирование параметров тестовых ситуаций" href="docs/manual/manual.ru.html#testpurpose_params_edit">
+  </topic>
+			<topic label="История ревизий тестовой ситуации" href="docs/manual/manual.ru.html#testpurpose_revisions">
+  </topic>
+			<topic label="Удаление тестовой ситуации" href="docs/manual/manual.ru.html#testpurpose_delete">
+  </topic>
+			<topic label="Генерация теста для тестовой ситуации" href="docs/manual/manual.ru.html#testpurpose_add_test">
+  </topic>
+		</topic>
+		<topic label="Работа с отчетами" href="docs/manual/manual.ru.html#reports">
+			<topic label="Описание стандартных видов отчетов" href="docs/manual/manual.ru.html#reports_list">
+  </topic>
+			<topic label="Добавление и удаление шаблона отчета" href="docs/manual/manual.ru.html#report_template_add_delete">
+  </topic>
+			<topic label="Создание настроек отчета" href="docs/manual/manual.ru.html#reportsettings_create">
+  </topic>
+			<topic label="Редактирование параметров настроек отчета" href="docs/manual/manual.ru.html#reportsettings_edit">
+  </topic>
+			<topic label="Генерация многотомных документов" href="docs/manual/manual.ru.html#reports_multipart_docs">
+				<topic label="Разбивка на тома на уровне разделов 1 (первого) уровня" href="docs/manual/manual.ru.html#reports_multipart_first_lvl">
+   </topic>
+				<topic label="Разбивка на тома на уровне раздела произвольного уровня" href="docs/manual/manual.ru.html#reports_multipart_random_lvl">
+   </topic>
+   </topic>
+			<topic label="Отчёты для решения типовых задач" href="docs/manual/manual.ru.html#reports_typical_tasks">
+				<topic label="Отчет 'Чтение требований'" href="docs/manual/manual.ru.html#report_tableview"/>
+				<topic label="Отчет 'Проверка правил оформления'" href="docs/manual/manual.ru.html#report_problems"/>
+				<topic label="Отчет 'Анализ покрытия требований'" href="docs/manual/manual.ru.html#report_coverage"/>
+				<topic label="Отчет 'Генерация документов (ODT)'" href="docs/manual/manual.ru.html#report_ODT"/>
+			</topic>
+			<topic label="ЭКСПЕРИМЕНТАЛЬНЫЕ" href="docs/manual/manual.ru.html#reports_experimental">
+				<topic label="Выделение требований" href="docs/manual/manual.ru.html#reports_highlight_requirements">
+					<topic label="Отчет 'Анализ покрытия выделенных требований'" href="docs/manual/manual.ru.html#report_documentmodel"/>
+				</topic>
+				<topic label="Анализ связей между требованиями" href="docs/manual/manual.ru.html#reports_links_analysis">
+					<topic label="Отчет 'Настраиваемая визуализация связей между требованиями'" href="docs/manual/manual.ru.html#report_traceability"/>
+				</topic>
+				<topic label="Остальное" href="docs/manual/manual.ru.html#reports_others">
+					<topic label="Отчет 'Прогресс по проекту'" href="docs/manual/manual.ru.html#report_progress"/>
+				</topic>
+			</topic>
+			<topic label="Удаление настроек отчета" href="docs/manual/manual.ru.html#reportsettings_delete">
+  </topic>
+			<topic label="Генерация отчета" href="docs/manual/manual.ru.html#report_generate">
+  </topic>
+			<topic label="Открытие и редактирование отчета" href="docs/manual/manual.ru.html#report_open_edit">
+  </topic>
+			<topic label="Экспорт отчета в файловую систему" href="docs/manual/manual.ru.html#report_to_filesystem">
+  </topic>
+			<topic label="Удаление отчета" href="docs/manual/manual.ru.html#report_delete">
+  </topic>
+			<topic label="Создание папок отчетов" href="docs/manual/manual.ru.html#reportfolder_create">
+  </topic>
+			<topic label="Удаление папки отчетов" href="docs/manual/manual.ru.html#reportfolder_delete">
+  </topic>
+			<topic label="Изменение названия папки отчетов" href="docs/manual/manual.ru.html#reportfolder_rename">
+  </topic>
+		</topic>
+		<topic label="Работа с комментариями" href="docs/manual/manual.ru.html#comments">
+			<topic label="Создание комментария" href="docs/manual/manual.ru.html#comment_create">
+  </topic>
+			<topic label="Создание комментария путем копирования" href="docs/manual/manual.ru.html#comment_create_by_copy">
+  </topic>
+			<topic label="Редактирование параметров комментария" href="docs/manual/manual.ru.html#comment_edit">
+  </topic>
+			<topic label="История ревизий комментария" href="docs/manual/manual.ru.html#comment_history">
+  </topic>
+			<topic label="Удаление комментария" href="docs/manual/manual.ru.html#comment_delete">
+  </topic>
+		</topic>
+		<topic label="Идентификация узлов" href="docs/manual/manual.ru.html#all_ids">
+			<topic label="Уникальные идентификаторы узлов дерева требований" href="docs/manual/manual.ru.html#seqid">
+  </topic>
+		</topic>		
+		<topic label="Сортировка элементов в проекте Requality" href="docs/manual/manual.ru.html#sorting">
+			<topic label="Изменение настроек сортировки элементов в проекте Requality" href="docs/manual/manual.ru.html#sorting_edit">
+  </topic>
+		</topic>
+		<topic label="Работа со ссылками между узлами дерева требований" href="docs/manual/manual.ru.html#references">
+			<topic label="Создание ссылок между узлами дерева требований" href="docs/manual/manual.ru.html#reference_create">
+				<topic label="Создание ссылок с помощью ручного задания атрибута 'REFERENCE'" href="docs/manual/manual.ru.html#reference_create_by_attribute">
+   </topic>
+				<topic label="Создание ссылки с помощью кнопки '0,1,*'" href="docs/manual/manual.ru.html#reference_create_by_button">
+   </topic>
+			</topic>
+			<topic label="Редактирование имени входящей ссылки" href="docs/manual/manual.ru.html#inreference_name_edit">
+  </topic>
+			<topic label="Просмотр ссылок узла дерева требований" href="docs/manual/manual.ru.html#linksexplorer">
+  </topic>
+		</topic>
+		<topic label="Термины и их использование" href="docs/manual/manual.ru.html#terms">
+			<topic label="Создание ссылки на термин" href="docs/manual/manual.ru.html#term_links">
+  </topic>
+			<topic label="Просмотр ссылок для терминов в Requality Links Explorer" href="docs/manual/manual.ru.html#linksexplorer_terms">
+  </topic>
+		</topic>		
+		
+		<topic label="Работа в Module Editor" href="docs/manual/manual.ru.html#ModuleEditor_work">
+			<topic label="Открытие Module Editor" href="docs/manual/manual.ru.html#ModuleEditor_open">
+  </topic>
+		</topic>
+		<topic label="Работа в UniEditor" href="docs/manual/manual.ru.html#UniEditor_work">
+			<topic label="Открытие UniEditor" href="docs/manual/manual.ru.html#UniEditor_open">
+  </topic>
+			<topic label="Добавление новых требований в UniEditor" href="docs/manual/manual.ru.html#UniEditor_requirement_add">
+  </topic>
+			<topic label="Удаление требований в UniEditor" href="docs/manual/manual.ru.html#UniEditor_requirement_delete">
+  </topic>
+			<topic label="Редактирование требований в UniEditor" href="docs/manual/manual.ru.html#UniEditor_requirement_edit">
+  </topic>
+			<topic label="Добавление новых текстовых узлов в UniEditor" href="docs/manual/manual.ru.html#UniEditor_textnode_add">
+  </topic>
+			<topic label="Удаление текстовых узлов в UniEditor" href="docs/manual/manual.ru.html#UniEditor_textnode_delete">
+  </topic>
+			<topic label="Редактирование текстовых узлов в UniEditor" href="docs/manual/manual.ru.html#UniEditor_textnode_edit">
+  </topic>
+			<topic label="Добавление новых тестовых ситуаций в UniEditor" href="docs/manual/manual.ru.html#UniEditor_testpurpose_add">
+  </topic>
+			<topic label="Удаление тестовых ситуаций в UniEditor" href="docs/manual/manual.ru.html#UniEditor_testpurpose_delete">
+  </topic>
+			<topic label="Редактирование тестовых ситуаций в UniEditor" href="docs/manual/manual.ru.html#UniEditor_testpurpose_edit">
+  </topic>
+			<topic label="Добавление новых комментариев в UniEditor" href="docs/manual/manual.ru.html#UniEditor_comment_add">
+  </topic>
+			<topic label="Удаление комментариев в UniEditor" href="docs/manual/manual.ru.html#UniEditor_comment_delete">
+  </topic>
+			<topic label="Редактирование комментария в UniEditor" href="docs/manual/manual.ru.html#UniEditor_comment_edit">
+  </topic>
+		</topic>
+		<topic label="Работа в Review" href="docs/manual/manual.ru.html#Review_work">
+			<topic label="Открытие Review" href="docs/manual/manual.ru.html#Review_open">
+  </topic>
+			<topic label="Редактирование статусов требований и тестовых ситуаций в Review" href="docs/manual/manual.ru.html#Review_status_edit">
+  </topic>
+		</topic>
+		<topic label="Работа с помощью клавиатуры в Module Editor, UniEditor и Review: горячие клавиши" href="docs/manual/manual.ru.html#hotkeys">
+ </topic>
+		<topic label="Работа с виртуальными узлами" href="docs/manual/manual.ru.html#vnode_work">
+			<topic label="Создание виртуального узла" href="docs/manual/manual.ru.html#vnode_create">
+  </topic>
+			<topic label="Редактирование параметров виртуального узла" href="docs/manual/manual.ru.html#vnode_edit">
+  </topic>
+			<topic label="Скрытие виртуального узла" href="docs/manual/manual.ru.html#vnode_hide">
+  </topic>
+			<topic label="Отмена скрытия виртуального узла" href="docs/manual/manual.ru.html#vnode_show">
+  </topic>
+		</topic>
+		<topic label="Поиск в дереве проекта Requality" href="docs/manual/manual.ru.html#tree_search">
+ </topic>
+		<topic label="Проверка корректности дерева проекта" href="docs/manual/manual.ru.html#project_checker">
+ </topic>
+		<topic label="Работа с внешним хранилищем данных (Repository)" href="docs/manual/manual.ru.html#repository_work">
+			<topic label="Процедуры для загрузки/выгрузки в репозиторий" href="docs/manual/manual.ru.html#repository_publish_update">
+				<topic label="Первичная загрузка проекта в локальный репозиторий" href="docs/manual/manual.ru.html#first_publish_local">
+   </topic>
+				<topic label="Первичная загрузка проекта в удалённый репозиторий" href="docs/manual/manual.ru.html#first_publish_remote">
+   </topic>
+  </topic>
+			<topic label="История ревизий" href="docs/manual/manual.ru.html#history">
+				<topic label="Просмотр истории ревизий у проекта Requality" href="docs/manual/manual.ru.html#history_view_for_project">
+   </topic>
+				<topic label="Просмотр истории ревизий у узлов дерева требований" href="docs/manual/manual.ru.html#history_view_for_node">
+   </topic>
+			</topic>
+		</topic>
+		<topic label="Импорт-экспорт каталога требований Requality в ReqIF" href="docs/manual/manual.ru.html#reqif_import_export">
+			<topic label="Экспорт каталога требований Requality в ReqIF" href="docs/manual/manual.ru.html#reqif_export">
+  </topic>
+			<topic label="Импорт каталога требований из ReqIF в Requality " href="docs/manual/manual.ru.html#reqif_import">
+  </topic>
+		</topic>
+		<topic label="Экспорт изменений из проекта Requality в модуль DOORS" href="docs/manual/manual.ru.html#requality_to_doors">
+ </topic>
+		<topic label="Руководство по устранению неполадок" href="docs/manual/manual.ru.html#troubleshooting">
+				<topic label="Не работают межпроектные ссылки" href="docs/manual/manual.ru.html#troubleshooting_links">
+  </topic>
+ </topic>
+		<topic label="Рекомендации по разработке требований в соответствии с КТ-178С" href="docs/manual/manual.ru.html#req_dev_guideline">
+ </topic>
+	</topic>
+</toc>

@@ -1,0 +1,102 @@
+.tpid {
+	font-weight: bold;
+}
+.tprocid {
+    font-weight: bold;
+    border-bottom: dotted 1px !important;
+    border-radius: 0px !important;
+    -moz-border-radius: 0px !important;
+    -webkit-border-radius: 0px !important;
+}
+.tsid {
+    font-weight: bold;
+}
+.teststepindex{
+    border: solid 1px #7f7f7f;
+    border-radius: 3px;
+    -moz-border-radius: 3px;
+    -webkit-border-radius: 3px;
+    padding: 2px 6px;
+    margin: 2px;
+	text-align: center;
+}
+.tstype {
+    font-weight: bold;
+    border: solid 1px #7f7f7f;
+    border-radius: 3px;
+    -moz-border-radius: 3px;
+    -webkit-border-radius: 3px;
+    padding: 2px 6px;
+    margin: 2px;
+    cursor: pointer;
+    width: 75px;
+    text-align: center;
+}
+div.children-TestPurpose {
+	border: solid 1px #7f7f7f;
+	background: #f3f9ff;
+	margin-right: 1ex;
+}
+div.children-TestPurpose {
+    border: solid 1px #7f7f7f;
+    background: #f3f9ff;
+}
+div.children-TestStep {
+/*    border: solid 1px #7f7f7f;
+    background: #f3f9ff; */
+}
+.testpurpose {
+	min-width: 100%-;
+	padding: 2px;
+	margin: 2px;
+	border: solid 1px transparent;
+	border-radius: 4px;
+	-moz-border-radius: 4px;
+	-webkit-border-radius: 4px;
+}
+.testprocedure {
+	min-width: 100%-;
+    padding: 2px;
+    margin: 2px 6px 2px 2px;
+    border: solid 1px transparent;
+    border-radius: 4px;
+    -moz-border-radius: 4px;
+    -webkit-border-radius: 4px;
+    background: #EEEEEE;
+}
+.teststep {
+	min-width: 100%-;
+    padding: 2px;
+    margin: 2px;
+    border: solid 1px transparent;
+    border-radius: 4px;
+    -moz-border-radius: 4px;
+    -webkit-border-radius: 4px;
+}
+div.testpurpose-title {
+	font-weight: bold;
+	padding: 4px;
+	background: #e3e9ef;
+}
+div.testprocedure-title {
+    font-weight: bold;
+    padding: 4px;
+    background: #e3e9ef;
+}
+div.teststep-title {
+    font-weight: bold;
+    padding: 4px;
+    background: #e3e9ef;
+}
+div.tprocdesc {
+    border-bottom: dotted 1px;
+    border-radius: 0px;
+    -moz-border-radius: 0px;
+    -webkit-border-radius: 0px;
+}
+div.tsdesc {
+    border-bottom: dotted 1px;
+    border-radius: 0px;
+    -moz-border-radius: 0px;
+    -webkit-border-radius: 0px;
+}

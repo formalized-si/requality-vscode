@@ -1,0 +1,1028 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Contributions of the Eclipse platform plug-ins that the Requality plug-in binds to, as the platform declares them
+  (org.eclipse.ui.navigator.resources, org.eclipse.ui.ide, org.eclipse.ui): read after the Requality plugin.xml.
+  The property pages of the IDE that apply to resources (Resource, Project References, Project Natures) are the ones of
+  org.eclipse.ui.ide, with the English names of its plugin.properties.
+  The Requality Explorer includes the action extensions "org.eclipse.ui.navigator.resources.*" (viewerActionBinding);
+  its New submenu gets the Folder and File shortcuts from the commonWizard elements of the upstream plugin.xml
+  (nonReqNavigatorProvider), the IDE new wizards are declared here with their category "General";
+  the Project menu commands of the IDE are window actions of the workbench.
+-->
+<plugin>
+   <!-- org.eclipse.team.core: the file modification validator of the workspace; org.eclipse.team.ui: the default
+        validator of the files of no repository provider (asks to make read-only files writable). -->
+   <extension point="org.eclipse.core.resources.fileModificationValidator">
+      <fileModificationValidator class="org.eclipse.team.internal.core.FileModificationValidatorManager">
+      </fileModificationValidator>
+   </extension>
+   <extension point="org.eclipse.team.core.defaultFileModificationValidator">
+      <validator class="org.eclipse.team.internal.ui.DefaultUIFileModificationValidator">
+      </validator>
+   </extension>
+   <extension point="org.eclipse.ui.navigator.navigatorContent">
+      <actionProvider
+            id="org.eclipse.ui.navigator.resources.UndoRedoActionProvider"
+            class="org.eclipse.ui.internal.navigator.resources.actions.UndoRedoActionProvider">
+         <enablement>
+            <!-- 'true' -->
+            <or/>
+         </enablement>
+      </actionProvider>
+      <actionProvider
+            class="org.eclipse.ui.navigator.resources.GoIntoActionProvider"
+            id="org.eclipse.ui.navigator.resources.GoIntoActions">
+         <enablement>
+            <and>
+               <or>
+                  <adapt type="org.eclipse.core.resources.IProject">
+                     <test property="org.eclipse.core.resources.open" />
+                  </adapt>
+                  <adapt type="org.eclipse.core.resources.IFolder" />
+                  <adapt type="org.eclipse.ui.IWorkingSet" />
+               </or>
+            </and>
+         </enablement>
+      </actionProvider>
+      <actionProvider
+            class="org.eclipse.ui.internal.navigator.resources.actions.ResourceMgmtActionProvider"
+            id="org.eclipse.ui.navigator.resources.ResourceMgmtActions">
+         <enablement>
+            <or>
+               <adapt type="org.eclipse.core.resources.IResource" />
+               <adapt type="java.util.Collection">
+                  <count value="0" />
+               </adapt>
+            </or>
+         </enablement>
+      </actionProvider>
+      <actionProvider
+            class="org.eclipse.ui.internal.navigator.resources.actions.PortingActionProvider"
+            id="org.eclipse.ui.navigator.resources.PortingActions">
+         <enablement>
+            <or>
+               <adapt type="org.eclipse.core.resources.IResource" />
+               <adapt type="java.util.Collection">
+                  <count value="0" />
+               </adapt>
+            </or>
+         </enablement>
+      </actionProvider>
+      <actionProvider
+            id="org.eclipse.ui.navigator.resources.OpenActions"
+            class="org.eclipse.ui.internal.navigator.resources.actions.OpenActionProvider">
+         <enablement>
+            <or>
+               <adapt type="org.eclipse.core.resources.IFile" />
+            </or>
+         </enablement>
+      </actionProvider>
+      <actionProvider
+            class="org.eclipse.ui.internal.navigator.resources.actions.GotoActionProvider"
+            id="org.eclipse.ui.navigator.resources.GotoActions">
+         <enablement>
+            <or>
+               <adapt type="org.eclipse.core.resources.IResource" />
+               <adapt type="org.eclipse.ui.IWorkingSet" />
+            </or>
+         </enablement>
+      </actionProvider>
+      <actionProvider
+            id="org.eclipse.ui.navigator.resources.FoldersAsProjectsActionProvider"
+            class="org.eclipse.ui.internal.navigator.resources.actions.FoldersAsProjectsActionProvider">
+         <enablement>
+            <with
+                  variable="selection">
+               <and>
+                  <iterate
+                        ifEmpty="false">
+                     <adapt
+                           type="org.eclipse.core.resources.IFolder">
+                     </adapt>
+                  </iterate>
+               </and>
+            </with>
+         </enablement>
+      </actionProvider>
+      <actionProvider
+            id="org.eclipse.ui.navigator.resources.ShowInActionProvider"
+            class="org.eclipse.ui.internal.navigator.resources.actions.ShowInActionProvider">
+         <enablement>
+            <or>
+               <adapt type="org.eclipse.core.resources.IResource" />
+            </or>
+         </enablement>
+      </actionProvider>
+   </extension>
+   <extension point="org.eclipse.ui.navigator.navigatorContent">
+      <actionProvider
+            class="org.eclipse.ui.internal.navigator.resources.actions.PropertiesActionProvider"
+            id="org.eclipse.ui.navigator.resources.PropertiesActionProvider">
+         <enablement>
+            <instanceof value="org.eclipse.core.runtime.IAdaptable" />
+         </enablement>
+      </actionProvider>
+   </extension>
+   <extension point="org.eclipse.ui.navigator.navigatorContent">
+      <actionProvider
+            class="org.eclipse.ui.internal.navigator.resources.actions.WorkManagementActionProvider"
+            id="org.eclipse.ui.navigator.resources.WorkManagementActions">
+         <enablement>
+            <adapt type="org.eclipse.core.resources.IResource" />
+         </enablement>
+      </actionProvider>
+   </extension>
+   <extension point="org.eclipse.ui.navigator.navigatorContent">
+      <actionProvider
+            class="org.eclipse.ui.internal.navigator.resources.actions.NewActionProvider"
+            id="org.eclipse.ui.navigator.resources.NewActions">
+         <enablement>
+            <or>
+               <adapt type="org.eclipse.core.resources.IResource" />
+               <adapt type="java.util.Collection">
+                  <count value="0" />
+               </adapt>
+            </or>
+         </enablement>
+      </actionProvider>
+   </extension>
+   <!-- The Import and Export wizards of org.eclipse.ui.ide (Basic category, named "General"). -->
+   <extension point="org.eclipse.ui.importWizards">
+      <category id="org.eclipse.ui.Basic" name="General" />
+      <wizard
+            category="org.eclipse.ui.Basic"
+            class="com.unitesk.requality.vscode.ui.ide.datatransfer.PreferencesImportWizard"
+            id="org.eclipse.ui.wizards.import.Preferences"
+            name="Preferences">
+         <description>Import preferences from the local file system.</description>
+      </wizard>
+      <wizard
+            category="org.eclipse.ui.Basic"
+            class="org.eclipse.ui.wizards.datatransfer.ZipFileImportWizard"
+            id="org.eclipse.ui.wizards.import.ZipFile"
+            name="Archive File">
+         <description>Import resources from an archive file into an existing project.</description>
+      </wizard>
+      <wizard
+            category="org.eclipse.ui.Basic"
+            class="org.eclipse.ui.wizards.datatransfer.FileSystemImportWizard"
+            id="org.eclipse.ui.wizards.import.FileSystem"
+            name="File System">
+         <description>Import resources from the local file system into an existing project.</description>
+      </wizard>
+      <wizard
+            category="org.eclipse.ui.Basic"
+            class="org.eclipse.ui.wizards.datatransfer.ExternalProjectImportWizard"
+            id="org.eclipse.ui.wizards.import.ExternalProject"
+            name="Existing Projects into Workspace">
+         <description>Create new projects from an archive file or directory.</description>
+      </wizard>
+   </extension>
+   <!-- Smart Import of org.eclipse.ui.ide: Projects from Folder or Archive, Open Projects from File System, Configure. -->
+   <extension point="org.eclipse.ui.importWizards">
+      <wizard
+            category="org.eclipse.ui.Basic"
+            class="org.eclipse.ui.internal.wizards.datatransfer.SmartImportWizard"
+            id="org.eclipse.e4.ui.importer.wizard"
+            name="Projects from Folder or Archive">
+         <description>Analyzes the content of your folder or archive file to find projects and import them in the IDE.</description>
+      </wizard>
+   </extension>
+   <extension point="org.eclipse.ui.commands">
+      <command id="org.eclipse.e4.ui.importer.openDirectory" name="Open Projects from File System..." />
+      <command id="org.eclipse.e4.ui.importer.configureProject" name="Configure and Detect Nested Projects..." />
+   </extension>
+   <extension point="org.eclipse.ui.handlers">
+      <handler
+            class="org.eclipse.ui.internal.wizards.datatransfer.OpenFolderCommand"
+            commandId="org.eclipse.e4.ui.importer.openDirectory" />
+      <handler
+            class="org.eclipse.ui.internal.wizards.datatransfer.ConfigureProjectHandler"
+            commandId="org.eclipse.e4.ui.importer.configureProject">
+         <enabledWhen>
+            <with variable="selection">
+               <count value="1" />
+               <iterate ifEmpty="false">
+                  <instanceof value="org.eclipse.core.resources.IProject" />
+               </iterate>
+            </with>
+         </enabledWhen>
+      </handler>
+   </extension>
+   <extension point="org.eclipse.ui.ide.projectConfigurators">
+      <projectConfigurator
+            class="org.eclipse.ui.internal.wizards.datatransfer.EclipseWorkspaceConfigurator"
+            label="Eclipse workspace">
+         <activeWhen>
+            <hasFolder path=".metadata" />
+         </activeWhen>
+      </projectConfigurator>
+   </extension>
+   <extension point="org.eclipse.ui.ide.projectConfigurators">
+      <projectConfigurator
+            class="org.eclipse.ui.internal.wizards.datatransfer.EclipseProjectConfigurator"
+            label="Eclipse project" />
+   </extension>
+   <!-- The menus of the Smart Import: File > Open Projects from File System, and the Configure submenu of the open
+        projects (org.eclipse.ui.ide and org.eclipse.ui.ide.application). -->
+   <extension point="org.eclipse.ui.menus">
+      <menuContribution allPopups="false" locationURI="menu:file?after=new.ext">
+         <command
+               commandId="org.eclipse.e4.ui.importer.openDirectory"
+               id="org.eclipse.e4.ui.importer.openDirectory.menu"
+               mnemonic="j"
+               style="push" />
+      </menuContribution>
+      <menuContribution allPopups="false" locationURI="popup:org.eclipse.ui.popup.any?after=additions">
+         <menu
+               id="org.eclipse.ui.projectConfigure"
+               label="Configure"
+               mnemonic="g">
+            <visibleWhen checkEnabled="false">
+               <with variable="activeMenuSelection">
+                  <iterate ifEmpty="false">
+                     <adapt type="org.eclipse.core.resources.IProject">
+                        <test property="org.eclipse.core.resources.open" value="true" />
+                     </adapt>
+                  </iterate>
+               </with>
+            </visibleWhen>
+            <separator name="additions" visible="false" />
+         </menu>
+      </menuContribution>
+      <menuContribution allPopups="false" locationURI="popup:org.eclipse.ui.projectConfigure?after=additions">
+         <command
+               commandId="org.eclipse.e4.ui.importer.configureProject"
+               id="org.eclipse.e4.ui.importer.configureProject.popupMenu"
+               mnemonic="n"
+               style="push">
+            <visibleWhen>
+               <with variable="selection">
+                  <count value="1" />
+                  <iterate ifEmpty="false">
+                     <instanceof value="org.eclipse.core.resources.IProject" />
+                  </iterate>
+               </with>
+            </visibleWhen>
+         </command>
+      </menuContribution>
+   </extension>
+   <extension point="org.eclipse.ui.exportWizards">
+      <category id="org.eclipse.ui.Basic" name="General" />
+      <wizard
+            category="org.eclipse.ui.Basic"
+            class="com.unitesk.requality.vscode.ui.ide.datatransfer.PreferencesExportWizard"
+            id="org.eclipse.ui.wizards.export.Preferences"
+            name="Preferences">
+         <description>Export preferences to the local file system.</description>
+      </wizard>
+      <wizard
+            category="org.eclipse.ui.Basic"
+            class="org.eclipse.ui.wizards.datatransfer.FileSystemExportWizard"
+            id="org.eclipse.ui.wizards.export.FileSystem"
+            name="File System">
+         <description>Export resources to the local file system.</description>
+      </wizard>
+      <wizard
+            category="org.eclipse.ui.Basic"
+            class="org.eclipse.ui.wizards.datatransfer.ZipFileExportWizard"
+            id="org.eclipse.ui.wizards.export.ZipFile"
+            name="Archive File">
+         <description>Export resources to an archive file on the local file system.</description>
+      </wizard>
+   </extension>
+   <extension point="org.eclipse.ui.propertyPages">
+      <page
+            class="org.eclipse.ui.internal.ide.dialogs.ResourceInfoPage"
+            id="org.eclipse.ui.propertypages.info.file"
+            name="Resource">
+         <enabledWhen>
+            <adapt type="org.eclipse.core.resources.IResource"/>
+         </enabledWhen>
+      </page>
+      <page
+            class="org.eclipse.ui.internal.ide.dialogs.ProjectReferencePage"
+            id="org.eclipse.ui.propertypages.project.reference"
+            name="Project References">
+         <filter
+               name="open"
+               value="true">
+         </filter>
+         <enabledWhen>
+            <adapt type="org.eclipse.core.resources.IProject"/>
+         </enabledWhen>
+      </page>
+      <page
+            class="org.eclipse.ui.internal.ide.dialogs.ProjectNaturesPage"
+            id="org.eclipse.ui.propertypages.project.natures"
+            name="Project Natures">
+         <filter
+               name="open"
+               value="true">
+         </filter>
+         <enabledWhen>
+            <adapt type="org.eclipse.core.resources.IProject"/>
+         </enabledWhen>
+      </page>
+   </extension>
+   <!-- org.eclipse.team.ui: the Synchronize wizards (Team > Synchronize...): Synchronize with Patch. -->
+   <extension point="org.eclipse.team.ui.synchronizeWizards">
+      <wizard
+            class="org.eclipse.team.internal.ui.synchronize.patch.ApplyPatchSynchronizationWizard"
+            description="Synchronize resources with patch contents."
+            id="org.eclipse.team.ui.applyPatchWizard"
+            name="Synchronize with Patch">
+      </wizard>
+   </extension>
+   <!-- org.eclipse.team.ui: the team content providers of the Models page (Team > Models): the workspace (resource) model
+        and the patch model, as declared by team-plugin.xml. -->
+   <extension
+         id="teamContentProvider"
+         name="Workspace"
+         point="org.eclipse.team.ui.teamContentProviders">
+      <teamContentProvider
+            contentExtensionId="org.eclipse.team.ui.resourceContent"
+            icon="icons/full/obj/workspace_obj.svg"
+            modelProviderId="org.eclipse.core.resources.modelProvider"
+            preferencePage="org.eclipse.team.internal.ui.preferences.ResourceModelPreferencePage"
+            supportsFlatLayout="true"/>
+   </extension>
+   <extension
+         point="org.eclipse.team.ui.teamContentProviders">
+      <teamContentProvider
+            contentExtensionId="org.eclipse.team.ui.patchSyncNavigatorContent"
+            icon="icons/full/obj/hunk_obj.svg"
+            modelProviderId="org.eclipse.team.ui.patchModelProvider">
+      </teamContentProvider>
+   </extension>
+   <!-- org.eclipse.team.ui: the Team Project Set import and export wizards, in the Team category. -->
+   <extension point="org.eclipse.ui.importWizards">
+      <category id="org.eclipse.team.ui.importWizards" name="Team" />
+      <wizard
+            category="org.eclipse.team.ui.importWizards"
+            class="org.eclipse.team.internal.ui.wizards.ProjectSetImportWizard"
+            id="org.eclipse.team.ui.ProjectSetImportWizard"
+            name="Team Project Set">
+         <description>Import a set of projects by fetching the project contents from the appropriate repositories described in a file.</description>
+      </wizard>
+   </extension>
+   <extension point="org.eclipse.ui.exportWizards">
+      <category id="org.eclipse.team.ui.exportWizards" name="Team" />
+      <wizard
+            category="org.eclipse.team.ui.exportWizards"
+            class="org.eclipse.team.internal.ui.wizards.ProjectSetExportWizard"
+            id="org.eclipse.team.ui.ProjectSetExportWizard"
+            name="Team Project Set">
+         <description>Export a file containing the names and locations of the shared projects in the workspace.</description>
+      </wizard>
+   </extension>
+   <!-- The preference pages of the platform plug-ins that the port implements (Window > Preferences), as declared by
+        org.eclipse.ui.ide, org.eclipse.compare and org.eclipse.team.ui: General, General > Workspace, General >
+        Workspace > Local History, General > Compare/Patch, Team and Team > Ignored Resources. -->
+   <extension point="org.eclipse.ui.preferencePages">
+      <page
+            class="org.eclipse.ui.internal.ide.dialogs.IDEWorkbenchPreferencePage"
+            id="org.eclipse.ui.preferencePages.Workbench"
+            name="General">
+      </page>
+      <page
+            category="org.eclipse.ui.preferencePages.Workbench"
+            class="org.eclipse.ui.internal.dialogs.PerspectivesPreferencePage"
+            id="org.eclipse.ui.preferencePages.Perspectives"
+            name="Perspectives">
+      </page>
+      <page
+            category="org.eclipse.ui.preferencePages.Workbench"
+            class="org.eclipse.ui.internal.ide.dialogs.IDEWorkspacePreferencePage"
+            id="org.eclipse.ui.preferencePages.Workspace"
+            name="Workspace">
+      </page>
+      <page
+            category="org.eclipse.ui.preferencePages.Workspace"
+            class="org.eclipse.ui.internal.ide.dialogs.BuildOrderPreferencePage"
+            id="org.eclipse.ui.preferencePages.BuildOrder"
+            name="Build">
+      </page>
+      <page
+            category="org.eclipse.ui.preferencePages.Workspace"
+            class="org.eclipse.ui.internal.ide.dialogs.FileStatesPage"
+            id="org.eclipse.ui.preferencePages.FileStates"
+            name="Local History">
+      </page>
+      <page
+            category="org.eclipse.ui.preferencePages.Workbench"
+            class="org.eclipse.compare.internal.ComparePreferencePage"
+            id="org.eclipse.compare.internal.ComparePreferencePage"
+            name="Compare/Patch">
+      </page>
+      <page
+            class="org.eclipse.team.internal.ui.preferences.SyncViewerPreferencePage"
+            id="org.eclipse.team.ui.TeamPreferences"
+            name="Team">
+      </page>
+      <page
+            category="org.eclipse.team.ui.TeamPreferences"
+            class="org.eclipse.team.internal.ui.preferences.IgnorePreferencePage"
+            id="org.eclipse.team.ui.IgnorePreferences"
+            name="Ignored Resources">
+      </page>
+      <page
+            category="org.eclipse.team.ui.TeamPreferences"
+            class="org.eclipse.team.internal.ui.preferences.TextPreferencePage"
+            id="org.eclipse.team.ui.TextPreferences"
+            name="File Content">
+      </page>
+      <page
+            category="org.eclipse.team.ui.TeamPreferences"
+            class="org.eclipse.team.internal.ui.mapping.ModelEnablementPreferencePage"
+            id="org.eclipse.team.ui.enabledModels"
+            name="Models">
+      </page>
+   </extension>
+   <!-- org.eclipse.ui.navigator.resources: the resource content and its filters (the Requality Explorer binds
+        "org.eclipse.ui.navigator.resourceContent" and "org.eclipse.ui.navigator.resources.filters.*"); names and
+        descriptions of its plugin.properties. -->
+   <extension point="org.eclipse.ui.navigator.navigatorContent">
+      <navigatorContent
+            activeByDefault="true"
+            id="org.eclipse.ui.navigator.resourceContent"
+            name="Resources"
+            priority="low">
+      </navigatorContent>
+      <!-- not bound to the Requality Explorer; its activation is used by WorkingSetActionProvider -->
+      <navigatorContent
+            activeByDefault="true"
+            id="org.eclipse.ui.navigator.resources.workingSets"
+            name="Working Sets"
+            priority="higher">
+         <triggerPoints>
+            <instanceof value="org.eclipse.ui.IWorkingSet"/>
+         </triggerPoints>
+         <possibleChildren>
+            <instanceof value="java.lang.Object"/>
+         </possibleChildren>
+      </navigatorContent>
+      <commonFilter
+            id="org.eclipse.ui.navigator.resources.filters.startsWithDot"
+            name=".* resources"
+            description="Hides resources that begin with &quot;.&quot;"
+            activeByDefault="true">
+         <filterExpression>
+            <and>
+               <adapt type="org.eclipse.core.resources.IResource">
+                  <test property="org.eclipse.core.resources.name" value=".*"/>
+               </adapt>
+            </and>
+         </filterExpression>
+      </commonFilter>
+      <commonFilter
+            id="org.eclipse.ui.navigator.resources.filters.endsWithClass"
+            name="*.class resources"
+            description="Hides resources that end with &quot;.class&quot;"
+            activeByDefault="false">
+         <filterExpression>
+            <and>
+               <instanceof value="org.eclipse.core.resources.IFile"/>
+               <test property="org.eclipse.core.resources.name" value="*.class"/>
+            </and>
+         </filterExpression>
+      </commonFilter>
+      <commonFilter
+            id="org.eclipse.ui.navigator.resources.filters.closedProject"
+            name="Closed projects"
+            description="Hides closed projects"
+            activeByDefault="false">
+         <filterExpression>
+            <adapt type="org.eclipse.core.resources.IProject">
+               <test property="org.eclipse.core.resources.open" value="false"/>
+            </adapt>
+         </filterExpression>
+      </commonFilter>
+      <commonFilter
+            class="org.eclipse.ui.internal.navigator.resources.ResourceNameRegexpFilter"
+            description="Hides resources matching user-defined regexp [not visible in UI]"
+            id="org.eclipse.ui.navigator.resources.filters.userDefined"
+            name="User defined filters [not visible in UI]"
+            visibleInUI="false"
+            activeByDefault="true">
+      </commonFilter>
+   </extension>
+   <extension point="org.eclipse.ui.newWizards">
+      <category
+            id="org.eclipse.ui.Basic"
+            name="General" />
+      <wizard
+            category="org.eclipse.ui.Basic"
+            class="org.eclipse.ui.wizards.newresource.BasicNewProjectResourceWizard"
+            id="org.eclipse.ui.wizards.new.project"
+            name="Project"
+            project="true" />
+      <wizard
+            category="org.eclipse.ui.Basic"
+            class="org.eclipse.ui.wizards.newresource.BasicNewFolderResourceWizard"
+            id="org.eclipse.ui.wizards.new.folder"
+            name="Folder" />
+      <wizard
+            category="org.eclipse.ui.Basic"
+            class="org.eclipse.ui.wizards.newresource.BasicNewFileResourceWizard"
+            id="org.eclipse.ui.wizards.new.file"
+            name="File" />
+   </extension>
+   <extension point="org.eclipse.ui.commands">
+      <category id="org.eclipse.team.ui.category.team" name="Version control (Team)"
+            description="Actions that apply when working with a version control system" />
+      <command id="org.eclipse.team.ui.synchronizeAll" name="Synchronize..."
+            description="Synchronize resources in the workspace with another location"
+            categoryId="org.eclipse.team.ui.category.team"
+            defaultHandler="com.unitesk.requality.vscode.ui.team.synchronize.actions.GlobalRefreshAction" />
+      <command id="org.eclipse.team.ui.synchronizeLast" name="Repeat last synchronization"
+            description="Repeat the last synchronization"
+            categoryId="org.eclipse.team.ui.category.team" />
+      <command id="org.eclipse.team.ui.TeamSynchronizingPerspective" name="Team Synchronizing"
+            description="Open the Team Synchronizing Perspective"
+            defaultHandler="com.unitesk.requality.vscode.ui.team.synchronize.actions.OpenSynchronizingPerspectiveHandler" />
+      <command id="org.eclipse.ui.edit.copy" name="Copy" />
+      <command id="org.eclipse.ui.edit.paste" name="Paste" />
+      <command id="org.eclipse.ui.edit.delete" name="Delete" />
+      <command id="org.eclipse.ui.edit.move" name="Move..." />
+      <command id="org.eclipse.ui.edit.rename" name="Rename" />
+      <command id="org.eclipse.ui.file.refresh" name="Refresh" />
+      <command id="org.eclipse.ui.project.buildProject" name="Build Project" />
+      <command id="org.eclipse.ui.project.buildAll" name="Build All" />
+      <command id="org.eclipse.ui.project.cleanAction" name="Clean..." />
+      <command id="org.eclipse.ui.project.buildAutomatically" name="Build Automatically" />
+      <command id="org.eclipse.ui.project.openProject" name="Open Project" />
+      <command id="org.eclipse.ui.project.closeProject" name="Close Project" />
+      <command id="org.eclipse.ui.project.closeUnrelatedProjects" name="Close Unrelated Projects" />
+      <command id="org.eclipse.ui.file.import" name="Import"
+            defaultHandler="com.unitesk.requality.vscode.ui.workbench.handlers.ImportWizardHandler" />
+      <command id="org.eclipse.ui.file.export" name="Export"
+            defaultHandler="com.unitesk.requality.vscode.ui.workbench.handlers.ExportWizardHandler" />
+      <command id="org.eclipse.ui.file.properties" name="Properties"
+            defaultHandler="com.unitesk.requality.vscode.ui.workbench.handlers.PropertyDialogHandler" />
+      <command id="org.eclipse.ui.newWizard" name="New"
+            defaultHandler="com.unitesk.requality.vscode.ui.workbench.handlers.NewWizardHandler" />
+      <command id="org.eclipse.ui.navigate.back" name="Back" />
+      <command id="org.eclipse.ui.navigate.forward" name="Forward" />
+      <command id="org.eclipse.ui.navigate.up" name="Up" />
+      <command id="org.eclipse.ui.navigate.goInto" name="Go Into" />
+      <command id="org.eclipse.ui.navigate.goToResource" name="Go to Resource" />
+      <command id="org.eclipse.ui.edit.addBookmark" name="Add Bookmark" />
+      <command id="org.eclipse.ui.edit.addTask" name="Add Task" />
+      <command id="org.eclipse.compare.compareWithOther" name="Compare With Other Resource"
+            description="Compare resources, clipboard contents or editors"
+            defaultHandler="org.eclipse.compare.internal.CompareWithOtherResourceHandler" />
+   </extension>
+   <!-- org.eclipse.team.ui/plugin.xml: the Team Synchronizing perspective (Window > Perspective). The Requality
+        perspective is declared by the Requality plugin.xml (com.unitesk.requality.main.perspective). -->
+   <extension point="org.eclipse.ui.perspectives">
+      <perspective name="Team Synchronizing"
+            class="com.unitesk.requality.vscode.ui.team.synchronize.TeamSynchronizingPerspective"
+            id="org.eclipse.team.ui.TeamSynchronizingPerspective">
+         <description>This perspective is designed to support the synchronization of resources in the local workspace with their counterparts shared in a repository. It incorporates views for synchronizing, browsing history and comparing resource content.</description>
+      </perspective>
+   </extension>
+   <!-- org.eclipse.ui/plugin.xml: the Perspectives commands of the Window menu (Save As, Open, Reset, Close, Close All). -->
+   <extension point="org.eclipse.ui.commands">
+      <category id="org.eclipse.ui.category.perspectives" name="Perspectives"
+            description="Commands for opening perspectives" />
+      <command id="org.eclipse.ui.perspectives.showPerspective" name="Show Perspective"
+            description="Show a particular perspective" categoryId="org.eclipse.ui.category.perspectives"
+            defaultHandler="com.unitesk.requality.vscode.ui.workbench.handlers.ShowPerspectiveHandler" />
+      <command id="org.eclipse.ui.window.savePerspective" name="Save Perspective As..."
+            description="Save the current perspective with a new name"
+            categoryId="org.eclipse.ui.category.perspectives"
+            defaultHandler="com.unitesk.requality.vscode.ui.workbench.handlers.SavePerspectiveHandler" />
+      <command id="org.eclipse.ui.window.resetPerspective" name="Reset Perspective"
+            description="Reset the current perspective to its default state"
+            defaultHandler="com.unitesk.requality.vscode.ui.workbench.handlers.ResetPerspectiveHandler" />
+      <command id="org.eclipse.ui.window.closePerspective" name="Close Perspective"
+            description="Close the current perspective"
+            defaultHandler="com.unitesk.requality.vscode.ui.workbench.handlers.ClosePerspectiveHandler" />
+      <command id="org.eclipse.ui.window.closeAllPerspectives" name="Close All Perspectives"
+            description="Close all open perspectives"
+            defaultHandler="com.unitesk.requality.vscode.ui.workbench.handlers.CloseAllPerspectivesHandler" />
+      <command id="org.eclipse.ui.window.customizePerspective" name="Customize Perspective..."
+            description="Customize the current perspective"
+            categoryId="org.eclipse.ui.category.perspectives"
+            defaultHandler="com.unitesk.requality.vscode.ui.workbench.handlers.CustomizePerspectiveHandler" />
+   </extension>
+   <!-- org.eclipse.ui.views (org.eclipse.ui, org.eclipse.ui.views, org.eclipse.ui.ide) and org.eclipse.team.ui: the views of
+        the platform, in their categories, as the Show View dialog and menu list them. The classes are the compat classes. -->
+   <extension point="org.eclipse.ui.views">
+      <category id="org.eclipse.ui" name="General" />
+      <category id="org.eclipse.team.ui" name="Version Control (Team)" />
+      <view id="org.eclipse.ui.views.PropertySheet" name="Properties" category="org.eclipse.ui"
+            class="com.unitesk.requality.vscode.ui.workbench.PropertySheet" icon="icons/full/eview16/prop_ps.svg" />
+      <view id="org.eclipse.ui.views.ContentOutline" name="Outline" category="org.eclipse.ui"
+            class="com.unitesk.requality.vscode.ui.workbench.ContentOutline" icon="icons/full/eview16/outline_co.svg" />
+      <view id="org.eclipse.ui.views.BookmarkView" name="Bookmarks" category="org.eclipse.ui"
+            class="com.unitesk.requality.vscode.ui.ide.views.BookmarkView" icon="icons/full/eview16/bkmrk_nav.svg" />
+      <view id="org.eclipse.ui.views.TaskList" name="Tasks" category="org.eclipse.ui"
+            class="com.unitesk.requality.vscode.ui.ide.views.TaskList" icon="icons/full/eview16/tasks_tsk.svg" />
+      <view id="org.eclipse.ui.views.ProblemView" name="Problems" category="org.eclipse.ui"
+            class="com.unitesk.requality.vscode.ui.ide.views.ProblemsView" icon="icons/full/eview16/problems_view.svg" />
+      <view id="org.eclipse.ui.views.ProgressView" name="Progress" category="org.eclipse.ui"
+            class="com.unitesk.requality.vscode.ui.workbench.progress.ProgressView" icon="icons/full/eview16/pview.svg" />
+      <view id="org.eclipse.team.ui.GenericHistoryView" name="History" category="org.eclipse.team.ui"
+            class="com.unitesk.requality.vscode.ui.team.history.GenericHistoryView" icon="icons/full/eview16/history_view.svg" />
+      <view id="org.eclipse.team.sync.views.SynchronizeView" name="Synchronize" category="org.eclipse.team.ui"
+            class="com.unitesk.requality.vscode.ui.team.synchronize.SynchronizeView" icon="icons/full/eview16/synch_synch.svg" />
+   </extension>
+   <!-- org.eclipse.ui/plugin.xml: the Show View command (Window > Show View), with the views as its parameter. -->
+   <extension point="org.eclipse.ui.commands">
+      <category id="org.eclipse.ui.category.views" name="Views" description="Commands for opening views" />
+      <command id="org.eclipse.ui.views.showView" name="Show View" description="Shows a particular view"
+            categoryId="org.eclipse.ui.category.views"
+            defaultHandler="com.unitesk.requality.vscode.ui.workbench.handlers.ShowViewHandler">
+         <commandParameter id="org.eclipse.ui.views.showView.viewId" name="View" />
+         <commandParameter id="org.eclipse.ui.views.showView.secondaryId" name="Secondary Id" optional="true" />
+         <commandParameter id="org.eclipse.ui.views.showView.makeFast" name="As FastView" optional="true" />
+      </command>
+   </extension>
+   <!-- org.eclipse.ltk.ui.refactoring/plugin.xml: the refactoring wizards of the resource actions (LTKLauncher). -->
+   <extension point="org.eclipse.ui.commands">
+      <command id="org.eclipse.ltk.ui.refactoring.commands.renameResource" name="Rename Resource"
+            defaultHandler="com.unitesk.requality.vscode.ui.ltk.actions.RenameResourceHandler" />
+      <command id="org.eclipse.ltk.ui.refactoring.commands.deleteResources" name="Delete Resources"
+            defaultHandler="com.unitesk.requality.vscode.ui.ltk.actions.DeleteResourcesHandler" />
+      <command id="org.eclipse.ltk.ui.refactoring.commands.moveResources" name="Move Resources"
+            defaultHandler="com.unitesk.requality.vscode.ui.ltk.actions.MoveResourcesHandler" />
+   </extension>
+   <extension point="org.eclipse.ui.handlers">
+      <handler
+            class="com.unitesk.requality.vscode.ui.ide.actions.ProjectHandlers$BuildAll"
+            commandId="org.eclipse.ui.project.buildAll" />
+      <handler
+            class="com.unitesk.requality.vscode.ui.ide.actions.ProjectHandlers$Clean"
+            commandId="org.eclipse.ui.project.cleanAction" />
+      <handler
+            class="com.unitesk.requality.vscode.ui.ide.actions.ProjectHandlers$ToggleAutoBuild"
+            commandId="org.eclipse.ui.project.buildAutomatically" />
+   </extension>
+   <extension point="org.eclipse.ui.workingSets">
+      <!-- The IDE's "Resource" working set type (org.eclipse.ui.ide/plugin.xml). -->
+      <workingSet
+            description="Working sets of resources"
+            elementAdapterClass="org.eclipse.ui.BasicWorkingSetElementAdapter:org.eclipse.core.resources.IResource;adapt=true"
+            icon="$nl$/icons/full/obj16/workset.png"
+            id="org.eclipse.ui.resourceWorkingSetPage"
+            name="Resource"
+            pageClass="org.eclipse.ui.internal.ide.dialogs.ResourceWorkingSetPage"
+            updaterClass="org.eclipse.ui.internal.ide.ResourceWorkingSetUpdater">
+      </workingSet>
+   </extension>
+   <extension point="org.eclipse.ui.navigator.navigatorContent">
+      <actionProvider
+            class="org.eclipse.ui.internal.navigator.resources.actions.WorkingSetActionProvider"
+            id="org.eclipse.ui.navigator.resources.WorkingSetActions">
+         <enablement>
+            <or>
+               <adapt type="org.eclipse.core.resources.IResource" />
+               <adapt type="java.util.Collection">
+                  <count value="0" />
+               </adapt>
+            </or>
+         </enablement>
+      </actionProvider>
+      <commonFilter
+            id="org.eclipse.ui.navigator.resources.filters.workingSet"
+            name="Working Set"
+            class="org.eclipse.ui.ResourceWorkingSetFilter"
+            activeByDefault="false"
+            visibleInUI="false">
+      </commonFilter>
+   </extension>
+   <extension point="org.eclipse.core.runtime.adapters">
+      <factory
+            adaptableType="org.eclipse.core.resources.IResource"
+            class="com.unitesk.requality.vscode.ui.ide.model.ResourceAdapterFactory">
+         <adapter type="com.unitesk.requality.vscode.ui.workbench.IPersistableElement" />
+      </factory>
+   </extension>
+   <extension point="org.eclipse.ui.elementFactories">
+      <factory
+            class="com.unitesk.requality.vscode.ui.ide.model.ResourceFactory"
+            id="org.eclipse.ui.internal.model.ResourceFactory">
+      </factory>
+   </extension>
+   <!-- org.eclipse.ui.ide: the lightweight decorators of the resources (overlays of the explorer icons). The labels are
+        the English texts of plugin.properties; the ResourceFilterDecorator is disabled by default (state="false"). -->
+   <extension point="org.eclipse.ui.decorators">
+      <decorator
+            lightweight="true"
+            adaptable="true"
+            location="BOTTOM_RIGHT"
+            label="Linked Resources"
+            class="org.eclipse.ui.internal.ide.LinkedResourceDecorator"
+            state="true"
+            id="org.eclipse.ui.LinkedResourceDecorator">
+         <description>
+            Adds an icon decoration to linked resources.
+         </description>
+         <enablement>
+            <objectClass
+                  name="org.eclipse.core.resources.IResource">
+            </objectClass>
+         </enablement>
+      </decorator>
+      <decorator
+            lightweight="true"
+            adaptable="true"
+            location="TOP_RIGHT"
+            label="Symbolic links"
+            class="org.eclipse.ui.internal.ide.SymlinkDecorator"
+            state="true"
+            id="org.eclipse.ui.SymlinkDecorator">
+         <description>
+            Adds an icon decoration for symbolic links.
+         </description>
+         <enablement>
+            <objectClass
+                  name="org.eclipse.core.runtime.PlatformObject">
+            </objectClass>
+         </enablement>
+      </decorator>
+      <decorator
+            lightweight="true"
+            adaptable="true"
+            location="BOTTOM_RIGHT"
+            label="Virtual Folders"
+            class="org.eclipse.ui.internal.ide.VirtualResourceDecorator"
+            state="true"
+            id="org.eclipse.ui.VirtualResourceDecorator">
+         <description>
+            Shows an icon for virtual folders.
+         </description>
+         <enablement>
+            <objectClass
+                  name="org.eclipse.core.resources.IResource">
+            </objectClass>
+         </enablement>
+      </decorator>
+      <decorator
+            adaptable="false"
+            class="org.eclipse.ui.internal.ide.ContentTypeDecorator"
+            id="org.eclipse.ui.ContentTypeDecorator"
+            label="File Icons Based On Content Analysis"
+            lightweight="true"
+            location="REPLACE"
+            state="true">
+         <description>
+            Displays an icon based on the examination of the contents of a file. This yields a more precise answer than one derived simply from the file name.
+         </description>
+         <enablement>
+            <objectClass
+                  name="org.eclipse.core.resources.IFile">
+            </objectClass>
+         </enablement>
+      </decorator>
+      <decorator
+            adaptable="true"
+            class="org.eclipse.ui.internal.ide.ResourceFilterDecorator"
+            id="org.eclipse.ui.ResourceFilterDecorator"
+            label="Containers with Resource Filters"
+            lightweight="true"
+            location="BOTTOM_LEFT"
+            state="false">
+         <description>
+            Displays an icon based on the presence of resource filters on a container.
+         </description>
+         <enablement>
+            <objectClass
+                  name="org.eclipse.core.resources.IContainer">
+            </objectClass>
+         </enablement>
+      </decorator>
+   </extension>
+   <!-- org.eclipse.core.resources: a resource adapts to its ResourceMapping (the popup contributions of Team and Compare
+        apply to the files and folders of the explorer as to the model nodes). -->
+   <extension point="org.eclipse.core.runtime.adapters">
+      <factory
+            adaptableType="org.eclipse.core.resources.IResource"
+            class="com.unitesk.requality.vscode.ui.resources.mapping.ResourceMappingAdapterFactory">
+         <adapter type="org.eclipse.core.resources.mapping.ResourceMapping" />
+      </factory>
+   </extension>
+   <!-- org.eclipse.compare: the structure creators (archives: the entries of a zip file are compared as a tree). -->
+   <extension point="org.eclipse.compare.structureCreators">
+      <structureCreator
+            extensions="zip"
+            class="org.eclipse.compare.ZipFileStructureCreator"
+            id="org.eclipse.compare.ZipFileStructureCreator">
+      </structureCreator>
+   </extension>
+
+   <!-- org.eclipse.team.ui and org.eclipse.compare: the popup menus of resources and of everything that adapts to them
+        (Requality nodes adapt to IFile and ResourceMapping), as in the plugin.xml of the two bundles; the labels are the
+        English texts of their plugin.properties. Team actions override the compare ones (overrideActionId). The
+        extensions of org.eclipse.compare come first, as in the registry (org.eclipse.team.ui requires it). -->
+   <extension point="org.eclipse.ui.popupMenus">
+      <objectContribution
+            objectClass="org.eclipse.core.resources.mapping.ResourceMapping"
+            adaptable="true"
+            id="org.eclipse.compare.MenuGroups">
+         <menu
+               label="Rep&amp;lace With"
+               path="additions"
+               id="replaceWithMenu">
+            <separator name="replaceWithGroup" />
+         </menu>
+         <menu
+               label="Comp&amp;are With"
+               path="additions"
+               id="compareWithMenu">
+            <separator name="compareWithGroup" />
+         </menu>
+      </objectContribution>
+      <objectContribution
+            objectClass="org.eclipse.core.resources.IResource"
+            adaptable="true"
+            id="org.eclipse.compare.CompareAction">
+         <action
+               label="&amp;Each Other"
+               tooltip="Compare the Selected Resources"
+               class="org.eclipse.compare.internal.CompareAction"
+               menubarPath="compareWithMenu/compareWithGroup"
+               enablesFor="2+"
+               id="compareWithEachOther" />
+      </objectContribution>
+      <objectContribution
+            objectClass="org.eclipse.core.resources.IFile"
+            adaptable="true"
+            id="org.eclipse.compare.ReplaceWithEditionAction">
+         <menu
+               label="Rep&amp;lace With"
+               path="additions"
+               id="replaceWithMenu">
+            <separator name="replaceWithGroup" />
+         </menu>
+         <action
+               class="org.eclipse.compare.internal.ReplaceWithEditionAction"
+               enablesFor="1"
+               helpContextId="org.eclipse.compare.replace_with_edition_action_context"
+               id="replaceFromHistory"
+               label="&amp;Local History..."
+               menubarPath="replaceWithMenu/replaceWithGroup"
+               tooltip="Replace the Selected Resource with Local History" />
+         <action
+               label="&amp;Previous from Local History"
+               tooltip="Replace the Selected Resource with the Previous from Local History"
+               class="org.eclipse.compare.internal.ReplaceWithPreviousEditionAction"
+               menubarPath="replaceWithMenu/replaceWithGroup"
+               enablesFor="1"
+               id="replaceWithPreviousFromHistory" />
+         <action
+               label="Clipboard"
+               tooltip="Replace the selection or entire contents in editor with contents in clipboard"
+               class="org.eclipse.compare.internal.ClipboardReplace"
+               menubarPath="replaceWithMenu/replaceWithGroup"
+               enablesFor="1"
+               id="replaceWithClipboard" />
+      </objectContribution>
+      <objectContribution
+            objectClass="org.eclipse.core.resources.IFile"
+            adaptable="true"
+            id="org.eclipse.compare.CompareWithEditionAction">
+         <menu
+               label="Comp&amp;are With"
+               path="additions"
+               id="compareWithMenu">
+            <separator name="compareWithGroup" />
+         </menu>
+         <action
+               label="Clipboard"
+               tooltip="Compare the selection or entire contents in editor with contents in clipboard"
+               class="org.eclipse.compare.internal.ClipboardCompare"
+               menubarPath="compareWithMenu/compareWithGroup"
+               enablesFor="1"
+               id="compareWithClipboard" />
+         <action
+               label="&amp;Local History..."
+               tooltip="Compare the Selected Resource with Local History"
+               class="org.eclipse.compare.internal.CompareWithEditionAction"
+               menubarPath="compareWithMenu/compareWithGroup"
+               enablesFor="1"
+               id="compareWithHistory" />
+      </objectContribution>
+      <objectContribution
+            objectClass="org.eclipse.core.resources.IContainer"
+            adaptable="true"
+            id="org.eclipse.compare.AddFromHistoryAction">
+         <action
+               label="Restore from Local Histor&amp;y..."
+               tooltip="Restore Deleted Files from Local History"
+               class="org.eclipse.compare.internal.AddFromHistoryAction"
+               menubarPath="replaceWithMenu"
+               enablesFor="1"
+               id="addFromHistoryAction" />
+      </objectContribution>
+   </extension>
+   <extension point="org.eclipse.ui.popupMenus">
+      <objectContribution
+            objectClass="org.eclipse.core.resources.mapping.ResourceMapping"
+            adaptable="true"
+            id="org.eclipse.team.ui.ResourceContributions">
+         <menu
+               label="T&amp;eam"
+               path="additions"
+               id="team.main">
+            <separator name="group1" />
+            <groupMarker name="applyPatchGroup" />
+            <separator name="group2" />
+            <separator name="group3" />
+            <separator name="group4" />
+            <separator name="group5" />
+            <separator name="group6" />
+            <separator name="group7" />
+            <separator name="group8" />
+            <separator name="group9" />
+            <separator name="group10" />
+            <separator name="targetGroup" />
+            <separator name="projectGroup" />
+         </menu>
+      </objectContribution>
+      <objectContribution
+            objectClass="org.eclipse.core.resources.mapping.ResourceMapping"
+            adaptable="true"
+            id="org.eclipse.team.ui.ProjectContributions">
+         <action
+               class="org.eclipse.team.internal.ui.actions.ConfigureProjectAction"
+               enablesFor="1"
+               helpContextId="org.eclipse.team.ui.share_project_action_context"
+               id="nonbound.org.eclipse.team.ui.ConfigureProject"
+               label="&amp;Share Project..."
+               menubarPath="team.main/projectGroup"
+               tooltip="Share the project with others using a version and configuration management system." />
+         <enablement>
+            <not>
+               <adapt type="org.eclipse.core.resources.mapping.ResourceMapping">
+                  <test property="org.eclipse.core.resources.projectPersistentProperty" args="org.eclipse.team.core.repository" />
+               </adapt>
+            </not>
+         </enablement>
+      </objectContribution>
+      <objectContribution
+            objectClass="org.eclipse.core.resources.IFile"
+            nameFilter="*.psf"
+            id="org.eclipse.team.ui.ProjectSetFileContributions">
+         <action
+               label="Import Project &amp;Set..."
+               class="org.eclipse.team.internal.ui.actions.ImportProjectSetAction"
+               menubarPath="team.main"
+               enablesFor="*"
+               id="nonbound.org.eclipse.team.ui.ImportProjectSetAction" />
+      </objectContribution>
+      <objectContribution
+            adaptable="true"
+            id="org.eclipse.team.ui.UnmanagedFileContributions"
+            objectClass="org.eclipse.core.resources.IFile">
+         <action
+               class="org.eclipse.team.internal.ui.history.ShowLocalHistory"
+               id="org.eclipse.team.ui.showLocalHistory"
+               label="Show Local &amp;History"
+               menubarPath="team.main/group4"
+               enablesFor="1"
+               tooltip="Show Local &amp;History" />
+         <action
+               class="org.eclipse.team.internal.ui.history.CompareLocalHistory"
+               id="org.eclipse.team.ui.compareLocalHistory"
+               label="&amp;Local History..."
+               menubarPath="compareWithMenu/compareWithGroup"
+               enablesFor="1"
+               overrideActionId="compareWithHistory"
+               tooltip="Compare the Selected Resource with Local History" />
+         <action
+               class="org.eclipse.team.internal.ui.history.ReplaceLocalHistory"
+               enablesFor="1"
+               helpContextId="org.eclipse.compare.replace_with_edition_action_context"
+               id="org.eclipse.team.ui.replaceLocalHistory"
+               label="&amp;Local History..."
+               menubarPath="replaceWithMenu/replaceWithGroup"
+               overrideActionId="replaceFromHistory"
+               tooltip="Replace the Selected Resource with Local History" />
+         <action
+               class="org.eclipse.team.internal.ui.actions.CompareAction"
+               enablesFor="2+"
+               id="org.eclipse.team.ui.compareWithEachOther"
+               label="&amp;Each Other"
+               menubarPath="compareWithMenu/compareWithGroup"
+               overrideActionId="compareWithEachOther"
+               tooltip="Compare the Selected Resources" />
+      </objectContribution>
+      <objectContribution
+            objectClass="org.eclipse.core.resources.mapping.ResourceMapping"
+            adaptable="true"
+            id="org.eclipse.team.ui.ResourceMappingContributions">
+         <action
+               class="org.eclipse.team.internal.ui.actions.ApplyPatchAction"
+               definitionId="org.eclipse.team.ui.applyPatch"
+               enablesFor="*"
+               helpContextId="org.eclipse.team.ui.apply_patch_action_context"
+               id="org.eclipse.team.ui.applyPatch"
+               label="Appl&amp;y Patch..."
+               menubarPath="team.main/applyPatchGroup"
+               tooltip="Apply a patch to one or more workspace projects." />
+      </objectContribution>
+   </extension>
+</plugin>

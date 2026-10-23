@@ -1,0 +1,24 @@
+<?xml version="1.0" ?>
+<groups>
+	<reportGroup id="typical" order="10" name="Отчёты для решения типовых задач">
+		<description>Отчеты для решения типовых задач.</description>
+	</reportGroup>
+	<reportGroup id="export" order="20" name="Экспорт">
+		<description>Отчеты для экспорта проекта.</description>
+	</reportGroup>
+	<reportGroup id="experimental" order="40" name="ЭКСПЕРИМЕНТАЛЬНЫЕ">
+		<description>Экспериментальные отчеты.</description>
+	</reportGroup>
+	<reportGroup id="extraction" order="50" name="Выделение требований" parent="experimental">
+		<description>Отчеты связанные с выделением требований.</description>
+	</reportGroup>
+	<reportGroup id="links" order="60" name="Анализ связей между требованиями" parent="experimental">
+		<description>Отчеты связанные с анализом связей между требованиями.</description>
+	</reportGroup>
+	<reportGroup id="debugrules" order="80" name="Отладка правил оформления" parent="experimental">
+		<description>Отчеты связанные с отладкой правил оформления.</description>
+	</reportGroup>
+	<reportGroup id="extra" order="90" name="Остальное" parent="experimental">
+		<description>Остальные отчеты.</description>
+	</reportGroup>
+</groups>

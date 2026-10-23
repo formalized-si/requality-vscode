@@ -1,0 +1,7 @@
+<?xml version="1.0" ?>
+<report start="trace.ftl" id="com.unitesk.requality.reports.testLinking" name="Test linking" read-only = "true">
+    <template source="trace.ftl" location="{project_name}-trace.html" class = "com.unitesk.requality.report.TraceabilityDataSource"/>
+	<gui>
+	    <button command="com.unitesk.requality.TraceSettings" text="Open Settings"/>
+	</gui>
+</report>

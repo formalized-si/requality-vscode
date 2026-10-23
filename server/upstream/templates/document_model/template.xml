@@ -1,0 +1,20 @@
+<?xml version="1.0" ?>
+<report start="dm.ftl" order="20" id="com.unitesk.requality.reports.dm" supports-multipart="true" 
+name="Анализ покрытия выделенных требований" read-only = "true" group="extraction">
+	<description>Для анализа покрытия требований, выделенных в импортированных документах.</description>
+    <template source="dm.ftl" location="{project_name}-{node_ForeignID|node_uuid}-docmod.html"/>
+    <gui>
+    	<button command="com.unitesk.reqcoverage.BuildCoverageWizard" text="Update Сoverage Source"/>
+    </gui>    
+    <multiPartSource class="com.unitesk.requality.report.DocumentMultiPart"/>
+    <param name="markupOnly" type="BOOLEAN,STRING"></param>
+    <param name="coverageSettings" type="COVERAGE,LIST[STRING]" description="Coverage settings. May include coverageFilePath or pair coverageStorageType and coverageStorageSettings">
+    	<or>
+	    	<attribute name="coverageFilePath" description="Path to file with coverage info"/>
+	    	<and>
+	    		<attribute name="coverageStorageType" description="Type of coverage info source"/>
+	    		<attribute name="coverageStorageSettings" description="Coverage info source-related settings. Will depend on source type. Separator is |"/>
+	    	</and>
+    	</or>
+    </param>
+</report>

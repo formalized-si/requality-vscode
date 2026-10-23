@@ -1,0 +1,902 @@
+[
+  {
+    "command": "requality.newProject",
+    "title": "New Requality Project...",
+    "eclipse": "com.unitesk.requality.wizards.ReqWizard (newWizard)"
+  },
+  {
+    "command": "requality.importDocument",
+    "title": "Import Document...",
+    "eclipse": "DocumentImportWizard (importWizard) / CNF ImportAction"
+  },
+  {
+    "command": "requality.importReqIF",
+    "title": "Import from ReqIF...",
+    "eclipse": "ImportFromReqIFWizard (importWizard)"
+  },
+  {
+    "command": "requality.exportReqIF",
+    "title": "Export to ReqIF...",
+    "eclipse": "ExportToReqIFWizard (exportWizard)"
+  },
+  {
+    "command": "requality.projectProperties",
+    "title": "Project Properties",
+    "eclipse": "propertyPages com.unitesk.requality.properties.*"
+  },
+  {
+    "command": "requality.preferences",
+    "title": "Preferences",
+    "eclipse": "preferencePages requality.PreferencesPage"
+  },
+  {
+    "command": "requality.help",
+    "title": "Requality Manual",
+    "eclipse": "org.eclipse.help.toc docs/manual/toc.xml"
+  },
+  {
+    "command": "requality.showView.explorer",
+    "title": "Requality Explorer",
+    "eclipse": "Window > Show View > Requality Explorer (org.eclipse.ui.views.showView viewId=com.unitesk.requality.views.RequalityExplorer)"
+  },
+  {
+    "command": "requality.showView.properties",
+    "title": "Properties",
+    "eclipse": "Window > Show View > Properties (org.eclipse.ui.views.showView viewId=org.eclipse.ui.views.PropertySheet)"
+  },
+  {
+    "command": "requality.showView.outline",
+    "title": "Outline",
+    "eclipse": "Window > Show View > Outline (org.eclipse.ui.views.showView viewId=org.eclipse.ui.views.ContentOutline)"
+  },
+  {
+    "command": "requality.showView.links",
+    "title": "Requality Links Explorer",
+    "eclipse": "Window > Show View > Requality Links Explorer (org.eclipse.ui.views.showView viewId=com.unitesk.requality.views.RequalityLinksExplorer)"
+  },
+  {
+    "command": "requality.showView.todo",
+    "title": "Update Processor Tasks",
+    "eclipse": "Window > Show View > Update Processor Tasks (org.eclipse.ui.views.showView viewId=com.unitesk.requality.views.ToDoList)"
+  },
+  {
+    "command": "requality.showView.bookmarks",
+    "title": "Bookmarks",
+    "eclipse": "Window > Show View > Bookmarks (org.eclipse.ui.views.showView viewId=org.eclipse.ui.views.BookmarkView)"
+  },
+  {
+    "command": "requality.showView.tasks",
+    "title": "Tasks",
+    "eclipse": "Window > Show View > Tasks (org.eclipse.ui.views.showView viewId=org.eclipse.ui.views.TaskList)"
+  },
+  {
+    "command": "requality.showView.problems",
+    "title": "Problems",
+    "eclipse": "Window > Show View > Problems (org.eclipse.ui.views.showView viewId=org.eclipse.ui.views.ProblemView)"
+  },
+  {
+    "command": "requality.showView.progress",
+    "title": "Progress",
+    "eclipse": "Window > Show View > Progress (org.eclipse.ui.views.showView viewId=org.eclipse.ui.views.ProgressView)"
+  },
+  {
+    "command": "requality.showView.history",
+    "title": "History",
+    "eclipse": "Window > Show View > History (org.eclipse.ui.views.showView viewId=org.eclipse.team.ui.GenericHistoryView)"
+  },
+  {
+    "command": "requality.showView.synchronize",
+    "title": "Synchronize",
+    "eclipse": "Window > Show View > Synchronize (org.eclipse.ui.views.showView viewId=org.eclipse.team.sync.views.SynchronizeView)"
+  },
+  {
+    "command": "requality.showView.other",
+    "title": "Other...",
+    "eclipse": "Window > Show View > Other... (org.eclipse.ui.views.showView: ShowViewDialog)"
+  },
+  {
+    "command": "requality.perspective.open",
+    "title": "Open Perspective...",
+    "eclipse": "org.eclipse.ui.perspectives.showPerspective (SelectPerspectiveDialog)"
+  },
+  {
+    "command": "requality.perspective.openOther",
+    "title": "Other...",
+    "eclipse": "Window > Perspective > Open Perspective > Other... (org.eclipse.ui.perspectives.showPerspective)"
+  },
+  {
+    "command": "requality.perspective.customize",
+    "title": "Customize Perspective...",
+    "eclipse": "org.eclipse.ui.window.customizePerspective (Window > Perspective > Customize Perspective...: CustomizePerspectiveDialog)"
+  },
+  {
+    "command": "requality.perspective.saveAs",
+    "title": "Save Perspective As...",
+    "eclipse": "org.eclipse.ui.window.savePerspective (Window > Perspective > Save Perspective As...: SavePerspectiveDialog)"
+  },
+  {
+    "command": "requality.perspective.reset",
+    "title": "Reset Perspective...",
+    "eclipse": "org.eclipse.ui.window.resetPerspective (Window > Perspective > Reset Perspective...)"
+  },
+  {
+    "command": "requality.perspective.close",
+    "title": "Close Perspective",
+    "eclipse": "org.eclipse.ui.window.closePerspective (Window > Perspective > Close Perspective)"
+  },
+  {
+    "command": "requality.perspective.closeAll",
+    "title": "Close All Perspectives",
+    "eclipse": "org.eclipse.ui.window.closeAllPerspectives (Window > Perspective > Close All Perspectives)"
+  },
+  {
+    "command": "requality.compare",
+    "title": "Requality Compare",
+    "eclipse": "org.eclipse.compare.contentMergeViewers JSONCompareViewerCreator (Compare With)"
+  },
+  {
+    "command": "requality.refresh",
+    "title": "Refresh",
+    "eclipse": "CNF Refresh (F5)"
+  },
+  {
+    "command": "requality.explorer.collapseAll",
+    "title": "Collapse All",
+    "eclipse": "CommonNavigatorActionGroup: CollapseAllHandler (the view toolbar of the Eclipse view)"
+  },
+  {
+    "command": "requality.filters",
+    "title": "Filters and Customization...",
+    "eclipse": "CommonNavigatorActionGroup FilterActionGroup: SelectFiltersAction (CommonFilterSelectionDialog)"
+  },
+  {
+    "command": "requality.recentFilters",
+    "title": "Recent Filters...",
+    "eclipse": "FilterActionGroup: Recent Filters (ToggleFilterAction)"
+  },
+  {
+    "command": "requality.linkWithEditor",
+    "title": "Link with Editor",
+    "eclipse": "CNF Link with Editor"
+  },
+  {
+    "command": "requality.unlinkWithEditor",
+    "title": "Unlink from Editor",
+    "eclipse": "CNF Link with Editor (toggle off)"
+  },
+  {
+    "command": "requality.undo",
+    "title": "Undo",
+    "eclipse": "org.eclipse.ui.edit.undo (UndoRedoMech)"
+  },
+  {
+    "command": "requality.redo",
+    "title": "Redo",
+    "eclipse": "org.eclipse.ui.edit.redo (UndoRedoMech)"
+  },
+  {
+    "command": "requality.open",
+    "title": "Open",
+    "eclipse": "com.unitesk.requality.commands.OpenNode"
+  },
+  {
+    "command": "requality.showProperties",
+    "title": "Show Properties",
+    "eclipse": "org.eclipse.ui.views.PropertySheet"
+  },
+  {
+    "command": "requality.properties",
+    "title": "Properties",
+    "eclipse": "org.eclipse.ui.file.properties (Alt+Enter): PropertiesActionProvider PropertyDialogAction, else PropertyDialogHandler"
+  },
+  {
+    "command": "requality.restartServer",
+    "title": "Restart Requality Server",
+    "eclipse": null
+  },
+  {
+    "command": "requality.showLog",
+    "title": "Show Server Log",
+    "eclipse": null
+  },
+  {
+    "command": "requality.new",
+    "title": "Other...",
+    "eclipse": "com.unitesk.requality.CreateDynNewMenu (NewMenuPoint)"
+  },
+  {
+    "command": "requality.createRequirement",
+    "title": "Requirement",
+    "eclipse": "CreateDynNewMenu / NewTypedTemplatedMenuPoint Requirement"
+  },
+  {
+    "command": "requality.createTextNode",
+    "title": "Text Node",
+    "eclipse": "CreateDynNewMenu / NewTypedTemplatedMenuPoint TextNode"
+  },
+  {
+    "command": "requality.createTestPurpose",
+    "title": "Test Purpose",
+    "eclipse": "CreateDynNewMenu / NewTypedTemplatedMenuPoint TestPurpose"
+  },
+  {
+    "command": "requality.createComment",
+    "title": "Comment",
+    "eclipse": "CreateDynNewMenu / NewTypedTemplatedMenuPoint Comment"
+  },
+  {
+    "command": "requality.createDocFolder",
+    "title": "Document Folder",
+    "eclipse": "CreateDynNewMenu / NewTypedTemplatedMenuPoint DocFolder"
+  },
+  {
+    "command": "requality.createReportFolder",
+    "title": "Report Folder",
+    "eclipse": "CreateDynNewMenu / NewTypedTemplatedMenuPoint ReportFolder"
+  },
+  {
+    "command": "requality.createReportSettings",
+    "title": "Report Settings",
+    "eclipse": "CreateDynNewMenu / NewTypedTemplatedMenuPoint ReportSettings"
+  },
+  {
+    "command": "requality.createVirtualNode",
+    "title": "Virtual Node",
+    "eclipse": "CreateDynNewMenu / NewTypedTemplatedMenuPoint VirtualNode"
+  },
+  {
+    "command": "requality.createNodeType",
+    "title": "Node Type",
+    "eclipse": "CreateDynNewMenu / NewTypedTemplatedMenuPoint NodeType"
+  },
+  {
+    "command": "requality.createTest",
+    "title": "Test",
+    "eclipse": "com.unitesk.requality.CreateTest"
+  },
+  {
+    "command": "requality.addRefTo",
+    "title": "Add reference to...",
+    "eclipse": "com.unitesk.requality.commands.AddRefTo"
+  },
+  {
+    "command": "requality.openBindings",
+    "title": "Open bindings",
+    "eclipse": "com.unitesk.requality.commands.OpenBindings (Ctrl+R)"
+  },
+  {
+    "command": "requality.copyQId",
+    "title": "Copy Full Name",
+    "eclipse": "CopyNodeQId"
+  },
+  {
+    "command": "requality.copy",
+    "title": "Copy",
+    "eclipse": "CopyNode / org.eclipse.ui.edit.copy"
+  },
+  {
+    "command": "requality.pasteInto",
+    "title": "Paste into",
+    "eclipse": "PasteIntoNode / org.eclipse.ui.edit.paste"
+  },
+  {
+    "command": "requality.pasteNear",
+    "title": "Paste near",
+    "eclipse": "PasteNearNode"
+  },
+  {
+    "command": "requality.delete",
+    "title": "Delete Selection",
+    "eclipse": "org.eclipse.ui.edit.delete (DeleteSelection + delete handlers)"
+  },
+  {
+    "command": "requality.renameDocFolder",
+    "title": "Rename Document Folder",
+    "eclipse": "org.eclipse.ui.edit.rename (RenameDocFolderHandler)"
+  },
+  {
+    "command": "requality.renameProject",
+    "title": "Rename...",
+    "eclipse": "navigator RefactorActionProvider: RenameResourceAction + ProjectRenameParticipant"
+  },
+  {
+    "command": "requality.rename",
+    "title": "Rename",
+    "eclipse": "org.eclipse.ui.edit.rename (F2): project rename or RenameDocFolderHandler"
+  },
+  {
+    "command": "requality.showHiddenChildren",
+    "title": "Show Hidden Children",
+    "eclipse": "ShowHiddenChildren"
+  },
+  {
+    "command": "requality.hideVirtualNodes",
+    "title": "Hide Selected Virtual Nodes",
+    "eclipse": "HideInstancerNode"
+  },
+  {
+    "command": "requality.find",
+    "title": "Find Node...",
+    "eclipse": "org.eclipse.ui.edit.findReplace (FindNodeHandler)"
+  },
+  {
+    "command": "requality.transferredStatus",
+    "title": "Transferred Status...",
+    "eclipse": "TransferedStatusGroup / TranserredStatusSubMenu"
+  },
+  {
+    "command": "requality.massOps",
+    "title": "Open Mass Ops Wizard",
+    "eclipse": "com.unitesk.requality.batch.wizard"
+  },
+  {
+    "command": "requality.fixLocationsDescriptions",
+    "title": "Fix Locations Descriptions",
+    "eclipse": "FixLocationsDescription"
+  },
+  {
+    "command": "requality.forceCheckers",
+    "title": "Clear caches and run Checkers",
+    "eclipse": "ForceCheckers"
+  },
+  {
+    "command": "requality.deleteStatisticsFile",
+    "title": "Delete Statistics File",
+    "eclipse": "DeleteStatisticsFileHandler"
+  },
+  {
+    "command": "requality.checkers",
+    "title": "Checkers...",
+    "eclipse": "com.unitesk.requality.menu.Checkers (CheckerCNFMenuBuilder)"
+  },
+  {
+    "command": "requality.resetProblems",
+    "title": "Reset Problems",
+    "eclipse": "ResetProblems"
+  },
+  {
+    "command": "requality.openUniEditor",
+    "title": "Edit in UniEditor",
+    "eclipse": "UniEditorOpen"
+  },
+  {
+    "command": "requality.openModuleEditor",
+    "title": "Edit in ModuleEditor",
+    "eclipse": "ModuleEditorOpen"
+  },
+  {
+    "command": "requality.openReview",
+    "title": "Review",
+    "eclipse": "ReviewEditorOpen"
+  },
+  {
+    "command": "requality.openExternal.moduleEditor",
+    "title": "ModuleEditor",
+    "eclipse": "ModuleEditorOpenExternal"
+  },
+  {
+    "command": "requality.openExternal.uniEditor",
+    "title": "UniEditor",
+    "eclipse": "UniEditorOpenExternal"
+  },
+  {
+    "command": "requality.openExternal.markup",
+    "title": "Markup",
+    "eclipse": "MarkupOpenExternal"
+  },
+  {
+    "command": "requality.openExternal.report",
+    "title": "Report",
+    "eclipse": "ReportOpenExternal"
+  },
+  {
+    "command": "requality.findNext",
+    "title": "Find Next",
+    "eclipse": "org.eclipse.ui.edit.findNext (Ctrl+K, Document Editor)"
+  },
+  {
+    "command": "requality.findPrevious",
+    "title": "Find Previous",
+    "eclipse": "org.eclipse.ui.edit.findPrevious (Ctrl+Shift+K, Document Editor)"
+  },
+  {
+    "command": "requality.docproc.saxHeaders",
+    "title": "HTML Headers Document Processor",
+    "eclipse": "document.processor SAXHeadersDocumentProcessor (CNF DocumentProcessorAction)"
+  },
+  {
+    "command": "requality.docproc.updateDocument",
+    "title": "Update Document",
+    "eclipse": "document.processor ProcessNewSpecificationVersion (CNF DocumentProcessorAction)"
+  },
+  {
+    "command": "requality.docproc.textToReq",
+    "title": "Custom Text To Requirements Parser",
+    "eclipse": "document.processor TextToReqParser (CNF DocumentProcessorAction)"
+  },
+  {
+    "command": "requality.docproc.updateFromLibreOffice",
+    "title": "Update From Libre Office",
+    "eclipse": "document.processor UpdateHTMLModule (CNF DocumentProcessorAction)"
+  },
+  {
+    "command": "requality.docproc.oldMarkup",
+    "title": "Test processor for updating old markup",
+    "eclipse": "document.processor OldMarkupProcessor (CNF DocumentProcessorAction)"
+  },
+  {
+    "command": "requality.docproc.paramExtraction",
+    "title": "Param extracton processor",
+    "eclipse": "document.processor ParamExtrProcessor (CNF DocumentProcessorAction)"
+  },
+  {
+    "command": "requality.generateReport",
+    "title": "Generate Report",
+    "eclipse": "GenerateReport"
+  },
+  {
+    "command": "requality.exportReport",
+    "title": "Export Report",
+    "eclipse": "ExportReport"
+  },
+  {
+    "command": "requality.exportToOdt",
+    "title": "Export To Odt",
+    "eclipse": "ExportToOdt"
+  },
+  {
+    "command": "requality.coverageSettings",
+    "title": "Coverage Settings",
+    "eclipse": "com.unitesk.reqcoverage.OpenCoverageSettings"
+  },
+  {
+    "command": "requality.progressSettings",
+    "title": "Progress Settings",
+    "eclipse": "com.unitesk.requality.ProgressSettings"
+  },
+  {
+    "command": "requality.traceabilitySettings",
+    "title": "Traceability Settings",
+    "eclipse": "com.unitesk.requality.TraceabilitySettings"
+  },
+  {
+    "command": "requality.traceSettings",
+    "title": "Trace Settings",
+    "eclipse": "com.unitesk.requality.TraceSettings"
+  },
+  {
+    "command": "requality.tvSettings",
+    "title": "Table view settings",
+    "eclipse": "com.unitesk.requality.TVSettings"
+  },
+  {
+    "command": "requality.selectReferencedNode",
+    "title": "Select Referenced Node",
+    "eclipse": "RequilityCNFRefSel (Explorer toolbar)"
+  },
+  {
+    "command": "requality.links.changeDirection",
+    "title": "Change reference direction in view",
+    "eclipse": "RequilityLinksDirection"
+  },
+  {
+    "command": "requality.links.selectAttribute",
+    "title": "Select filter for reference names",
+    "eclipse": "SelectLinksAttribute"
+  },
+  {
+    "command": "requality.links.lightLinks",
+    "title": "Light up links",
+    "eclipse": "LightLinks"
+  },
+  {
+    "command": "requality.selectReferencedNode.oneLink",
+    "title": "Select Referenced Node",
+    "eclipse": "RequilityCNFRefSel (onelink.png)"
+  },
+  {
+    "command": "requality.selectReferencedNode.multiLink",
+    "title": "Select Referenced Node",
+    "eclipse": "RequilityCNFRefSel (multilink.png)"
+  },
+  {
+    "command": "requality.links.changeDirection.down",
+    "title": "Change reference direction in view",
+    "eclipse": "RequilityLinksDirection (downarrow.png)"
+  },
+  {
+    "command": "requality.links.changeDirection.up",
+    "title": "Change reference direction in view",
+    "eclipse": "RequilityLinksDirection (uparrow.png)"
+  },
+  {
+    "command": "requality.links.lightLinks.on",
+    "title": "Light up links",
+    "eclipse": "LightLinks (light_link.png)"
+  },
+  {
+    "command": "requality.todo.hideCompleted",
+    "title": "Hide Completed Items",
+    "eclipse": "HideCompletedItems (toggle)"
+  },
+  {
+    "command": "requality.todo.showCompleted",
+    "title": "Show Completed Items",
+    "eclipse": "HideCompletedItems (toggle off)"
+  },
+  {
+    "command": "requality.todo.delete",
+    "title": "Delete Selected Task",
+    "eclipse": "DeleteToDoItem"
+  },
+  {
+    "command": "requality.todo.deleteAll",
+    "title": "Delete All Update Processor Tasks",
+    "eclipse": "DeleteAllToDoItems"
+  },
+  {
+    "command": "requality.project.copy",
+    "title": "Copy",
+    "eclipse": "EditActionProvider: CopyAction"
+  },
+  {
+    "command": "requality.project.paste",
+    "title": "Paste",
+    "eclipse": "EditActionProvider: PasteAction (CopyProjectOperation, Copy Project dialog)"
+  },
+  {
+    "command": "requality.project.delete",
+    "title": "Delete",
+    "eclipse": "EditActionProvider: DeleteResourceAction (Delete Resources dialog)"
+  },
+  {
+    "command": "requality.project.move",
+    "title": "Move...",
+    "eclipse": "RefactorActionProvider: MoveProjectAction (Move Project dialog)"
+  },
+  {
+    "command": "requality.project.build",
+    "title": "Build Project",
+    "eclipse": "ResourceMgmtActionProvider: BuildAction (when not building automatically)"
+  },
+  {
+    "command": "requality.project.refresh",
+    "title": "Refresh",
+    "eclipse": "ResourceMgmtActionProvider: RefreshAction"
+  },
+  {
+    "command": "requality.project.open",
+    "title": "Open Project",
+    "eclipse": "ResourceMgmtActionProvider: OpenResourceAction"
+  },
+  {
+    "command": "requality.project.close",
+    "title": "Close Project",
+    "eclipse": "ResourceMgmtActionProvider: CloseResourceAction"
+  },
+  {
+    "command": "requality.project.closeUnrelated",
+    "title": "Close Unrelated Projects",
+    "eclipse": "ResourceMgmtActionProvider: CloseUnrelatedProjectsAction"
+  },
+  {
+    "command": "requality.goInto",
+    "title": "Go Into",
+    "eclipse": "GoIntoActionProvider: GoIntoAction (an open project or a folder becomes the input of the explorer)"
+  },
+  {
+    "command": "requality.importAsProject",
+    "title": "Import as Project",
+    "eclipse": "FoldersAsProjectsActionProvider: OpenFolderAsProjectAction"
+  },
+  {
+    "command": "requality.goToProject",
+    "title": "Go to Project",
+    "eclipse": "FoldersAsProjectsActionProvider: SelectProjectForFolderAction"
+  },
+  {
+    "command": "requality.import",
+    "title": "Import...",
+    "eclipse": "PortingActionProvider: ImportResourcesAction (Import wizard selection)"
+  },
+  {
+    "command": "requality.export",
+    "title": "Export...",
+    "eclipse": "PortingActionProvider: ExportResourcesAction (Export wizard selection)"
+  },
+  {
+    "command": "requality.edit.copy",
+    "title": "Copy",
+    "eclipse": "org.eclipse.ui.edit.copy (Ctrl+C): CopyHandler, or the CopyAction of projects"
+  },
+  {
+    "command": "requality.edit.paste",
+    "title": "Paste",
+    "eclipse": "org.eclipse.ui.edit.paste (Ctrl+V): PasteIntoHandler, or the PasteAction of projects"
+  },
+  {
+    "command": "requality.edit.refresh",
+    "title": "Refresh",
+    "eclipse": "org.eclipse.ui.file.refresh (F5): the RefreshAction of projects"
+  },
+  {
+    "command": "requality.buildAll",
+    "title": "Build All",
+    "eclipse": "org.eclipse.ui.project.buildAll (GlobalBuildAction, Ctrl+B)"
+  },
+  {
+    "command": "requality.clean",
+    "title": "Clean...",
+    "eclipse": "org.eclipse.ui.project.cleanAction (BuildCleanAction: CleanDialog)"
+  },
+  {
+    "command": "requality.buildAutomatically",
+    "title": "Build Automatically",
+    "eclipse": "org.eclipse.ui.project.buildAutomatically (ToggleAutoBuildAction)"
+  },
+  {
+    "command": "requality.openWith",
+    "title": "Open With...",
+    "eclipse": "OpenActionProvider: the Open With submenu (OpenWithMenu)"
+  },
+  {
+    "command": "requality.showIn",
+    "title": "Show In...",
+    "eclipse": "ShowInActionProvider: the Show In submenu (Alt+Shift+W)"
+  },
+  {
+    "command": "requality.goToResource",
+    "title": "Go to Resource...",
+    "eclipse": "GotoActionProvider: GotoResourceAction (Navigate > Go To > Resource...)"
+  },
+  {
+    "command": "requality.addBookmark",
+    "title": "Add Bookmark",
+    "eclipse": "WorkManagementActionProvider: AddBookmarkAction (org.eclipse.ui.edit.addBookmark)"
+  },
+  {
+    "command": "requality.addTask",
+    "title": "Add Task...",
+    "eclipse": "WorkManagementActionProvider: AddTaskAction (org.eclipse.ui.edit.addTask)"
+  },
+  {
+    "command": "requality.properties.pin",
+    "title": "Pin to Selection",
+    "eclipse": "PropertySheet: PinPropertySheetAction (pins this property view to the current selection)"
+  },
+  {
+    "command": "requality.properties.unpin",
+    "title": "Pin to Selection",
+    "eclipse": "PropertySheet: PinPropertySheetAction (checked: unpins the view)"
+  },
+  {
+    "command": "requality.bookmarks.show",
+    "title": "Show",
+    "eclipse": "ExtendedMarkersView: the view menu of org.eclipse.ui.views.BookmarkView"
+  },
+  {
+    "command": "requality.bookmarks.sortBy",
+    "title": "Sort By",
+    "eclipse": "ExtendedMarkersView: the view menu of org.eclipse.ui.views.BookmarkView"
+  },
+  {
+    "command": "requality.bookmarks.filters",
+    "title": "Filters...",
+    "eclipse": "ExtendedMarkersView: the view menu of org.eclipse.ui.views.BookmarkView"
+  },
+  {
+    "command": "requality.bookmarks.columns",
+    "title": "Configure Columns...",
+    "eclipse": "ExtendedMarkersView: the view menu of org.eclipse.ui.views.BookmarkView"
+  },
+  {
+    "command": "requality.tasks.show",
+    "title": "Show",
+    "eclipse": "ExtendedMarkersView: the view menu of org.eclipse.ui.views.TaskList"
+  },
+  {
+    "command": "requality.tasks.groupBy",
+    "title": "Group By",
+    "eclipse": "ExtendedMarkersView: the view menu of org.eclipse.ui.views.TaskList"
+  },
+  {
+    "command": "requality.tasks.sortBy",
+    "title": "Sort By",
+    "eclipse": "ExtendedMarkersView: the view menu of org.eclipse.ui.views.TaskList"
+  },
+  {
+    "command": "requality.tasks.filters",
+    "title": "Filters...",
+    "eclipse": "ExtendedMarkersView: the view menu of org.eclipse.ui.views.TaskList"
+  },
+  {
+    "command": "requality.tasks.columns",
+    "title": "Configure Columns...",
+    "eclipse": "ExtendedMarkersView: the view menu of org.eclipse.ui.views.TaskList"
+  },
+  {
+    "command": "requality.synchronize.synchronizations",
+    "title": "Synchronizations",
+    "eclipse": "SynchronizeView: SynchronizePageDropDownAction (the participants and Synchronize...)"
+  },
+  {
+    "command": "requality.synchronize.pin",
+    "title": "Pin Current Synchronization",
+    "eclipse": "SynchronizeView: PinParticipantAction"
+  },
+  {
+    "command": "requality.synchronize.link",
+    "title": "Link with Editor",
+    "eclipse": "SynchronizeView: ToggleLinkingAction"
+  },
+  {
+    "command": "requality.synchronize.removeCurrent",
+    "title": "Remove Current Synchronization",
+    "eclipse": "SynchronizeView: RemoveSynchronizeParticipantAction"
+  },
+  {
+    "command": "requality.synchronize.removeUnpinned",
+    "title": "Remove Un-Pinned Synchronizations",
+    "eclipse": "SynchronizeView: RemoveSynchronizeParticipantAction (all)"
+  },
+  {
+    "command": "requality.progress.removeAllFinished",
+    "title": "Remove All Finished Operations",
+    "eclipse": "ProgressView: ClearAllAction (view toolbar and menu)"
+  },
+  {
+    "command": "requality.progress.preferences",
+    "title": "Preferences...",
+    "eclipse": "ProgressView: ViewPreferencesAction (view menu): JobsViewPreferenceDialog"
+  },
+  {
+    "command": "requality.newResource.project",
+    "title": "Project...",
+    "eclipse": "NewActionProvider: NewProjectAction"
+  },
+  {
+    "command": "requality.newResource.folder",
+    "title": "Folder",
+    "eclipse": "NewActionProvider: commonWizard org.eclipse.ui.wizards.new.folder"
+  },
+  {
+    "command": "requality.newResource.file",
+    "title": "File",
+    "eclipse": "NewActionProvider: commonWizard org.eclipse.ui.wizards.new.file"
+  },
+  {
+    "command": "requality.newResource.other",
+    "title": "Other...",
+    "eclipse": "NewActionProvider: ActionFactory.NEW (NewWizardAction)"
+  },
+  {
+    "command": "requality.newWizard",
+    "title": "New...",
+    "eclipse": "org.eclipse.ui.newWizard (Ctrl+N): the New wizard selection dialog"
+  },
+  {
+    "command": "requality.fileImport",
+    "title": "Import...",
+    "eclipse": "org.eclipse.ui.file.import (File > Import...): the Import wizard selection"
+  },
+  {
+    "command": "requality.fileExport",
+    "title": "Export...",
+    "eclipse": "org.eclipse.ui.file.export (File > Export...): the Export wizard selection"
+  },
+  {
+    "command": "requality.workingSet.select",
+    "title": "Select Working Set...",
+    "eclipse": "WorkingSetFilterActionGroup: SelectWorkingSetAction"
+  },
+  {
+    "command": "requality.workingSet.deselect",
+    "title": "Deselect Working Set",
+    "eclipse": "WorkingSetFilterActionGroup: ClearWorkingSetAction"
+  },
+  {
+    "command": "requality.workingSet.edit",
+    "title": "Edit Active Working Set...",
+    "eclipse": "WorkingSetFilterActionGroup: EditWorkingSetAction"
+  },
+  {
+    "command": "requality.workingSet.recent",
+    "title": "Recent Working Sets...",
+    "eclipse": "WorkingSetFilterActionGroup: the most recently used working sets (WorkingSetMenuContributionItem)"
+  },
+  {
+    "command": "requality.workingSet.topProjects",
+    "title": "Projects",
+    "eclipse": "WorkingSetRootModeActionGroup: Top Level Elements > Projects"
+  },
+  {
+    "command": "requality.workingSet.topWorkingSets",
+    "title": "Working Sets",
+    "eclipse": "WorkingSetRootModeActionGroup: Top Level Elements > Working Sets"
+  },
+  {
+    "command": "requality.explorer.back",
+    "title": "Back",
+    "eclipse": "CommonNavigatorActionGroup: BackAction (view toolbar)"
+  },
+  {
+    "command": "requality.explorer.forward",
+    "title": "Forward",
+    "eclipse": "CommonNavigatorActionGroup: ForwardAction (view toolbar)"
+  },
+  {
+    "command": "requality.explorer.up",
+    "title": "Up One Level",
+    "eclipse": "CommonNavigatorActionGroup: UpAction (view toolbar)"
+  },
+  {
+    "command": "requality.importProjects",
+    "title": "Import Existing Projects...",
+    "eclipse": "Import > General > Existing Projects into Workspace (WizardProjectsImportPage)"
+  },
+  {
+    "command": "requality.openProjectsFromFileSystem",
+    "title": "Open Projects from File System...",
+    "eclipse": "org.eclipse.e4.ui.importer.openDirectory (File > Open Projects from File System...)"
+  },
+  {
+    "command": "requality.configureProject",
+    "title": "Configure and Detect Nested Projects...",
+    "eclipse": "org.eclipse.e4.ui.importer.configureProject (Configure submenu of projects)"
+  },
+  {
+    "command": "requality.team.applyPatch",
+    "title": "Apply Patch...",
+    "eclipse": "org.eclipse.team.ui ApplyPatchAction (Team > Apply Patch...)"
+  },
+  {
+    "command": "requality.team.showLocalHistory",
+    "title": "Show Local History",
+    "eclipse": "org.eclipse.team.ui ShowLocalHistory (Team > Show Local History)"
+  },
+  {
+    "command": "requality.team.shareProject",
+    "title": "Share Project...",
+    "eclipse": "org.eclipse.team.ui ConfigureProjectAction (Team > Share Project...)"
+  },
+  {
+    "command": "requality.team.importProjectSet",
+    "title": "Import Project Set...",
+    "eclipse": "org.eclipse.team.ui ImportProjectSetAction (.psf files)"
+  },
+  {
+    "command": "requality.compareWith.eachOther",
+    "title": "Each Other",
+    "eclipse": "org.eclipse.team.ui / org.eclipse.compare CompareAction (Compare With > Each Other)"
+  },
+  {
+    "command": "requality.compareWith.localHistory",
+    "title": "Local History...",
+    "eclipse": "org.eclipse.team.ui CompareLocalHistory (Compare With > Local History...)"
+  },
+  {
+    "command": "requality.compareWith.clipboard",
+    "title": "Clipboard",
+    "eclipse": "org.eclipse.compare ClipboardCompare (Compare With > Clipboard)"
+  },
+  {
+    "command": "requality.replaceWith.localHistory",
+    "title": "Local History...",
+    "eclipse": "org.eclipse.team.ui ReplaceLocalHistory (Replace With > Local History...)"
+  },
+  {
+    "command": "requality.replaceWith.previous",
+    "title": "Previous from Local History",
+    "eclipse": "org.eclipse.compare ReplaceWithPreviousEditionAction"
+  },
+  {
+    "command": "requality.replaceWith.clipboard",
+    "title": "Clipboard",
+    "eclipse": "org.eclipse.compare ClipboardReplace (Replace With > Clipboard)"
+  },
+  {
+    "command": "requality.restoreFromLocalHistory",
+    "title": "Restore from Local History...",
+    "eclipse": "org.eclipse.compare AddFromHistoryAction (folders and projects)"
+  }
+]

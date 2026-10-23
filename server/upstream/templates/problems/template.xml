@@ -1,0 +1,45 @@
+<?xml version="1.0" ?>
+<report start="tr.ftl" order="30" id="com.unitesk.requality.reports.violations" name="Проверка правил оформления" read-only = "true" group="typical" allowsProjectNumeration="true">
+    <description>Для просмотра нарушений правил оформления требований.</description>
+    <template source="tr.ftl" location="{project_name}-rules.html"/>
+    <gui>
+	    <button command="com.unitesk.requality.TVSettings" text="Open Settings"/>
+	</gui>
+	<param name="tableSettings" type="TABLE_SETTINGS,LIST[LIST[STRING]]">
+		<attribute name="selFormula" type="LIST[STRING]" description="Settings of this report defines the params of displayed columns. This one includes the formula that defines what will be shown for given attribute.">
+			<defaultValue>{
+	            "atype": "LIST",
+	            "value": [
+	                {"value": ""},
+	                {"value": ""},
+	                {"value": ""},
+	                {"value": "value == \"true\"?\"Пр\":value == \"false\"?\"\":value"}
+	            ]
+	        }</defaultValue>
+		</attribute>
+	    <attribute name="selAttrsWidth" type="LIST[STRING]" description="Settings of this report defines the params of displayed columns. This one defines the width of the column. Usually uses px notation.">
+			<defaultValue>{
+	            "atype": "LIST",
+	            "value": [
+	                {"value": ""},
+	                {"value": "850px"},
+	                {"value": ""},
+	                {"value": ""}
+	            ]
+	        }</defaultValue>
+	    </attribute>
+	    <attribute name="selAttrs" type="LIST[STRING]" description="Settings of this report defines the params of displayed columns. This one defines the names of attributes to be shown in table.">
+	    	<defaultValue>{
+	            "atype": "LIST",
+	            "value": [
+	                {"value": "%SeqID"},
+	                {"value": "_description"},
+	                {"value": "Вид"},
+	                {"value": "Производное"}
+	            ]
+	        }</defaultValue>
+	    </attribute>
+	</param>
+		
+</report>
+

@@ -1,0 +1,7 @@
+<?xml version="1.0" ?>
+<report start="em.ftl" order="10" id="com.unitesk.requality.reports.em" name="Анализ выделения требований" read-only = "true" supports-multipart="true" group="extraction">
+	<description>Для экспорта выделения фрагментов требований в импортированных документах.</description>
+    <template source="em.ftl" location="{project_name}-{node_ForeignID|node_uuid}-markup.html"/>
+    <param name="markupOnly" type="BOOLEAN,STRING"></param>
+    <multiPartSource class="com.unitesk.requality.report.DocumentMultiPart"/>
+</report>
