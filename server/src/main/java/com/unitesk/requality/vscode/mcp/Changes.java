@@ -53,6 +53,47 @@ final class Changes {
     KEYS.put("resolve", Arrays.asList("item", "status"));
   }
 
+  /** The keys each operation needs. */
+  static final Map<String, List<String>> REQUIRED = new LinkedHashMap<>();
+  static {
+    REQUIRED.put("create", Arrays.asList("parent"));
+    REQUIRED.put("update", Arrays.asList("node"));
+    REQUIRED.put("delete", Arrays.asList("node"));
+    REQUIRED.put("move", Arrays.asList("node", "parent"));
+    REQUIRED.put("link", Arrays.asList("from", "to"));
+    REQUIRED.put("unlink", Arrays.asList("from", "to"));
+    REQUIRED.put("locate", Arrays.asList("requirement", "document"));
+    REQUIRED.put("unlocate", Arrays.asList("location"));
+    REQUIRED.put("resolve", Arrays.asList("item"));
+  }
+
+  /** What each key means, for the schema of the operations. */
+  static final Map<String, String> MEANING = new LinkedHashMap<>();
+  static {
+    MEANING.put("parent", "The parent node: a path, a UUID, or \"$name\" of an earlier operation.");
+    MEANING.put("node", "The node: a path, a UUID, or \"$name\".");
+    MEANING.put("type", "Requirement (default), TestPurpose, Comment, TextNode, DocFolder or ReportFolder.");
+    MEANING.put("id", "The id (default for create: the next free id).");
+    MEANING.put("name", "The name.");
+    MEANING.put("description", "Text (paragraphs separated by empty lines) or HTML (starts with '<').");
+    MEANING.put("attributes", "User attributes: name -> value (string, number, boolean, list of strings; null removes).");
+    MEANING.put("as", "A name for the node, to refer to it later in the call as \"$name\".");
+    MEANING.put("after", "A child of the new parent to put the node after (default: last).");
+    MEANING.put("from", "The node the link starts at.");
+    MEANING.put("to", "The target: a path, a UUID, \"$name\", or \"<project>::<path>\" in another project.");
+    MEANING.put("attribute", "The link attribute (default: the default link attribute of the project).");
+    MEANING.put("requirement", "The requirement.");
+    MEANING.put("document", "The document (under /Documents).");
+    MEANING.put("quote", "Text of the document to mark (white space, typographic quotes, dashes and case do not matter).");
+    MEANING.put("paragraph", "Paragraph number: with quote, the paragraph to look in; alone, mark all its text.");
+    MEANING.put("occurrence", "With quote: the n-th occurrence (1 = first) when the quote occurs more than once.");
+    MEANING.put("start", "Start offset of the range to mark (see read_document with ranges).");
+    MEANING.put("end", "End offset of the range to mark.");
+    MEANING.put("location", "The location UUID.");
+    MEANING.put("item", "A review item (see trace_coverage).");
+    MEANING.put("status", "COMPLETED (default) or CHECK.");
+  }
+
   /** The node types create makes (documents come with import_document). */
   static final List<String> TYPES = Arrays.asList(Requirement.TYPE_NAME, TestPurpose.TYPE_NAME, "Comment", "TextNode", "DocFolder",
       "ReportFolder");
@@ -86,6 +127,9 @@ final class Changes {
         if (!k.equals("op") && !keys.contains(k))
           throw new InvalidParams("Operation " + i + " (" + kind + "): unknown key '" + k + "'; " + kind + " takes "
               + String.join(", ", keys));
+      for (String k : REQUIRED.get(kind))
+        if (!op.has(k) || op.get(k).isJsonNull())
+          throw new InvalidParams("Operation " + i + " (" + kind + "): missing key '" + k + "' (" + MEANING.get(k) + ")");
     }
   }
 
@@ -156,6 +200,14 @@ final class Changes {
     TreeLogic tl = (TreeLogic) db.getTreeLogic();
     if (id == null)
       id = RequalityCLI.getNextId(parent, type, RequalityCLI.detectPrefix(parent, type, true));
+    if (!tl.canBeCreatedIn(type, parent)) {
+      List<String> allowed = new ArrayList<>();
+      for (String t : TYPES)
+        if (tl.canBeCreatedIn(t, parent))
+          allowed.add(t);
+      throw new ToolError("a " + type + " cannot be a child of " + parent.getQualifiedId() + " (it takes: "
+          + (allowed.isEmpty() ? "none of " + TYPES : allowed) + ")");
+    }
     try {
       tl.canBeCreatedInExc(type, id, parent);
     } catch (Exception e) {
@@ -205,6 +257,23 @@ final class Changes {
     JsonObject before = snapshot(n);
     before.addProperty("nodes_under", count(n) - 1);
     r.add("before", before);
+    // the links from other nodes to the deleted ones: they will not resolve any more
+    JsonArray incoming = new JsonArray();
+    String under = n.getQualifiedId() + "/";
+    for (TreeNode x : subtree(n))
+      for (Map.Entry<String, Map<TreeNode, String>> e : linksTo(x).entrySet())
+        for (TreeNode from : e.getValue().keySet())
+          if (from != null && !from.isDisposed() && from != n && !from.getQualifiedId().startsWith(under)) {
+            JsonObject l = new JsonObject();
+            l.addProperty("from", from.getQualifiedId());
+            l.addProperty("attribute", e.getKey());
+            l.addProperty("to", x.getQualifiedId());
+            incoming.add(l);
+          }
+    if (incoming.size() > 0) {
+      r.add("broken_links", incoming);
+      r.addProperty("note", "These links from other nodes do not resolve after the delete");
+    }
     n.delete();
     return r;
   }
@@ -351,6 +420,18 @@ final class Changes {
       if (start < 0 || end > dt.text.length() || start >= end)
         throw new ToolError("invalid range " + start + ".." + end + " (the text has " + dt.text.length() + " characters)");
     }
+    // the same text located again (a retried call) gives the location the requirement has
+    for (Location have : req.getLocations(false))
+      if (have != null && !have.isDisposed() && have.getDocument() == doc) {
+        List<int[]> f = DocumentText.fragments(have);
+        if (f.size() == 1 && f.get(0)[0] == start && f.get(0)[1] == end) {
+          alias(op, have);
+          JsonObject r = result("locate", req);
+          r.add("location", dt.location(have));
+          r.addProperty("unchanged", true);
+          return r;
+        }
+      }
     Location l = doc.createLocation(null);
     List<Object> frags = new ArrayList<>(Arrays.asList((Object) (start + Location.FRAGMENT_SEPARATOR + end)));
     l.attrs().setConstAttribute(Location.ATTR_MARKUP, new ListValue(AttributeType.STRING, frags), Flag.HIDDEN);
@@ -424,6 +505,26 @@ final class Changes {
     String as = Core.optStr(op, "as", null);
     if (as != null)
       aliases.put(as.startsWith("$") ? as.substring(1) : as, n);
+  }
+
+  private static List<TreeNode> subtree(TreeNode n) {
+    List<TreeNode> out = new ArrayList<>();
+    out.add(n);
+    for (TreeNode c : n.getWorkChildren())
+      if (c != null && !c.isDisposed())
+        out.addAll(subtree(c));
+    return out;
+  }
+
+  /** The user links to a node (not the locations of the requirements). */
+  private static Map<String, Map<TreeNode, String>> linksTo(TreeNode n) {
+    Map<String, Map<TreeNode, String>> m = com.unitesk.requality.core.attribute.reference.RelManager.getRevertLinks(n, false, true);
+    Map<String, Map<TreeNode, String>> out = new LinkedHashMap<>();
+    if (m != null)
+      for (Map.Entry<String, Map<TreeNode, String>> e : m.entrySet())
+        if (!e.getKey().startsWith("_") && e.getValue() != null)
+          out.put(e.getKey(), e.getValue());
+    return out;
   }
 
   private static int count(TreeNode n) {

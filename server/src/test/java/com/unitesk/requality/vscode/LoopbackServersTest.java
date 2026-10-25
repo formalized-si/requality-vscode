@@ -33,6 +33,20 @@ class LoopbackServersTest {
     }
   }
 
+  /** The status line of a WebSocket handshake with the origin (null: none). */
+  static String handshake(int port, String origin) throws Exception {
+    try (Socket s = new Socket("127.0.0.1", port)) {
+      s.setSoTimeout(10_000);
+      String req = "GET / HTTP/1.1\r\nHost: 127.0.0.1:" + port + "\r\nUpgrade: websocket\r\nConnection: Upgrade\r\n"
+          + "Sec-WebSocket-Key: dGhlIHNhbXBsZSBub25jZQ==\r\nSec-WebSocket-Version: 13\r\n"
+          + (origin != null ? "Origin: " + origin + "\r\n" : "") + "\r\n";
+      s.getOutputStream().write(req.getBytes(java.nio.charset.StandardCharsets.US_ASCII));
+      s.getOutputStream().flush();
+      return new java.io.BufferedReader(new java.io.InputStreamReader(s.getInputStream(), java.nio.charset.StandardCharsets.US_ASCII))
+          .readLine();
+    }
+  }
+
   @Test
   void theEditorServersListenOnLoopbackOnly() throws Exception {
     try (ServerHarness h = new ServerHarness()) {
@@ -69,6 +83,11 @@ class LoopbackServersTest {
       h.await("the second WebSocket server", 60_000, v -> fifth.getPortStatus() == PortStatus.STARTED);
       assertTrue(fifth != servers.get(0) && fifth.getPort() != servers.get(0).getPort(), servers.toString());
       assertTrue(accepts(InetAddress.getByName("127.0.0.1"), fifth.getPort()));
+      // the editor pages of this computer may connect, a page of another site may not
+      assertTrue(handshake(ws.getPort(), "http://127.0.0.1:" + rp.getPort()).contains(" 101 "));
+      assertTrue(handshake(ws.getPort(), null).contains(" 101 "));
+      String foreign = handshake(ws.getPort(), "http://evil.example");
+      assertTrue(foreign.contains(" 403 "), foreign);
     }
   }
 }

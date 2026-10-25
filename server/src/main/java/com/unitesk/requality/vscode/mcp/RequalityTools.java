@@ -63,7 +63,8 @@ final class RequalityTools {
   /** get_node lists at most this many children (get_tree pages larger ones). */
   private static final int MAX_CHILDREN = 100;
 
-  static void register(McpServer mcp, HeadlessClient headless, Policy policy) {
+  /** Adds the tools and prompts; returns the access to the core they use. */
+  static Core register(McpServer mcp, HeadlessClient headless, Policy policy) {
     Core core = new Core(headless);
     Session session = new Session(core, headless.server().options().storage);
 
@@ -71,7 +72,8 @@ final class RequalityTools {
 
     mcp.add(new Tool("list_projects", "List projects",
         "Lists the Requality projects (catalogs) in the workspace folders with their state: loading, ready, broken, closed, "
-            + "or needs_conversion (a catalog of an older Requality: convert_project converts it after a backup).",
+            + "released (unused for a while: the next call loads it again), or needs_conversion (a catalog of an older "
+            + "Requality: convert_project converts it after a backup).",
         Schema.object().build(), true, false, a -> {
           JsonObject r = headless.call("workspace/projects", null).getAsJsonObject();
           JsonArray out = new JsonArray();
@@ -80,7 +82,8 @@ final class RequalityTools {
             JsonObject o = new JsonObject();
             o.add("name", p.get("name"));
             o.add("path", p.get("path"));
-            boolean old = headless.needsConversion(p.get("localName").getAsString());
+            Workspace.Project wp = core.workspace().project(p.get("localName").getAsString());
+            boolean old = wp != null && core.needsConversion(wp);
             o.addProperty("state", old ? "needs_conversion" : p.get("state").getAsString());
             if (p.has("error"))
               o.add("error", p.get("error"));
@@ -126,14 +129,16 @@ final class RequalityTools {
     mcp.add(new Tool("search_nodes", "Search nodes",
         "Finds nodes under a node. With 'text': the nodes whose user-visible attributes (id, name, description and the "
             + "others) contain the text. With 'attribute': the nodes where this attribute matches 'operator' and 'value'. "
-            + "Each match gives the attributes that matched; a document location gives its text and its requirements.",
+            + "With 'type' alone: the nodes of the type. Each match gives the attributes that matched; a document location "
+            + "gives its text, its document and its requirements.",
         Schema.object().prop("project", "string", PROJECT, true)
             .prop("text", "string", "Text to find in the user-visible attributes (case-insensitive).", false)
             .prop("attribute", "string", "Attribute name, for example status or %Name.", false)
             .prop("operator", enumSchema("Comparison for 'attribute' (default CONTAINS).", OPERATORS), false)
             .prop("value", "string", "Value for 'attribute'.", false)
             .prop("under", "string", NODE + " Search only under this node (default: the project root).", false)
-            .prop("type", "string", "Only nodes of this type, for example Requirement or Location.", false)
+            .prop("type", "string", "Only nodes of this type, for example Requirement or Location; alone: all nodes of "
+                + "the type.", false)
             .prop("limit", "integer", "At most this many matches (default 100).", false).build(),
         true, false, a -> search(core, a)));
 
@@ -142,9 +147,10 @@ final class RequalityTools {
     mcp.add(new Tool("read_document", "Read document",
         "Reads a document of the project (a node under /Documents) paragraph by paragraph. Each paragraph has its "
             + "number 'p', its heading level (h1 to h6, when it is a heading), its text, its coverage by requirement "
-            + "locations (none, partial, full) and the requirements that mark it. Use 'filter': 'uncovered' to see only "
-            + "the text that no requirement covers yet: the work list when you turn a document into requirements with "
-            + "apply_changes (op 'locate').",
+            + "locations (none; partial, with the sentences no location covers in uncovered_text; full: each sentence is "
+            + "covered) and the requirements that mark it. Use 'filter': 'uncovered' to see only the paragraphs with text "
+            + "that no requirement covers yet: the work list when you turn a document into requirements with apply_changes "
+            + "(op 'locate').",
         Schema.object().prop("project", "string", PROJECT, true).prop("document", "string", "The document: " + NODE, true)
             .prop("from", "integer", "First paragraph number (default 0).", false)
             .prop("count", "integer", "Number of paragraphs (default 200).", false)
@@ -186,14 +192,15 @@ final class RequalityTools {
               : ops.size() + " operation" + (ops.size() == 1 ? "" : "s"));
           JsonObject r = new JsonObject();
           if (Core.optBool(a, "dry_run", false)) {
-            r.add("results", Session.dryRun(db, label, () -> Changes.run(db, ops)));
+            r.add("results", compact(Session.dryRun(db, label, () -> Changes.run(db, ops))));
             r.addProperty("dry_run", true);
             r.addProperty("note", "Nothing was changed. The operations can be applied.");
             return r;
           }
           JsonObject e = session.change(db, "apply_changes", label, summary, () -> Changes.run(db, ops));
           r.addProperty("change", e.get("change").getAsInt());
-          r.add("results", e.get("operations"));
+          // the values before and after are in the history (review_changes with the change)
+          r.add("results", compact(e.getAsJsonArray("operations")));
           return r;
         }));
 
@@ -205,19 +212,29 @@ final class RequalityTools {
             .prop("folder", "string", "The document folder: " + NODE + " Default: /Documents.", false).build(),
         false, false, a -> {
           TreeDB db = core.db(Core.str(a, "project"));
-          File file = policy.document(Core.str(a, "file"));
+          File file = importable(policy, Core.str(a, "file"));
           TreeNode folder = Core.node(db, Core.optStr(a, "folder", Document.getTypeRootQId()));
           String existing = existingName(folder, file);
           Document[] doc = { null };
-          JsonObject e = session.change(db, "import_document", "Import documents", "Import of " + file.getName(), () -> {
-            doc[0] = importInto(db, file, folder);
-            JsonObject op = Core.brief(doc[0]);
-            op.addProperty("op", "import");
-            op.addProperty("file", file.getPath());
-            JsonArray ops = new JsonArray();
-            ops.add(op);
-            return ops;
-          });
+          File dir = childrenFolder(db, folder);
+          java.util.Set<String> before = list(dir);
+          JsonObject e;
+          try {
+            e = session.change(db, "import_document", "Import documents", "Import of " + file.getName(), () -> {
+              doc[0] = importInto(db, file, folder);
+              JsonObject op = Core.brief(doc[0]);
+              op.addProperty("op", "import");
+              op.addProperty("file", file.getPath());
+              JsonArray ops = new JsonArray();
+              ops.add(op);
+              return ops;
+            });
+          } catch (Exception x) {
+            // a change that was committed (and failed after) keeps its files
+            if (doc[0] == null || db.getNode(doc[0].getUUId()) == null)
+              removeNew(dir, before);
+            throw x;
+          }
           DocumentText dt = DocumentText.of(doc[0]);
           JsonObject r = Core.brief(doc[0]);
           r.addProperty("paragraphs", dt.paragraphs.size());
@@ -232,12 +249,14 @@ final class RequalityTools {
     mcp.add(new Tool("update_document_version", "Update document version",
         "A new version of a specification. Call it first: its result is the list of what to fix. It imports the new "
             + "version (or takes one already imported) and moves the requirement locations of the old document to it "
-            + "sentence by sentence, in one change (one undo step). For each requirement: unchanged (its text is in the "
-            + "new version), changed (moved to the most similar sentence; old and new text, similarity, "
+            + "sentence by sentence, in one change (one undo step). For each requirement: unchanged (its text and its "
+            + "paragraph are the same), changed (moved to the most similar sentence: old and new text, similarity, "
             + "modality_changed when shall/must/may/not changed, numbers_changed, and the new location UUID to unlocate "
-            + "when it is wrong) or lost (with suggestions). Lost and changed come first. Also lists the statements of the "
-            + "new version that no requirement marks (uncovered_statements). The old document stays as the history; by "
-            + "default the requirements lose their locations in it (detach_old).",
+            + "when it is wrong; or text_same with the sentences that came into or went out of its paragraph) or lost "
+            + "(with suggestions). Lost and changed come first. Also lists the sentences of the new version that the old "
+            + "one does not have and no requirement marks (new_sentences; statement true when it has shall, must or the "
+            + "like). The old document stays as the history; by default the requirements lose their locations in it "
+            + "(detach_old).",
         Schema.object().prop("project", "string", PROJECT, true).prop("document", "string", "The old document: " + NODE, true)
             .prop("file", "string", "Absolute path of the new version (in a folder of the server).", false)
             .prop("new_document", "string", "The new version, already imported: " + NODE, false)
@@ -250,7 +269,7 @@ final class RequalityTools {
           String newRef = Core.optStr(a, "new_document", null);
           if ((path == null) == (newRef == null))
             throw new InvalidParams("Give 'file' or 'new_document' (one of them)");
-          File file = path == null ? null : policy.document(path);
+          File file = path == null ? null : importable(policy, path);
           TreeNode folder = oldDoc.getWorkParent();
           if (file != null) {
             String existing = existingName(folder, file);
@@ -261,12 +280,18 @@ final class RequalityTools {
           Document given = newRef == null ? null : DocumentText.document(Core.node(db, newRef));
           boolean detach = Core.optBool(a, "detach_old", true);
           JsonObject[] result = { null };
-          JsonObject e = session.change(db, "update_document_version", "Update document version",
+          Document[] imported = { null };
+          File dir = childrenFolder(db, folder);
+          java.util.Set<String> before = list(dir);
+          JsonObject e;
+          try {
+            e = session.change(db, "update_document_version", "Update document version",
               "New version of " + oldDoc.getQualifiedId(), () -> {
                 JsonArray ops = new JsonArray();
                 Document newDoc = given;
                 if (file != null) {
                   newDoc = importInto(db, file, folder);
+                  imported[0] = newDoc;
                   JsonObject op = Core.brief(newDoc);
                   op.addProperty("op", "import");
                   op.addProperty("file", file.getPath());
@@ -278,9 +303,18 @@ final class RequalityTools {
                 op.addProperty("path", newDoc.getQualifiedId());
                 op.addProperty("old_document", oldDoc.getQualifiedId());
                 op.add("summary", result[0].get("summary"));
+                // what the update did to each requirement, for the review
+                op.add("requirements", result[0].get("requirements"));
+                op.add("new_sentences", result[0].get("new_sentences"));
                 ops.add(op);
                 return ops;
               });
+          } catch (Exception x) {
+            // a change that was committed (and failed after) keeps its files
+            if (file != null && (imported[0] == null || db.getNode(imported[0].getUUId()) == null))
+              removeNew(dir, before);
+            throw x;
+          }
           result[0].addProperty("change", e.get("change").getAsInt());
           return result[0];
         }));
@@ -370,8 +404,10 @@ final class RequalityTools {
               p.addProperty("name", d.name);
               p.addProperty("type", paramType(d));
               p.addProperty("description", d.description);
-              if (d.defvalue != null)
-                p.addProperty("default", d.defvalue.toString());
+              Object def = d.defvalue instanceof com.unitesk.requality.core.attribute.TypedValue
+                  ? ((com.unitesk.requality.core.attribute.TypedValue) d.defvalue).getValue() : d.defvalue;
+              if (def != null)
+                p.addProperty("default", def.toString());
               ps.add(p);
             }
             o.add("parameters", ps);
@@ -381,26 +417,41 @@ final class RequalityTools {
         }));
 
     mcp.add(new Tool("generate_report", "Generate report",
-        "Generates a report from a template (see list_report_templates) for the requirements under a node and writes it "
-            + "to a new or empty folder in a folder of the server, for example to show it to a person.",
-        Schema.object().prop("project", "string", PROJECT, true).prop("template", "string", "Template id.", true)
+        "Generates a report from a template (see list_report_templates) for the requirements under a node, or from saved "
+            + "report settings of the project (a node under /Reports), and writes it to a new or empty folder in a folder "
+            + "of the server, for example to show it to a person. The coverage report takes the test coverage from "
+            + "coverage_file (the file of test_coverage).",
+        Schema.object().prop("project", "string", PROJECT, true)
+            .prop("template", "string", "Template id (or give settings).", false)
+            .prop("settings", "string", "Saved report settings: " + NODE + " (instead of template, root and parameters).", false)
             .prop("output", "string", "Absolute path of the output folder: new or empty.", true)
             .prop("root", "string", "Requirements under this node (default /Requirements).", false)
+            .prop("coverage_file", "string", "Absolute path of a coverage file of the test runs, for the coverage report.", false)
             .prop("parameters", paramsSchema(), false).build(),
         false, false, a -> generateReport(core, policy, a)));
 
     mcp.add(new Tool("open_project", "Open project",
-        "Opens a closed project, or loads a broken one again (for example after another process released its catalog), "
-            + "and waits until it is loaded.",
+        "Opens a closed project, loads a broken one again (for example after another process released its catalog), or "
+            + "loads a ready one again from its files (for example after git pull changed them), and waits until it is "
+            + "loaded. The undo steps of the project end with a load.",
         Schema.object().prop("project", "string", PROJECT, true).build(), false, false, a -> {
           String name = Core.str(a, "project");
           Workspace.Project p = core.project(name);
-          if (p.closed)
+          String done;
+          if (p.closed) {
             core.workspace().openProject(p.dir);
-          else if (p.error != null || com.unitesk.requality.vscode.core.Nodes.findDB(p.localName) == null)
+            done = "opened";
+          } else if (p.error != null || com.unitesk.requality.vscode.core.Nodes.findDB(p.localName) == null) {
             core.workspace().loadProject(p.dir);
+            done = "loaded";
+          } else {
+            core.workspace().reloadProject(p.dir);
+            done = "loaded again";
+          }
           core.db(name);
-          return obj("project", new JsonPrimitive(name));
+          JsonObject r = obj("project", new JsonPrimitive(name));
+          r.addProperty("state", done);
+          return r;
         }));
 
     mcp.add(new Tool("close_project", "Close project",
@@ -420,7 +471,7 @@ final class RequalityTools {
         Schema.object().prop("project", "string", PROJECT, true).build(), false, true, a -> {
           String name = Core.str(a, "project");
           Workspace.Project p = core.project(name);
-          if (!headless.needsConversion(p.localName))
+          if (!core.needsConversion(p))
             throw new ToolError("Project " + name + " needs no conversion");
           File backup = backup(headless.server().options().storage, p.dir);
           headless.allowConversion(p.localName);
@@ -477,12 +528,25 @@ final class RequalityTools {
         }));
 
     RequalityPrompts.register(mcp);
+    return core;
   }
 
   static final String[] OPERATORS = { "EQUALS", "NOT_EQUALS", "CONTAINS", "NOT_CONTAINS", "EXISTS", "NOT_EXISTS" };
   static final String[] FILTERS = { "all", "uncovered", "partial", "covered" };
 
   // ---- helpers
+
+  /** The results of the operations without the values before and after (they are in the history). */
+  static JsonArray compact(JsonArray results) {
+    JsonArray out = new JsonArray();
+    for (JsonElement x : results) {
+      JsonObject o = x.getAsJsonObject().deepCopy();
+      o.remove("before");
+      o.remove("after");
+      out.add(o);
+    }
+    return out;
+  }
 
   static JsonObject obj(String key, JsonElement value) {
     JsonObject o = new JsonObject();
@@ -530,16 +594,18 @@ final class RequalityTools {
             break;
           case "attributes":
             s.addProperty("type", "object");
-            s.addProperty("description", "User attributes: name -> value (null removes it).");
             break;
           default:
             s.addProperty("type", "string");
         }
+        s.addProperty("description", Changes.MEANING.get(k));
         p.add(k, s);
       }
       item.add("properties", p);
       JsonArray req = new JsonArray();
       req.add("op");
+      for (String k : Changes.REQUIRED.get(e.getKey()))
+        req.add(k);
       item.add("required", req);
       item.addProperty("additionalProperties", false);
       variants.add(item);
@@ -584,6 +650,9 @@ final class RequalityTools {
       o.addProperty("description", html ? d : Core.text(d));
     o.add("attributes", Core.attributes(n, html));
     o.add("links", Core.links(n, false));
+    JsonArray broken = Core.brokenLinks(n);
+    if (broken.size() > 0)
+      o.add("broken_links", broken);
     o.add("linked_from", Core.links(n, true));
     if (n instanceof Requirement) {
       JsonArray locs = new JsonArray();
@@ -659,7 +728,7 @@ final class RequalityTools {
     for (int i = from; i < dt.paragraphs.size(); i++) {
       DocumentText.Paragraph p = dt.paragraphs.get(i);
       String c = p.coverage();
-      boolean match = filter.equals("all") || (filter.equals("uncovered") && c.equals("none"))
+      boolean match = filter.equals("all") || (filter.equals("uncovered") && !c.equals("full"))
           || (filter.equals("partial") && c.equals("partial")) || (filter.equals("covered") && c.equals("full"));
       if (!match)
         continue;
@@ -692,16 +761,19 @@ final class RequalityTools {
     String text = Core.optStr(a, "text", null);
     String attribute = Core.optStr(a, "attribute", null);
     AttributeRequest req;
+    String type = Core.optStr(a, "type", null);
     if (text != null) {
       req = new AttributeRequest(AttributeRequest.USER_VISIBLE_KEY, AttributeOperator.CONTAINS_SINGLE_SPACE, text, false);
     } else if (attribute != null) {
       AttributeOperator op = AttributeOperator.valueOf(Core.optEnum(a, "operator", "CONTAINS", OPERATORS));
       String key = com.unitesk.requality.core.attribute.SystemNames.getOne(db).getSysName(attribute);
       req = new AttributeRequest(key != null ? key : attribute, op, Core.optStr(a, "value", ""), false);
+    } else if (type != null) {
+      // all nodes of the type: every node has a type
+      req = new AttributeRequest(TreeNode.ATTR_TYPE, AttributeOperator.EXISTS, "", false);
     } else {
-      throw new InvalidParams("Give 'text' or 'attribute'");
+      throw new InvalidParams("Give 'text', 'attribute' or 'type'");
     }
-    String type = Core.optStr(a, "type", null);
     int limit = Math.max(1, Core.optInt(a, "limit", 100));
     NodeSearch search = new NodeSearch(req);
     search.execute(under);
@@ -718,12 +790,20 @@ final class RequalityTools {
       JsonObject o = Core.brief(n);
       JsonArray keys = new JsonArray();
       if (m.getSecond() != null)
-        m.getSecond().forEach(keys::add);
-      o.add("matched", keys);
+        for (String k : m.getSecond()) {
+          // the system attributes by their names in the editor (_name, _nameorid: name)
+          String shown = k.equals("_nameorid") || k.equals("%Name") ? "name" : k.replaceFirst("^[_%]+", "");
+          if (!keys.contains(new JsonPrimitive(shown)))
+            keys.add(shown);
+        }
+      if (text != null || attribute != null)
+        o.add("matched", keys);
       // the node of the tree now (a search can give an instance that a load replaced)
       TreeNode current = db.getNode(n.getUUId());
       if (current instanceof Location) {
         // a location is known by its document, its text and its requirements, not by its UUID path
+        o.remove("path");
+        o.remove("id");
         Location l = (Location) current;
         Document doc = l.getDocument();
         String marked = "";
@@ -752,12 +832,60 @@ final class RequalityTools {
     return r;
   }
 
+  /** The folder on disk of the children of a node (the importer writes the files of a new document there). */
+  static File childrenFolder(TreeDB db, TreeNode node) {
+    try {
+      File json = db.getStorage().getJSONResource(node.getUUId(), com.unitesk.requality.core.lock.LockType.NO_LOCK);
+      if (json == null)
+        return null;
+      String n = json.getName();
+      return new File(json.getParentFile(), n.endsWith(".json") ? n.substring(0, n.length() - 5) : n);
+    } catch (Exception e) {
+      return null;
+    }
+  }
+
+  static java.util.Set<String> list(File dir) {
+    String[] l = dir == null ? null : dir.list();
+    return l == null ? new java.util.HashSet<>() : new java.util.HashSet<>(Arrays.asList(l));
+  }
+
+  /** Removes the files a failed (rolled back) import left in a folder: the ones that were not there before. */
+  static void removeNew(File dir, java.util.Set<String> before) {
+    String[] now = dir == null ? null : dir.list();
+    if (now == null)
+      return;
+    for (String n : now)
+      if (!before.contains(n))
+        deleteTree(new File(dir, n));
+  }
+
+  private static void deleteTree(File f) {
+    File[] l = f.listFiles();
+    if (l != null)
+      for (File c : l)
+        deleteTree(c);
+    f.delete();
+  }
+
   /** The name of the document an import of the file makes, when the folder has a child of that name already; else null. */
   static String existingName(TreeNode folder, File file) {
     String name = file.getName();
     int dot = name.lastIndexOf('.');
     String id = (dot < 0 ? name : name.substring(0, dot)) + ".xhtml";
     return folder.findWorkChild(id) != null ? id : null;
+  }
+
+  /** The document file to import: in an allowed folder, of a document type, with no references the import must not follow. */
+  static File importable(Policy policy, String path) throws IOException {
+    File file = policy.document(path);
+    List<String> bad = policy.unsafeReferences(file);
+    if (!bad.isEmpty())
+      throw new ToolError("The document " + file.getName() + " refers to URLs or to files outside the folders of the server: "
+          + (bad.size() > 10 ? bad.subList(0, 10) + " and " + (bad.size() - 10) + " more" : bad) + ". The import would copy "
+          + "or download them into the catalog. Remove these references (or put the files next to the document) and import "
+          + "again");
+    return file;
   }
 
   /** Imports a document file into a document folder, in the open transaction (an error makes the caller roll back). */
@@ -797,9 +925,13 @@ final class RequalityTools {
     return doc;
   }
 
-  /** A copy of a catalog (without its caches) in {@code <storage>/backups/<name>-<time>}. */
+  /** The backups of a catalog the storage keeps: the newest ones. */
+  static final int BACKUPS = 3;
+
+  /** A copy of a catalog (without its caches) in {@code <storage>/backups/<name>-<time>}; older copies go. */
   static File backup(File storage, File catalog) throws IOException {
-    File dir = new File(new File(storage, "backups"),
+    File backups = new File(storage, "backups");
+    File dir = new File(backups,
         catalog.getName() + "-" + LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyyMMdd-HHmmss")));
     Path from = catalog.toPath();
     try (Stream<Path> all = Files.walk(from)) {
@@ -813,6 +945,16 @@ final class RequalityTools {
         else
           Files.copy(p, to, StandardCopyOption.COPY_ATTRIBUTES);
       }
+    }
+    String[] all = backups.list();
+    if (all != null) {
+      List<String> mine = new ArrayList<>();
+      for (String n : all)
+        if (n.matches(java.util.regex.Pattern.quote(catalog.getName()) + "-\\d{8}-\\d{6}"))
+          mine.add(n);
+      java.util.Collections.sort(mine);
+      for (int i = 0; i < mine.size() - BACKUPS; i++)
+        deleteTree(new File(backups, mine.get(i)));
     }
     return dir;
   }
@@ -849,44 +991,84 @@ final class RequalityTools {
 
   private static JsonObject generateReport(Core core, Policy policy, JsonObject a) throws Exception {
     TreeDB db = core.db(Core.str(a, "project"));
-    String templateId = Core.str(a, "template");
-    Template tpl = TemplatesManager.getOne(db).getTemplates().get(templateId);
-    if (tpl == null || tpl.getNotExists())
-      throw new ToolError("No template " + templateId + " (see list_report_templates)");
+    String templateId = Core.optStr(a, "template", null);
+    String settingsRef = Core.optStr(a, "settings", null);
+    if ((templateId == null) == (settingsRef == null))
+      throw new InvalidParams("Give 'template' or 'settings' (one of them)");
+    ReportSettings saved = null;
+    Template tpl = null;
+    if (settingsRef != null) {
+      TreeNode n = Core.node(db, settingsRef);
+      if (!(n instanceof ReportSettings))
+        throw new ToolError(n.getQualifiedId() + " is no report settings (a " + n.getType() + ")");
+      for (String k : new String[] { "root", "parameters" })
+        if (a.has(k) && !a.get(k).isJsonNull())
+          throw new InvalidParams("Argument " + k + " is for a template; saved settings have their own");
+      saved = (ReportSettings) n;
+      String tid = saved.attrs().getStringAttributeValue(ReportSettings.ATTR_TEMPLATE);
+      Template st = tid == null ? null : TemplatesManager.getOne(db).getTemplates().get(tid);
+      if (st == null || st.getNotExists())
+        throw new ToolError("The settings " + n.getQualifiedId() + " use the template " + tid + ", which is not installed "
+            + "here (see list_report_templates)");
+    } else {
+      tpl = TemplatesManager.getOne(db).getTemplates().get(templateId);
+      if (tpl == null || tpl.getNotExists())
+        throw new ToolError("No template " + templateId + " (see list_report_templates)");
+    }
     File output = policy.allowed(Core.str(a, "output"), "The output folder");
     if (output.exists() && !output.isDirectory())
       throw new ToolError(output + " is a file: give a new or empty folder");
     String[] there = output.list();
     if (there != null && there.length > 0)
       throw new ToolError("The folder " + output + " is not empty: give a new or empty folder");
+    String coverage = null;
+    if (a.has("coverage_file") && !a.get("coverage_file").isJsonNull())
+      coverage = policy.file(Core.str(a, "coverage_file"), "coverage file", java.util.Set.of("xml")).toURI().toString();
     // the parameters by their definitions: a name the template does not have is an error
-    Map<String, TemplateParamDefinition> defs = new HashMap<>();
-    for (TemplateParamDefinition d : parameters(tpl))
-      defs.put(d.name, d);
     Map<String, Object> values = new HashMap<>();
-    if (a.has("parameters") && !a.get("parameters").isJsonNull()) {
-      if (!a.get("parameters").isJsonObject())
-        throw new InvalidParams("Argument parameters must be an object: name -> value");
-      for (Map.Entry<String, JsonElement> e : a.getAsJsonObject("parameters").entrySet()) {
-        TemplateParamDefinition d = defs.get(e.getKey());
-        if (d == null)
-          throw new InvalidParams("Template " + templateId + " has no parameter " + e.getKey() + " (its parameters: "
-              + new java.util.TreeSet<>(defs.keySet()) + ")");
-        values.put(e.getKey(), paramValue(d, e.getKey(), e.getValue()));
+    if (tpl != null) {
+      Map<String, TemplateParamDefinition> defs = new HashMap<>();
+      for (TemplateParamDefinition d : parameters(tpl))
+        defs.put(d.name, d);
+      if (a.has("parameters") && !a.get("parameters").isJsonNull()) {
+        if (!a.get("parameters").isJsonObject())
+          throw new InvalidParams("Argument parameters must be an object: name -> value");
+        for (Map.Entry<String, JsonElement> e : a.getAsJsonObject("parameters").entrySet()) {
+          TemplateParamDefinition d = defs.get(e.getKey());
+          if (d == null)
+            throw new InvalidParams("Template " + templateId + " has no parameter " + e.getKey() + " (its parameters: "
+                + new java.util.TreeSet<>(defs.keySet()) + ")");
+          values.put(e.getKey(), paramValue(d, e.getKey(), e.getValue()));
+        }
       }
     }
-    String root = Core.node(db, Core.optStr(a, "root", Requirement.getTypeRootQId())).getQualifiedId();
+    String root = tpl == null ? null : Core.node(db, Core.optStr(a, "root", Requirement.getTypeRootQId())).getQualifiedId();
     TreeNode reports = Core.node(db, "/Reports");
     output.mkdirs();
     if (!output.isDirectory())
       throw new ToolError("Cannot create the folder " + output);
-    // the temporary report settings are not changes of the user: not in the undo history
+    Template t = tpl;
+    String cov = coverage;
+    ReportSettings savedSettings = saved;
+    // the temporary report settings (or the coverage file of saved ones) are not changes of the user: not in the undo
+    // history
+    String[] savedCoverage = { null };
     ReportSettings rs = Core.write(db, "Create report settings", false, () -> {
+      if (savedSettings != null) {
+        if (cov != null) {
+          savedCoverage[0] = savedSettings.attrs().getStringAttributeValue("coverageFilePath");
+          savedSettings.attrs().setConstAttribute("coverageFilePath", cov, 0);
+          savedSettings.commitAttributes();
+        }
+        return savedSettings;
+      }
       ReportSettings s = (ReportSettings) reports.createChild(RequalityCLI.getNextId(reports, ReportSettings.TYPE_NAME, "mcp"),
           ReportSettings.TYPE_NAME);
-      s.attrs().setConstAttribute(ReportSettings.ATTR_TEMPLATE, tpl.getId(), 0);
+      s.attrs().setConstAttribute(ReportSettings.ATTR_TEMPLATE, t.getId(), 0);
       s.attrs().setConstAttribute(ReportSettings.ATTR_ROOT_REQUIREMENT, root, 0);
       s.setCrossProjectFlag(true);
+      if (cov != null)
+        s.attrs().setConstAttribute("coverageFilePath", cov, 0);
       for (Map.Entry<String, Object> e : values.entrySet()) {
         Object v = e.getValue();
         if (v instanceof Boolean)
@@ -920,8 +1102,16 @@ final class RequalityTools {
         for (TreeNode g : generated)
           if (!g.isDisposed())
             g.delete();
-        if (!rs.isDisposed())
-          rs.delete();
+        if (savedSettings == null) {
+          if (!rs.isDisposed())
+            rs.delete();
+        } else if (cov != null) {
+          if (savedCoverage[0] != null)
+            savedSettings.attrs().setConstAttribute("coverageFilePath", savedCoverage[0], 0);
+          else
+            savedSettings.attrs().removeAttribute("coverageFilePath");
+          savedSettings.commitAttributes();
+        }
         return null;
       });
     }

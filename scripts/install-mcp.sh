@@ -9,8 +9,9 @@
 #   REQUALITY_MCP_HOME        the installation folder (default: ~/.local/share/requality-mcp)
 #   REQUALITY_MCP_BIN         the folder of the command link (default: ~/.local/bin)
 #   REQUALITY_MCP_ARCHIVE     a downloaded archive (.tar.gz or .zip) to install instead of a download
-# The server keeps its caches and change histories in ~/.requality-mcp, apart from the installation: an uninstall
-# (rm -rf of the installation folder and the command link) keeps them.
+#   REQUALITY_MCP_INSECURE    1: install also when the release gives no SHA-256 for the archive
+# When the GitHub CLI (gh) is installed and signed in, the script also verifies the build provenance attestation.
+# The server keeps its caches and change histories in ~/.requality-mcp, apart from the installation.
 #
 # All the work is in main, called on the last line: a download that ends early runs nothing.
 set -eu
@@ -66,7 +67,8 @@ main() {
   fi
   target=$os-$arch
   tmp=$(mktemp -d)
-  trap 'rm -rf "$tmp"' EXIT
+  staging="$home/.staging-$$"
+  trap 'rm -rf "$tmp" "$staging"' EXIT
 
   if [ -n "${REQUALITY_MCP_ARCHIVE:-}" ]; then
     archive=$(absolute "$REQUALITY_MCP_ARCHIVE")
@@ -102,31 +104,52 @@ main() {
       actual=$(sha256 "$archive")
       [ "$actual" = "$digest" ] || fail "the SHA-256 of the archive is $actual, the release gives $digest"
       echo "SHA-256 is correct."
+    elif [ "${REQUALITY_MCP_INSECURE:-}" = 1 ]; then
+      echo "Warning: the release gives no SHA-256 for the archive; it is not checked (REQUALITY_MCP_INSECURE=1)." >&2
     else
-      echo "Warning: the release gives no SHA-256 for the archive; it is not checked." >&2
+      fail "the release gives no SHA-256 for the archive; set REQUALITY_MCP_INSECURE=1 to install it without the check"
+    fi
+    # the build provenance attestation of the release workflow, when the GitHub CLI can check it
+    if command -v gh > /dev/null 2>&1 && gh auth status > /dev/null 2>&1; then
+      gh attestation verify "$archive" -R "$repo" > /dev/null 2>&1 \
+        || fail "the archive has no valid build provenance attestation of $repo"
+      echo "Build provenance attestation is correct."
     fi
   fi
 
-  mkdir -p "$tmp/x" "$home" "$bin"
+  mkdir -p "$home" "$bin"
+  # the new version is unpacked and started in the installation folder (not in /tmp, which can forbid running programs)
+  rm -rf "$staging"
+  mkdir -p "$staging"
   case "$archive" in
-    *.zip) unzip -q "$archive" -d "$tmp/x" ;;
-    *) tar -xzf "$archive" -C "$tmp/x" ;;
+    *.zip) unzip -q "$archive" -d "$staging" ;;
+    *) tar -xzf "$archive" -C "$staging" ;;
   esac
-  dir=$(find "$tmp/x" -mindepth 1 -maxdepth 1 -type d -name 'requality-mcp-*' | head -n 1)
-  [ -n "$dir" ] || fail "the archive has no requality-mcp folder"
+  dir=$(find "$staging" -mindepth 1 -maxdepth 1 -type d -name 'requality-mcp-*' | head -n 1)
+  [ -n "$dir" ] || { rm -rf "$staging"; fail "the archive has no requality-mcp folder"; }
   name=$(basename "$dir")
   chmod +x "$dir/bin/requality-mcp"
   # the new version must start before it replaces the installed one
-  version=$("$dir/bin/requality-mcp" --version) || fail "$name does not start (it needs Java 17 or later when it has no jre/)"
-  rm -rf "${home:?}/$name.new"
-  mv "$dir" "$home/$name.new"
+  if ! version=$("$dir/bin/requality-mcp" --version); then
+    rm -rf "$staging"
+    fail "$name does not start (it needs Java 17 or later when it has no jre/)"
+  fi
+  # the marker of a folder this script installed: only such folders are replaced and removed
+  echo "$version" > "$dir/.requality-mcp-install"
+  if [ -e "$home/$name" ] && [ ! -f "$home/$name/.requality-mcp-install" ]; then
+    rm -rf "$staging"
+    fail "$home/$name exists and is not an installation of this script"
+  fi
   rm -rf "${home:?}/$name"
-  mv "$home/$name.new" "$home/$name"
+  mv "$dir" "$home/$name"
+  rm -rf "$staging"
   ln -sfn "$home/$name" "$home/current"
   ln -sf "$home/current/bin/requality-mcp" "$bin/requality-mcp"
-  # the other versions go
+  # the other versions this script installed go
   for old in "$home"/requality-mcp-*; do
-    [ -d "$old" ] && [ "$old" != "$home/$name" ] && rm -rf "$old"
+    if [ -f "$old/.requality-mcp-install" ] && [ "$old" != "$home/$name" ]; then
+      rm -rf "$old"
+    fi
   done
 
   echo "Installed $version in $home/$name."
@@ -138,7 +161,7 @@ main() {
   echo
   echo "Connect Claude Code (the folder contains your Requality catalogs):"
   echo "  claude mcp add requality -- '$bin/requality-mcp' '/path/to/catalogs'"
-  echo "Uninstall: rm -rf '$home' '$bin/requality-mcp'"
+  echo "Uninstall: rm -rf '$home/$name' '$home/current' '$bin/requality-mcp'"
 }
 
 main "$@"

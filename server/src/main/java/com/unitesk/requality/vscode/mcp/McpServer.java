@@ -26,7 +26,8 @@ import com.unitesk.requality.vscode.rpc.JsonRpcConnection;
 public final class McpServer {
   /** Protocol versions this server can speak; the last one is its own. */
   static final List<String> PROTOCOL_VERSIONS = Arrays.asList("2024-11-05", "2025-03-26", "2025-06-18", "2025-11-25");
-  static final String DEFAULT_PROTOCOL_VERSION = "2025-06-18";
+  /** The answer to a version the server does not know: the newest one it speaks. */
+  static final String DEFAULT_PROTOCOL_VERSION = PROTOCOL_VERSIONS.get(PROTOCOL_VERSIONS.size() - 1);
 
   /** A failure of a tool: the result of the call has {@code isError} and this text (not a JSON-RPC error). */
   public static final class ToolError extends RuntimeException {
@@ -146,11 +147,16 @@ public final class McpServer {
     prompts.put(prompt.name, prompt);
   }
 
-  /** The ids of requests the client cancelled (notifications/cancelled): their results are not sent. */
-  private final java.util.Set<String> cancelled = java.util.concurrent.ConcurrentHashMap.newKeySet();
-  /** Requests that run now, and their ids. */
+  /** The requests that run now, by id: true when the client cancelled one (its result is not sent). */
+  private final Map<String, Boolean> runningIds = new java.util.concurrent.ConcurrentHashMap<>();
   private final java.util.concurrent.atomic.AtomicInteger running = new java.util.concurrent.atomic.AtomicInteger();
-  private final java.util.Set<String> runningIds = java.util.concurrent.ConcurrentHashMap.newKeySet();
+  /**
+   * Read-only tools run side by side; a tool that changes something runs alone. A change runs in a transaction of the
+   * core that the other threads would see before its commit.
+   */
+  private final java.util.concurrent.locks.ReadWriteLock toolsLock = new java.util.concurrent.locks.ReentrantReadWriteLock(true);
+  /** The client sent initialize: before it, the server answers only initialize and ping. */
+  private volatile boolean initialized;
 
   /** Reads messages until the input ends. A malformed message gets an error and the server continues. */
   public void listen() throws IOException {
@@ -177,13 +183,26 @@ public final class McpServer {
       return;
     }
     if (msg.isJsonArray() && msg.getAsJsonArray().size() > 0) {
+      // a batch (protocol 2025-03-26): one array with the responses, after all requests of the batch ran
+      List<java.util.concurrent.CompletableFuture<JsonObject>> results = new java.util.ArrayList<>();
       for (JsonElement m : msg.getAsJsonArray())
-        if (m.isJsonObject())
-          dispatch(m.getAsJsonObject());
-        else
-          send(error(null, -32600, "Invalid request: not an object"));
+        results.add(m.isJsonObject() ? dispatch(m.getAsJsonObject())
+            : java.util.concurrent.CompletableFuture.completedFuture(error(null, -32600, "Invalid request: not an object")));
+      java.util.concurrent.CompletableFuture.allOf(results.toArray(new java.util.concurrent.CompletableFuture[0])).thenRun(() -> {
+        JsonArray out = new JsonArray();
+        for (java.util.concurrent.CompletableFuture<JsonObject> f : results) {
+          JsonObject r = f.join();
+          if (r != null)
+            out.add(r);
+        }
+        if (out.size() > 0)
+          send(out);
+      });
     } else if (msg.isJsonObject()) {
-      dispatch(msg.getAsJsonObject());
+      dispatch(msg.getAsJsonObject()).thenAccept(r -> {
+        if (r != null)
+          send(r);
+      });
     } else {
       send(error(null, -32600, "Invalid request"));
     }
@@ -193,38 +212,44 @@ public final class McpServer {
     return e != null && e.isJsonPrimitive() && e.getAsJsonPrimitive().isString();
   }
 
-  private void dispatch(JsonObject msg) {
+  /** Runs a message; the future gives its response (null: none, for a notification or a cancelled request). */
+  private java.util.concurrent.CompletableFuture<JsonObject> dispatch(JsonObject msg) {
+    java.util.concurrent.CompletableFuture<JsonObject> done = new java.util.concurrent.CompletableFuture<>();
     JsonElement idE = msg.get("id");
     JsonElement id = idE == null || idE.isJsonNull() ? null : idE;
     if (id != null && !(id.isJsonPrimitive() && (id.getAsJsonPrimitive().isString() || id.getAsJsonPrimitive().isNumber()))) {
-      send(error(null, -32600, "Invalid request: the id must be a string or a number"));
-      return;
+      done.complete(error(null, -32600, "Invalid request: the id must be a string or a number"));
+      return done;
     }
     JsonElement m = msg.get("method");
-    if (m == null)
-      return; // a response: this server sends no requests
+    if (m == null) {
+      done.complete(null); // a response: this server sends no requests
+      return done;
+    }
     if (!isString(m)) {
-      if (id != null)
-        send(error(id, -32600, "Invalid request: the method must be a string"));
-      return;
+      done.complete(id != null ? error(id, -32600, "Invalid request: the method must be a string") : null);
+      return done;
     }
     String method = m.getAsString();
     JsonElement p = msg.get("params");
     if (p != null && !p.isJsonNull() && !p.isJsonObject()) {
-      if (id != null)
-        send(error(id, -32602, "Invalid params: params must be an object"));
-      return;
+      done.complete(id != null ? error(id, -32602, "Invalid params: params must be an object") : null);
+      return done;
     }
     JsonObject params = p != null && p.isJsonObject() ? p.getAsJsonObject() : new JsonObject();
     if (id == null) {
       // notifications: initialized, cancelled (a running core operation is not stopped; its result is not sent)
-      // only a request that runs can be cancelled (a later request may have the id of a finished one)
-      if (method.equals("notifications/cancelled") && params.has("requestId") && runningIds.contains(params.get("requestId").toString()))
-        cancelled.add(params.get("requestId").toString());
-      return;
+      if (method.equals("notifications/cancelled") && params.has("requestId"))
+        runningIds.computeIfPresent(params.get("requestId").toString(), (k, v) -> true);
+      done.complete(null);
+      return done;
+    }
+    if (!initialized && !method.equals("initialize") && !method.equals("ping")) {
+      done.complete(error(id, -32002, "Server not initialized: send initialize first"));
+      return done;
     }
     running.incrementAndGet();
-    runningIds.add(id.toString());
+    runningIds.put(id.toString(), false);
     workers.execute(() -> {
       JsonObject out;
       try {
@@ -239,10 +264,21 @@ public final class McpServer {
       } finally {
         running.decrementAndGet();
       }
-      runningIds.remove(id.toString());
-      if (!cancelled.remove(id.toString()))
-        send(out);
+      // the cancellation and the end of the request do not race: the entry is removed once
+      Boolean cancelled = runningIds.remove(id.toString());
+      done.complete(Boolean.TRUE.equals(cancelled) ? null : out);
     });
+    return done;
+  }
+
+  /** Runs the task when no tool runs, and lets no tool start until it ends. */
+  public void exclusive(Runnable task) {
+    toolsLock.writeLock().lock();
+    try {
+      task.run();
+    } finally {
+      toolsLock.writeLock().unlock();
+    }
   }
 
   /** Waits until no request runs, at most the time given; true when none runs. */
@@ -259,7 +295,10 @@ public final class McpServer {
   private JsonElement handle(String method, JsonObject params) throws Exception {
     switch (method) {
       case "initialize": {
+        if (params.has("protocolVersion") && !isString(params.get("protocolVersion")))
+          throw new InvalidParams("Invalid params: protocolVersion must be a string");
         String requested = params.has("protocolVersion") ? params.get("protocolVersion").getAsString() : null;
+        initialized = true;
         JsonObject r = new JsonObject();
         r.addProperty("protocolVersion", PROTOCOL_VERSIONS.contains(requested) ? requested : DEFAULT_PROTOCOL_VERSION);
         JsonObject caps = new JsonObject();
@@ -303,6 +342,8 @@ public final class McpServer {
         Prompt p = name == null ? null : prompts.get(name);
         if (p == null)
           throw new InvalidParams("Unknown prompt: " + name);
+        if (params.has("arguments") && !params.get("arguments").isJsonNull() && !params.get("arguments").isJsonObject())
+          throw new InvalidParams("Invalid params: arguments must be an object");
         JsonObject args = params.has("arguments") && params.get("arguments").isJsonObject() ? params.getAsJsonObject("arguments")
             : new JsonObject();
         for (String[] a : p.arguments)
@@ -333,15 +374,24 @@ public final class McpServer {
     Tool tool = tools.get(name);
     if (tool == null)
       throw new InvalidParams("Unknown tool: " + name);
-    JsonObject args = params.has("arguments") && params.get("arguments").isJsonObject() ? params.getAsJsonObject("arguments")
-        : new JsonObject();
+    JsonElement given = params.get("arguments");
+    if (given != null && !given.isJsonNull() && !given.isJsonObject())
+      throw new InvalidParams("Invalid params: arguments must be an object");
+    JsonObject args = given != null && given.isJsonObject() ? given.getAsJsonObject() : new JsonObject();
     JsonObject r = new JsonObject();
     JsonArray content = new JsonArray();
     JsonObject text = new JsonObject();
     text.addProperty("type", "text");
+    java.util.concurrent.locks.Lock lock = tool.readOnly ? toolsLock.readLock() : toolsLock.writeLock();
     try {
       checkArguments(tool, args);
-      Object value = tool.handler.call(args);
+      Object value;
+      lock.lock();
+      try {
+        value = tool.handler.call(args);
+      } finally {
+        lock.unlock();
+      }
       JsonElement json = JsonRpcConnection.toJson(value);
       // compact JSON text (no structuredContent: the tools declare no output schema, a client would pass both)
       text.addProperty("text", json.isJsonPrimitive() ? json.getAsString() : JsonRpcConnection.GSON.toJson(json));
@@ -404,7 +454,7 @@ public final class McpServer {
     return m;
   }
 
-  private void send(JsonObject msg) {
+  private void send(JsonElement msg) {
     byte[] line = (JsonRpcConnection.GSON.toJson(msg) + "\n").getBytes(StandardCharsets.UTF_8);
     synchronized (out) {
       try {

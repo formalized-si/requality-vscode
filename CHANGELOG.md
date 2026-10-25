@@ -19,11 +19,19 @@ Prompts give these jobs as commands of the agent. The GitHub release has archive
 provenance attestations. The VS Code extension contains the same server.
 
 - The agent can import files and write reports only in the folders of the catalogs and in the `--allow` folders.
+  An HTML document that refers to a URL or to a file outside these folders is refused.
 - The server converts a catalog of an older Requality only after a backup (`convert_project`), or with `--convert`.
-- The HTTP and WebSocket servers of the web editors accept connections from this computer only. The headless server
-  starts none.
+- The server does not write over the files of a catalog that changed on disk (for example by `git pull`);
+  `open_project` loads the catalog again. `--release-after` releases idle catalogs for other sessions.
+- The HTTP and WebSocket servers of the web editors accept connections from this computer only, and the WebSocket
+  servers only from the pages of the editors (Origin). The headless server starts none.
+- Apache Tika 3.3.3 and POI 5.5.1 replace Tika 2.7.0 (XXE in the XFA forms of a PDF: CVE-2025-54988,
+  CVE-2025-66516). The coverage files are read without a DOCTYPE.
+- The packages use a pinned Temurin JRE (`scripts/jre-lock.json`, its SHA-256 checked).
 - Fixes of the core: a requirement of a converted catalog can be deleted; an undo that removes a document with its
-  locations does not fail; the report export does not copy files outside the report folder.
+  locations does not fail; the report export does not copy files outside the report folder; a second WebSocket server
+  for more than four web editors starts.
+- The plug-in finds its report templates and web editors also in a folder whose path has a space.
 - Only one Requality process opens a catalog: a catalog that VS Code shows is not open in the MCP server, and the
   opposite.
 - The name field of the Properties view has the experimental check box **Ignore**.

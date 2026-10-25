@@ -62,6 +62,31 @@ class HistoryTest {
   }
 
   @Test
+  void theStatesOfOldChangesGo() throws Exception {
+    File dir = Files.createTempDirectory("requality-history-old").toFile();
+    History h = new History(dir, "/catalog");
+    History.Capture c = new History.Capture(h.blobs());
+    JsonObject st = state("D", "Doc");
+    JsonObject res = new JsonObject();
+    res.addProperty("doc.xhtml", "abc");
+    st.add("resources", res);
+    c.before.add("u1", st);
+    c.after.add("u1", JsonNull.INSTANCE);
+    h.add("P", "apply_changes", "Agent: old", null, new JsonArray(), c, 0);
+    Files.writeString(new File(h.blobs(), "abc").toPath(), "content");
+    Files.writeString(new File(h.blobs(), "unused").toPath(), "content");
+    // the change is two years old
+    File journal = new File(dir, "journal.jsonl");
+    String old = java.time.Instant.now().minus(java.time.Duration.ofDays(730)).toString();
+    Files.writeString(journal.toPath(), Files.readString(journal.toPath()).replaceAll("\"time\":\"[^\"]*\"", "\"time\":\"" + old + "\""));
+    History later = new History(dir, "/catalog");
+    assertEquals(1, later.entries().size());
+    assertNull(later.states(1));
+    assertFalse(new File(h.blobs(), "abc").exists());
+    assertFalse(new File(h.blobs(), "unused").exists());
+  }
+
+  @Test
   void statesCompareWithoutLineEnds() {
     JsonObject a = state("A", "Alpha\r\n");
     JsonObject b = state("A", "Alpha\n");

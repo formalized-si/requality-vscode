@@ -78,18 +78,72 @@ final class History {
     }
   }
 
+  /** The node states of a change are kept this long (a revert of an older change is not possible). */
+  static final long KEEP_DAYS = 365;
+
   History(File dir, String catalog) {
     this.dir = dir;
     if (dir != null) {
+      boolean fresh = !dir.isDirectory();
       new File(dir, "changes").mkdirs();
       new File(dir, "blobs").mkdirs();
+      if (fresh)
+        ownerOnly(dir.getParentFile());
       try {
         Files.writeString(new File(dir, "catalog.txt").toPath(), catalog + "\n", StandardCharsets.UTF_8);
       } catch (IOException e) {
         System.err.println("[mcp] cannot write the history of " + catalog + ": " + e);
       }
       load();
+      prune();
     }
+  }
+
+  /** The history keeps the content of documents: only the user reads the folder. */
+  private static void ownerOnly(File f) {
+    if (f == null)
+      return;
+    f.setReadable(false, false);
+    f.setReadable(true, true);
+    f.setWritable(false, false);
+    f.setWritable(true, true);
+    f.setExecutable(false, false);
+    f.setExecutable(true, true);
+  }
+
+  /** Removes the node states of the changes older than KEEP_DAYS, and the contents no state refers to any more. */
+  private void prune() {
+    Instant limit = Instant.now().minus(java.time.Duration.ofDays(KEEP_DAYS));
+    boolean pruned = false;
+    for (JsonObject e : entries) {
+      try {
+        if (Instant.parse(e.get("time").getAsString()).isBefore(limit)
+            && new File(dir, "changes/" + e.get("change").getAsInt() + ".json").delete())
+          pruned = true;
+      } catch (RuntimeException x) {
+        // a time of another format: kept
+      }
+    }
+    if (!pruned)
+      return;
+    java.util.Set<String> used = new java.util.HashSet<>();
+    File[] changes = new File(dir, "changes").listFiles();
+    if (changes != null)
+      for (File f : changes)
+        try {
+          JsonObject states = JsonParser.parseString(Files.readString(f.toPath(), StandardCharsets.UTF_8)).getAsJsonObject();
+          for (Map.Entry<String, JsonElement> st : states.getAsJsonObject("before").entrySet())
+            if (st.getValue().isJsonObject() && st.getValue().getAsJsonObject().has("resources"))
+              for (Map.Entry<String, JsonElement> r : st.getValue().getAsJsonObject().getAsJsonObject("resources").entrySet())
+                used.add(r.getValue().getAsString());
+        } catch (IOException | RuntimeException x) {
+          return; // a file that cannot be read: no content is removed
+        }
+    File[] blobs = new File(dir, "blobs").listFiles();
+    if (blobs != null)
+      for (File b : blobs)
+        if (!used.contains(b.getName()))
+          b.delete();
   }
 
   File blobs() {
@@ -233,6 +287,8 @@ final class History {
     final File blobs;
     /** The committed transaction: the undo step of the change. */
     TransactionStorage transaction;
+    /** The nodes whose stored state differs from the tree after the commit (the storage did not write them). */
+    final List<String> unsaved = new ArrayList<>();
     private List<UUID> touched;
 
     Capture(File blobs) {
@@ -246,10 +302,18 @@ final class History {
       TransactionStorage ts = (TransactionStorage) db.getStorage();
       touched = new ArrayList<>(ts.getTouchedNodes());
       ITreeStorage base = ts.getStorage();
+      List<String> changedOnDisk = new ArrayList<>();
       for (UUID u : touched) {
         JsonObject s = state(base, u, blobs);
         before.add(u.toString(), s == null ? com.google.gson.JsonNull.INSTANCE : s);
+        if (s != null && !onDisk(base, u, s))
+          changedOnDisk.add(path(db, u));
       }
+      // the change would write over these files with the state the server loaded
+      if (!changedOnDisk.isEmpty())
+        throw new ToolError("The files of " + String.join(", ", changedOnDisk) + " changed on disk after the server loaded "
+            + "them (for example by git pull or another editor). Nothing was changed. Load the project again with "
+            + "open_project, then repeat the change");
     }
 
     /** After the commit. */
@@ -257,6 +321,15 @@ final class History {
       transaction = ts;
       for (UUID u : touched) {
         JsonObject s = state(db.getStorage(), u, null);
+        // the commit of the core logs a file that it could not write and goes on: the tree and the files can differ
+        TreeNode n = db.getNode(u);
+        boolean inTree = n != null && !n.isDisposed();
+        if (inTree && s == null)
+          unsaved.add(n.getQualifiedId() + " has no file");
+        else if (inTree && !s.get("id").getAsString().equals(n.getId()))
+          unsaved.add(n.getQualifiedId() + " has the file of the id " + s.get("id").getAsString());
+        else if (!inTree && s != null)
+          unsaved.add("the file of the deleted node " + s.get("id").getAsString() + " " + u + " stays");
         JsonElement b = before.get(u.toString());
         if (same(b.isJsonNull() ? null : b.getAsJsonObject(), s)) {
           before.remove(u.toString());
@@ -320,6 +393,30 @@ final class History {
       }
     o.add("resources", res);
     return o;
+  }
+
+  /** True when the file of a node on disk has the id and the attributes of its state in the storage. */
+  static boolean onDisk(ITreeStorage s, UUID u, JsonObject state) {
+    File f;
+    try {
+      f = s.getJSONResource(u, com.unitesk.requality.core.lock.LockType.NO_LOCK);
+    } catch (Exception e) {
+      return true; // no file of its own (the root, a virtual node): nothing to compare
+    }
+    if (f == null)
+      return true;
+    // a renamed or deleted file is not at the path of the storage
+    if (!f.isFile())
+      return false;
+    try (InputStream in = Files.newInputStream(f.toPath())) {
+      Map<String, AttributeDefinition> m = NodeMapper.getAttributes(u, in, TempFolderFilesProvider.EMPTY);
+      if (m == null)
+        return false;
+      JsonElement disk = JsonParser.parseString(NodeMapper.toJSON(u, m.values(), true).getJSONObject("attributes").toString());
+      return normalize(disk).equals(normalize(state.get("attributes")));
+    } catch (IOException | RuntimeException | com.unitesk.jsonclone.JSONException e) {
+      return false;
+    }
   }
 
   /** Two states are the same when both are absent, or their id, parent, attributes and resources are equal. */
@@ -438,19 +535,53 @@ final class History {
     return "changed (resources)";
   }
 
-  /** Makes the nodes as they were before the change (in the transaction of the caller). */
+  /**
+   * Makes the nodes as they were before the change (in the transaction of the caller):
+   * <ol>
+   * <li>the nodes that go back to another id or parent get temporary ids, so that no node keeps an id another one takes
+   * back (a node renamed from A to B and a new node A);</li>
+   * <li>the ones in a node the change made move to their old parents;</li>
+   * <li>the nodes the change made go (a node is not renamed and then deleted: the undo storage of the core cannot redo
+   * that);</li>
+   * <li>the deleted nodes come back, parents first;</li>
+   * <li>the changed nodes get their parent, id, attributes and resources.</li>
+   * </ol>
+   */
   static void apply(TreeDB db, JsonObject states, Plan p, File blobs) throws Exception {
     JsonObject before = states.getAsJsonObject("before");
-    for (UUID u : p.recreate)
-      recreate(db, u, before.getAsJsonObject(u.toString()), blobs);
-    for (UUID u : p.restore)
-      restore(db, u, before.getAsJsonObject(u.toString()), blobs);
+    int[] serial = { 0 };
+    java.util.Set<UUID> made = new java.util.HashSet<>(p.delete);
+    // (the id of a location is its UUID: no other node takes it)
+    for (UUID u : p.restore) {
+      TreeNode n = db.getNode(u);
+      JsonObject b = before.getAsJsonObject(u.toString());
+      JsonObject now = state(db.getStorage(), u, null);
+      if (n != null && !(n instanceof com.unitesk.requality.nodetype.Location) && now != null
+          && (!b.get("id").equals(now.get("id")) || !String.valueOf(b.get("parent")).equals(String.valueOf(now.get("parent"))))) {
+        n.setId(temporary(n, serial));
+        n.commitAttributes();
+      }
+    }
+    for (UUID u : p.restore) {
+      TreeNode n = db.getNode(u);
+      if (n == null || !inside(n, made))
+        continue;
+      TreeNode parent = db.getNode(UUID.fromString(before.getAsJsonObject(u.toString()).get("parent").getAsString()));
+      if (parent == null || parent.isDisposed() || inside(parent, made))
+        throw new ToolError(n.getQualifiedId() + " is in a node the change made, and its old parent is not there: it cannot "
+            + "be reverted");
+      new MoveOperation(n, parent, null, true).excecute();
+    }
     for (UUID u : p.delete) {
       TreeNode n = db.getNode(u);
       // a node under a deleted node is gone with it
       if (n != null && !n.isDisposed())
         n.delete();
     }
+    for (UUID u : p.recreate)
+      recreate(db, u, before.getAsJsonObject(u.toString()), blobs);
+    for (UUID u : p.restore)
+      restore(db, u, before.getAsJsonObject(u.toString()), blobs);
     // a delete can change other nodes (the locations of a deleted requirement): they are made as before again
     for (int round = 0; round < 2; round++) {
       boolean changed = false;
@@ -483,6 +614,24 @@ final class History {
             + " as it was (it " + what + "); nothing was changed");
       }
     }
+  }
+
+  /** True when the node or one of its parents is one of the nodes. */
+  private static boolean inside(TreeNode n, java.util.Set<UUID> nodes) {
+    for (TreeNode x = n; x != null; x = x.getWorkParent())
+      if (nodes.contains(x.getUUId()))
+        return true;
+    return false;
+  }
+
+  /** An id that no sibling has, for a node in the middle of a revert. */
+  private static String temporary(TreeNode n, int[] serial) {
+    TreeNode parent = n.getWorkParent();
+    String id;
+    do
+      id = n.getId() + "_reverting_" + (++serial[0]);
+    while (parent != null && parent.findWorkChild(id) != null);
+    return id;
   }
 
   /** The attribute definitions of a state, read as the storage reads a node file. */
@@ -641,7 +790,7 @@ final class History {
   }
 
   /** The reference values of an attribute value (one, or the ones of a list). */
-  private static List<com.unitesk.requality.core.attribute.ReferenceValue> references(Object v) {
+  static List<com.unitesk.requality.core.attribute.ReferenceValue> references(Object v) {
     List<com.unitesk.requality.core.attribute.ReferenceValue> out = new ArrayList<>();
     if (v instanceof com.unitesk.requality.core.attribute.ReferenceValue)
       out.add((com.unitesk.requality.core.attribute.ReferenceValue) v);

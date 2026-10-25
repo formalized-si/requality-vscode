@@ -88,7 +88,8 @@ let current = null;
 (async () => {
   // the options
   const version = run(['--version']);
-  check(version.code === 0 && /^requality-mcp \d+\.\d+\.\d+/.test(version.out), `--version: ${version.out.trim()}`);
+  check(version.code === 0 && /^requality-mcp \d+\.\d+\.\d+/.test(version.out),
+    `--version: ${version.out.trim()}${version.code === 0 ? '' : ` (exit code ${version.code}: ${version.err.trim()})`}`);
   const help = run(['--help']);
   check(help.code === 0 && help.out.includes('--allow'), '--help');
   const bad = run(['--no-such-option']);

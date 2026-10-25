@@ -28,16 +28,17 @@ tasks.withType(JavaCompile).configureEach {
 }
 
 dependencies {
-    // Upstream unstable core dependencies (build.gradle "extraLib"), same versions.
-    implementation 'org.apache.tika:tika-parsers:2.7.0'
-    implementation 'org.apache.tika:tika-core:2.7.0'
-    implementation 'org.apache.tika:tika-parser-pdf-module:2.7.0'
-    implementation 'org.apache.tika:tika-parser-microsoft-module:2.7.0'
-    implementation 'org.apache.tika:tika-parser-miscoffice-module:2.7.0'
-    implementation 'org.apache.tika:tika-parser-ocr-module:2.7.0'
-    implementation 'org.apache.tika:tika-parser-text-module:2.7.0'
-    implementation 'org.apache.logging.log4j:log4j-api:2.20.0'
-    implementation 'org.apache.poi:poi-ooxml:5.2.3'
+    // Upstream unstable core dependencies (build.gradle "extraLib"), same versions, except Tika 3.3.3 with POI 5.5.1:
+    // Tika 2.7.0 parsed the XFA forms of a PDF with external entities (CVE-2025-54988, CVE-2025-66516).
+    implementation 'org.apache.tika:tika-parsers:3.3.3'
+    implementation 'org.apache.tika:tika-core:3.3.3'
+    implementation 'org.apache.tika:tika-parser-pdf-module:3.3.3'
+    implementation 'org.apache.tika:tika-parser-microsoft-module:3.3.3'
+    implementation 'org.apache.tika:tika-parser-miscoffice-module:3.3.3'
+    implementation 'org.apache.tika:tika-parser-ocr-module:3.3.3'
+    implementation 'org.apache.tika:tika-parser-text-module:3.3.3'
+    implementation 'org.apache.logging.log4j:log4j-api:2.26.1'
+    implementation 'org.apache.poi:poi-ooxml:5.5.1'
     implementation 'org.apache.xmlbeans:xmlbeans:5.1.1'
     implementation 'xerces:xercesImpl:2.12.2'
     implementation 'org.odftoolkit:odfdom-java:0.11.0'

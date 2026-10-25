@@ -60,6 +60,8 @@ class McpServerTest {
   static ExecutorService pool;
   static MemoryPipe toServer;
   static McpServer mcp;
+  static Core core;
+  static File workspace;
   static final Map<Integer, CompletableFuture<JsonObject>> pending = new ConcurrentHashMap<>();
   /** The responses no test waits for by id (errors with a null id, responses of raw lines). */
   static final BlockingQueue<JsonObject> others = new LinkedBlockingQueue<>();
@@ -68,7 +70,7 @@ class McpServerTest {
   @BeforeAll
   static void start() throws Exception {
     root = Files.createTempDirectory("requality-mcp-test").toFile();
-    File workspace = new File(root, "workspace");
+    workspace = new File(root, "workspace");
     storage = new File(root, "storage");
     workspace.mkdirs();
     storage.mkdirs();
@@ -85,7 +87,7 @@ class McpServerTest {
     MemoryPipe fromServer = new MemoryPipe();
     mcp = new McpServer(toServer.in, fromServer.out, pool, RequalityServer.VERSION, McpMain.INSTRUCTIONS);
     // the folders of the server: the workspace and the test folder (the files to import, the report folders)
-    RequalityTools.register(mcp, headless, new Policy(List.of(workspace, root)));
+    core = RequalityTools.register(mcp, headless, new Policy(List.of(workspace, root)));
     pool.execute(() -> {
       try {
         mcp.listen();
@@ -97,7 +99,15 @@ class McpServerTest {
       try (BufferedReader r = new BufferedReader(new InputStreamReader(fromServer.in, StandardCharsets.UTF_8))) {
         String line;
         while ((line = r.readLine()) != null) {
-          JsonObject m = JsonParser.parseString(line).getAsJsonObject();
+          JsonElement parsed = JsonParser.parseString(line);
+          if (parsed.isJsonArray()) {
+            // the response to a batch
+            JsonObject batch = new JsonObject();
+            batch.add("batch", parsed);
+            others.add(batch);
+            continue;
+          }
+          JsonObject m = parsed.getAsJsonObject();
           JsonElement id = m.get("id");
           CompletableFuture<JsonObject> f = id != null && id.isJsonPrimitive() && id.getAsJsonPrimitive().isNumber()
               ? pending.remove(id.getAsInt()) : null;
@@ -219,6 +229,12 @@ class McpServerTest {
   @Test
   @Order(1)
   void theProtocolIsRobust() throws Exception {
+    // before initialize the server answers only initialize and ping
+    assertEquals(-32002, rpc("tools/list", null).getAsJsonObject("error").get("code").getAsInt());
+    assertEquals(0, rpc("ping", null).getAsJsonObject("result").size());
+    JsonObject badVersion = new JsonObject();
+    badVersion.addProperty("protocolVersion", 5);
+    assertEquals(-32602, rpc("initialize", badVersion).getAsJsonObject("error").get("code").getAsInt());
     JsonObject p = new JsonObject();
     p.addProperty("protocolVersion", "2025-06-18");
     p.add("capabilities", new JsonObject());
@@ -238,9 +254,16 @@ class McpServerTest {
       JsonObject an = o.getAsJsonObject("annotations");
       if (List.of("undo", "redo", "revert_change", "apply_changes", "convert_project", "update_document_version").contains(name))
         assertTrue(an.get("destructiveHint").getAsBoolean(), o.toString());
-      if (name.equals("apply_changes"))
-        assertEquals(9, o.getAsJsonObject("inputSchema").getAsJsonObject("properties").getAsJsonObject("operations")
-            .getAsJsonObject("items").getAsJsonArray("oneOf").size(), "one schema for each operation");
+      if (name.equals("apply_changes")) {
+        JsonArray variants = o.getAsJsonObject("inputSchema").getAsJsonObject("properties").getAsJsonObject("operations")
+            .getAsJsonObject("items").getAsJsonArray("oneOf");
+        assertEquals(9, variants.size(), "one schema for each operation");
+        // the keys each operation needs, and a description of each key
+        JsonObject locate = variants.get(6).getAsJsonObject();
+        assertEquals("locate", locate.getAsJsonObject("properties").getAsJsonObject("op").get("const").getAsString());
+        assertEquals("[\"op\",\"requirement\",\"document\"]", locate.getAsJsonArray("required").toString());
+        assertTrue(locate.getAsJsonObject("properties").getAsJsonObject("quote").has("description"), locate.toString());
+      }
     }
     assertEquals(List.of("list_projects", "get_tree", "get_node", "search_nodes", "read_document", "apply_changes", "import_document",
         "update_document_version", "trace_coverage", "test_coverage", "review_changes", "revert_change", "undo", "redo", "list_report_templates",
@@ -271,6 +294,10 @@ class McpServerTest {
     JsonObject badName = new JsonObject();
     badName.addProperty("name", 5);
     assertEquals(-32602, rpc("tools/call", badName).getAsJsonObject("error").get("code").getAsInt());
+    JsonObject badArgs = new JsonObject();
+    badArgs.addProperty("name", "list_projects");
+    badArgs.add("arguments", JsonParser.parseString("[1,2]"));
+    assertEquals(-32602, rpc("tools/call", badArgs).getAsJsonObject("error").get("code").getAsInt());
     assertEquals(-32601, rpc("no/such/method", null).getAsJsonObject("error").get("code").getAsInt());
 
     // malformed messages get errors and the server goes on
@@ -283,6 +310,13 @@ class McpServerTest {
     assertEquals(-32600, others.poll(30, TimeUnit.SECONDS).getAsJsonObject("error").get("code").getAsInt());
     send("5");
     assertEquals(-32600, others.poll(30, TimeUnit.SECONDS).getAsJsonObject("error").get("code").getAsInt());
+    // a batch gets one array with the responses
+    send("[{\"jsonrpc\":\"2.0\",\"id\":9101,\"method\":\"ping\"},{\"jsonrpc\":\"2.0\",\"method\":\"notifications/initialized\"},"
+        + "{\"jsonrpc\":\"2.0\",\"id\":9102,\"method\":\"no/such\"}]");
+    JsonArray batch = others.poll(30, TimeUnit.SECONDS).getAsJsonArray("batch");
+    assertEquals(2, batch.size(), batch.toString());
+    assertEquals(9101, batch.get(0).getAsJsonObject().get("id").getAsInt());
+    assertEquals(-32601, batch.get(1).getAsJsonObject().getAsJsonObject("error").get("code").getAsInt());
     CompletableFuture<JsonObject> f = new CompletableFuture<>();
     pending.put(9001, f);
     send("{\"jsonrpc\":\"2.0\",\"id\":9001,\"method\":5}");
@@ -382,6 +416,41 @@ class McpServerTest {
     Files.writeString(script.toPath(), "echo");
     assertContains(callError("import_document", "project", P, "file", script.getAbsolutePath()), "is no document");
     assertContains(callError("import_document", "project", P, "file", new File(root, "a/../../x.html").getPath()), "outside");
+    // a secret outside the folders of the server
+    File secret = Files.createTempFile("requality-secret", ".txt").toFile();
+    secret.deleteOnExit();
+    Files.writeString(secret.toPath(), "TOP-SECRET-TOKEN-12345");
+    // an HTML document whose references the importer would copy or download is refused, with the references
+    File refs = new File(root, "refs.html");
+    Files.writeString(refs.toPath(), "<html><body><p>The system shall work.</p><img src=\"" + secret.getAbsolutePath() + "\"/>"
+        + "<img src=\"http://127.0.0.1:1/x.png\"/><img alt=\"Figure 1\" src=\"data:image/png;base64,AA==\"/></body></html>");
+    String r = callError("import_document", "project", P, "file", refs.getAbsolutePath());
+    assertContains(r, secret.getAbsolutePath());
+    assertContains(r, "http://127.0.0.1:1/x.png");
+    assertFalse(r.contains("data:image"), r);
+    // a picture next to the document is fine
+    File pics = new File(root, "pics");
+    pics.mkdirs();
+    Files.write(new File(pics, "a.png").toPath(), new byte[] { (byte) 0x89, 'P', 'N', 'G' });
+    File withPic = new File(pics, "pic.html");
+    Files.writeString(withPic.toPath(), "<html><body><p>The system shall show a picture.</p><img src=\"a.png\" alt=\"a\"/></body></html>");
+    JsonObject pic = call("import_document", "project", P, "file", withPic.getAbsolutePath());
+    call("apply_changes", "project", P, "operations", ops("[{\"op\":\"delete\",\"node\":\"" + pic.get("path").getAsString() + "\"}]"));
+    // the XFA form of a PDF with an external entity does not read the secret (Tika 3)
+    File pdf = new File(root, "form.pdf");
+    Files.write(pdf.toPath(), xfaPdf(secret));
+    JsonObject form = call("import_document", "project", P, "file", pdf.getAbsolutePath());
+    JsonObject formText = call("read_document", "project", P, "document", form.get("path").getAsString());
+    assertContains(formText.toString(), "The system shall work.");
+    assertFalse(formText.toString().contains("TOP-SECRET"), formText.toString());
+    call("apply_changes", "project", P, "operations", ops("[{\"op\":\"delete\",\"node\":\"" + form.get("path").getAsString() + "\"}]"));
+    // a coverage file with a DOCTYPE is not read (no external entity)
+    File xxe = new File(root, "xxe-coverage.xml");
+    Files.writeString(xxe.toPath(), "<?xml version=\"1.0\"?><!DOCTYPE c [<!ENTITY s SYSTEM \"" + secret.toURI() + "\">]>"
+        + "<coverage><error name=\"e\" testuri=\"t\"><violates qid=\"/Requirements\"/><description format=\"plain\">&s;</description>"
+        + "</error></coverage>");
+    String cov = callError("test_coverage", "project", P, "file", xxe.getAbsolutePath());
+    assertFalse(cov.contains("TOP-SECRET"), cov);
     File full = new File(root, "full");
     full.mkdirs();
     Files.writeString(new File(full, "keep.txt").toPath(), "keep");
@@ -464,12 +533,36 @@ class McpServerTest {
     // a requirement of the legacy catalog whose location reference has the old path form can be deleted
     assertTrue(call("apply_changes", "project", P, "dry_run", true, "operations", ops("[{\"op\":\"delete\",\"node\":"
         + "\"/Requirements/SEC_ITSS/SEC_ITSS_SND/SEC_ITSS_SND_GENMSG/SEC_ITSS_SND_GENMSG_01\"}]")).get("dry_run").getAsBoolean());
-    // the text no requirement covers yet (the filter in any case)
+    // the text no requirement covers yet (the filter in any case): also a paragraph whose sentence is covered in part
     JsonObject uncovered = call("read_document", "project", P, "document", "/Documents/spec.xhtml", "filter", "UNCOVERED");
     List<String> left = new ArrayList<>();
     for (JsonElement e : uncovered.getAsJsonArray("paragraphs"))
       left.add(e.getAsJsonObject().get("text").getAsString());
-    assertEquals(List.of("Spec", "The system shall keep logs for one year."), left);
+    assertEquals(List.of("Spec", "The system shall keep logs for one year.", "The system shall lock the account after 3 failed attempts."),
+        left);
+    JsonObject lockP = paragraph(uncovered, "lock the account");
+    assertEquals("partial", lockP.get("coverage").getAsString());
+    assertEquals("[\"The system shall lock the account after 3 failed attempts.\"]", lockP.getAsJsonArray("uncovered_text").toString());
+    // the results of a change are short: the values before and after are in the history
+    for (JsonElement e : applied.getAsJsonArray("results"))
+      assertFalse(e.getAsJsonObject().has("before") || e.getAsJsonObject().has("after"), e.toString());
+    // a locate made again (a retried call) changes nothing
+    JsonObject again = call("apply_changes", "project", P, "operations", ops("[{\"op\":\"locate\",\"requirement\":\"/Requirements/SPEC/LOG\","
+        + "\"document\":\"/Documents/spec.xhtml\",\"quote\":\"The system shall log every access.\"}]"));
+    assertTrue(again.getAsJsonArray("results").get(0).getAsJsonObject().get("unchanged").getAsBoolean(), again.toString());
+    assertEquals(1, call("get_node", "project", P, "node", "/Requirements/SPEC/LOG").getAsJsonArray("locations").size());
+    // a node only where the tree takes its type; the keys an operation needs
+    assertContains(callError("apply_changes", "project", P, "operations", ops("[{\"op\":\"create\",\"parent\":\"/Documents\",\"id\":\"X\"}]")),
+        "a Requirement cannot be a child of /Documents (it takes: [DocFolder])");
+    assertContains(callError("apply_changes", "project", P, "operations", ops("[{\"op\":\"locate\",\"requirement\":\"/Requirements/SPEC/LOG\"}]")),
+        "missing key 'document'");
+    // the nodes of a type; the attributes that matched by their names
+    JsonObject tps = call("search_nodes", "project", P, "type", "TestPurpose", "under", "/Requirements/SPEC");
+    assertEquals(1, tps.get("total").getAsInt(), tps.toString());
+    JsonObject byName = call("search_nodes", "project", P, "text", "Access log", "under", "/Requirements/SPEC");
+    for (JsonElement m : byName.getAsJsonArray("matches"))
+      for (JsonElement k : m.getAsJsonObject().getAsJsonArray("matched"))
+        assertFalse(k.getAsString().startsWith("_") || k.getAsString().startsWith("%"), byName.toString());
     // unlocate with a requirement that does not have the location changes nothing
     String logLocation = log.getAsJsonArray("locations").get(0).getAsJsonObject().get("uuid").getAsString();
     assertContains(callError("apply_changes", "project", P, "operations", ops("[{\"op\":\"unlocate\",\"location\":\""
@@ -523,6 +616,33 @@ class McpServerTest {
     }
   }
 
+  /** A PDF with one line of text and an XFA form whose external entity names a file. */
+  static byte[] xfaPdf(File secret) {
+    String xfa = "<?xml version=\"1.0\"?>\n<!DOCTYPE xdp:xdp [ <!ENTITY e SYSTEM \"" + secret.toURI() + "\"> ]>\n"
+        + "<xdp:xdp xmlns:xdp=\"http://ns.adobe.com/xdp/\"><template xmlns=\"http://www.xfa.org/schema/xfa-template/3.3/\">"
+        + "<subform name=\"form1\"><field name=\"f1\"><caption><value><text>Cap &e;</text></value></caption></field></subform>"
+        + "</template><datasets xmlns:xfa=\"http://www.xfa.org/schema/xfa-data/1.0/\"><xfa:data><form1><f1>Val &e;</f1></form1>"
+        + "</xfa:data></datasets></xdp:xdp>";
+    String content = "BT /F1 12 Tf 72 712 Td (The system shall work.) Tj ET";
+    String[] objects = { "<< /Type /Catalog /Pages 2 0 R /AcroForm 4 0 R >>", "<< /Type /Pages /Kids [3 0 R] /Count 1 >>",
+        "<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Contents 5 0 R /Resources << /Font << /F1 6 0 R >> >> >>",
+        "<< /Fields [] /XFA 7 0 R >>", "<< /Length " + content.length() + " >>\nstream\n" + content + "\nendstream",
+        "<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>",
+        "<< /Length " + xfa.getBytes(StandardCharsets.UTF_8).length + " >>\nstream\n" + xfa + "\nendstream" };
+    StringBuilder b = new StringBuilder("%PDF-1.7\n");
+    List<Integer> offsets = new ArrayList<>();
+    for (int i = 0; i < objects.length; i++) {
+      offsets.add(b.toString().getBytes(StandardCharsets.UTF_8).length);
+      b.append(i + 1).append(" 0 obj\n").append(objects[i]).append("\nendobj\n");
+    }
+    int xref = b.toString().getBytes(StandardCharsets.UTF_8).length;
+    b.append("xref\n0 ").append(objects.length + 1).append("\n0000000000 65535 f \n");
+    for (int o : offsets)
+      b.append(String.format("%010d 00000 n \n", o));
+    b.append("trailer\n<< /Size ").append(objects.length + 1).append(" /Root 1 0 R >>\nstartxref\n").append(xref).append("\n%%EOF\n");
+    return b.toString().getBytes(StandardCharsets.UTF_8);
+  }
+
   /** The text of a document as the Document Editor of the core counts the offsets of locations. */
   static String coreText(Document doc) throws Exception {
     SAXTextExtractor ste = new SAXTextExtractor();
@@ -551,7 +671,8 @@ class McpServerTest {
 
     JsonObject update = call("apply_changes", "project", P, "operations",
         ops("[{\"op\":\"update\",\"node\":\"/Requirements/SPEC/LOG\",\"name\":\"Access logging\",\"attributes\":{\"status\":\"approved\",\"tags\":null}}]"));
-    JsonObject res = update.getAsJsonArray("results").get(0).getAsJsonObject();
+    JsonObject res = call("review_changes", "project", P, "change", update.get("change").getAsInt()).getAsJsonArray("operations").get(0)
+        .getAsJsonObject();
     assertEquals("Access log", res.getAsJsonObject("before").get("name").getAsString());
     assertEquals("Access logging", res.getAsJsonObject("after").get("name").getAsString());
     assertFalse(res.getAsJsonObject("after").getAsJsonObject("attributes").has("tags"), res.toString());
@@ -625,9 +746,18 @@ class McpServerTest {
         + "{\"op\":\"create\",\"parent\":\"$rev\",\"id\":\"C\",\"name\":\"Gamma\",\"description\":\"Gamma text.\",\"attributes\":{\"priority\":3},\"as\":\"c\"},"
         + "{\"op\":\"create\",\"parent\":\"$c\",\"type\":\"TestPurpose\",\"id\":\"C_T1\",\"name\":\"Check gamma\"},"
         + "{\"op\":\"link\",\"from\":\"$a\",\"to\":\"$c\",\"attribute\":\"depends\"}]"));
+    // a dry run of a delete names the links that would break, and changes nothing (the link index too)
+    JsonObject dryDel = call("apply_changes", "project", P, "dry_run", true, "operations", ops("[{\"op\":\"delete\",\"node\":\"/Requirements/REV/C\"}]"));
+    assertContains(dryDel.getAsJsonArray("results").get(0).getAsJsonObject().getAsJsonArray("broken_links").toString(), "/Requirements/REV/A");
+    assertEquals("/Requirements/REV/C", call("get_node", "project", P, "node", "/Requirements/REV/A").getAsJsonObject("links")
+        .getAsJsonArray("depends").get(0).getAsString());
     // the undo of a delete brings the node back with the links to it
     call("apply_changes", "project", P, "operations", ops("[{\"op\":\"delete\",\"node\":\"/Requirements/REV/C\"}]"));
-    assertFalse(call("get_node", "project", P, "node", "/Requirements/REV/A").getAsJsonObject("links").has("depends"));
+    JsonObject aBroken = call("get_node", "project", P, "node", "/Requirements/REV/A");
+    assertFalse(aBroken.getAsJsonObject("links").has("depends"), aBroken.toString());
+    assertEquals("depends", aBroken.getAsJsonArray("broken_links").get(0).getAsJsonObject().get("attribute").getAsString(), aBroken.toString());
+    assertEquals(1, call("trace_coverage", "project", P, "under", "/Requirements/REV").getAsJsonObject("requirements")
+        .getAsJsonObject("broken_links").get("total").getAsInt());
     call("undo");
     assertEquals("/Requirements/REV/C", call("get_node", "project", P, "node", "/Requirements/REV/A").getAsJsonObject("links")
         .getAsJsonArray("depends").get(0).getAsString());
@@ -649,6 +779,14 @@ class McpServerTest {
     JsonObject dry = call("revert_change", "project", P, "change", n, "dry_run", true);
     assertTrue(dry.get("dry_run").getAsBoolean());
     assertContains(dry.getAsJsonArray("nodes").toString(), cUuid);
+    // the plan names the type of each node, and the text of a location
+    boolean locationText = false;
+    for (JsonElement x : dry.getAsJsonArray("nodes")) {
+      assertTrue(x.getAsJsonObject().has("type"), x.toString());
+      locationText |= "Location".equals(x.getAsJsonObject().get("type").getAsString())
+          && x.getAsJsonObject().get("text").getAsString().contains("keep logs for one year");
+    }
+    assertTrue(locationText, dry.toString());
     call("get_node", "project", P, "node", "/Requirements/REV/D");
 
     JsonObject rev = call("revert_change", "project", P, "change", n);
@@ -675,9 +813,17 @@ class McpServerTest {
     assertContains(callError("revert_change", "project", P, "change", n), "reverted already");
 
     // a revert of the revert makes the change again, with the same nodes
-    call("revert_change", "project", P, "change", rev.get("change").getAsInt());
+    int rr = call("revert_change", "project", P, "change", rev.get("change").getAsInt()).get("change").getAsInt();
     assertEquals("Alpha 2", call("get_node", "project", P, "node", "/Requirements/REV/A").get("name").getAsString());
     callError("get_node", "project", P, "node", "/Requirements/REV/C");
+    assertEquals("done", call("review_changes", "project", P, "change", n).get("state").getAsString());
+    assertEquals("reverted", call("review_changes", "project", P, "change", rev.get("change").getAsInt()).get("state").getAsString());
+    // its undo and redo keep the states of the chain
+    call("undo");
+    assertEquals("reverted", call("review_changes", "project", P, "change", n).get("state").getAsString());
+    assertEquals("done", call("review_changes", "project", P, "change", rev.get("change").getAsInt()).get("state").getAsString());
+    assertEquals("undone", call("review_changes", "project", P, "change", rr).get("state").getAsString());
+    call("redo");
     assertEquals("done", call("review_changes", "project", P, "change", n).get("state").getAsString());
     assertEquals("reverted", call("review_changes", "project", P, "change", rev.get("change").getAsInt()).get("state").getAsString());
 
@@ -692,6 +838,21 @@ class McpServerTest {
     assertEquals("Alpha", call("get_node", "project", P, "node", "/Requirements/REV/A").get("name").getAsString());
     assertEquals(cUuid, call("get_node", "project", P, "node", "/Requirements/REV/C").get("uuid").getAsString());
     assertEquals("/Requirements/REV/B", call("get_node", "project", P, "node", "/Requirements/REV/B").get("path").getAsString());
+
+    // a rename and a new node with the old id; a delete and a new node with the same id: the revert gives each node back
+    // its id and UUID
+    String bUuid = call("get_node", "project", P, "node", "/Requirements/REV/B").get("uuid").getAsString();
+    int swap = call("apply_changes", "project", P, "operations", ops("[{\"op\":\"update\",\"node\":\"/Requirements/REV/B\",\"id\":\"B2\"},"
+        + "{\"op\":\"create\",\"parent\":\"/Requirements/REV\",\"id\":\"B\",\"name\":\"New B\"},"
+        + "{\"op\":\"delete\",\"node\":\"/Requirements/REV/C\"},{\"op\":\"create\",\"parent\":\"/Requirements/REV\",\"id\":\"C\"}]"))
+        .get("change").getAsInt();
+    call("revert_change", "project", P, "change", swap);
+    assertEquals(bUuid, call("get_node", "project", P, "node", "/Requirements/REV/B").get("uuid").getAsString());
+    assertEquals(cUuid, call("get_node", "project", P, "node", "/Requirements/REV/C").get("uuid").getAsString());
+    callError("get_node", "project", P, "node", "/Requirements/REV/B2");
+    // the files of the catalog are the ones of the tree: B.json has the UUID of B
+    File bFile = new File(workspace, "TS103096/root/Requirements/REV/B.json");
+    assertContains(Files.readString(bFile.toPath()), bUuid);
 
     // an undone change is not reverted
     int e = call("apply_changes", "project", P, "operations", ops("[{\"op\":\"create\",\"parent\":\"/Requirements/REV\",\"id\":\"E\"}]"))
@@ -778,12 +939,18 @@ class McpServerTest {
     assertEquals("changed", lock.get("status").getAsString(), up.toString());
     assertTrue(lock.get("modality_changed").getAsBoolean(), up.toString());
     assertTrue(lock.get("numbers_changed").getAsBoolean(), up.toString());
-    // the new statements no requirement marks, in English and Russian
+    // the new sentences no requirement marks, statements in English and Russian
     List<String> quotes = new ArrayList<>();
-    for (JsonElement e : up.getAsJsonArray("uncovered_statements"))
+    for (JsonElement e : up.getAsJsonArray("new_sentences")) {
       quotes.add(e.getAsJsonObject().get("quote").getAsString());
+      assertTrue(e.getAsJsonObject().get("statement").getAsBoolean(), e.toString());
+    }
     assertEquals(List.of("The system shall keep logs for two years.", "The system must alert the operator.",
         "Система должна хранить журнал."), quotes);
+    // the review of the change has what the update did to each requirement
+    JsonObject reviewed = call("review_changes", "project", P, "change", up.get("change").getAsInt());
+    assertContains(reviewed.toString(), "/Requirements/SPEC/LOCKOUT");
+    assertContains(reviewed.toString(), "new_sentences");
     JsonObject newDoc = call("read_document", "project", P, "document", "/Documents/spec_v2.xhtml");
     assertTrue(paragraph(newDoc, "log every access").getAsJsonArray("requirements").toString().contains("/Requirements/SPEC/LOG"),
         newDoc.toString());
@@ -815,6 +982,35 @@ class McpServerTest {
     // the undo of the revert brings the new version with its three locations back
     call("undo");
     assertEquals(3, call("read_document", "project", P, "document", "/Documents/spec_v2.xhtml").get("locations").getAsInt());
+    // a paragraph that got a sentence, and a short text: neither is "unchanged"
+    File c1 = new File(root, "pump.html");
+    Files.writeString(c1.toPath(), "<html><body><p>The pump shall stop at 5 bar. It shall alarm.</p>"
+        + "<table><tr><td>Limit</td><td>5</td></tr></table><p>Version 2024.</p></body></html>");
+    JsonObject pump = call("import_document", "project", P, "file", c1.getAbsolutePath());
+    call("apply_changes", "project", P, "operations", ops("[{\"op\":\"create\",\"parent\":\"/Requirements\",\"id\":\"PUMP\",\"as\":\"p\"},"
+        + "{\"op\":\"create\",\"parent\":\"$p\",\"id\":\"STOP\",\"as\":\"s\"},{\"op\":\"create\",\"parent\":\"$p\",\"id\":\"LIM\",\"as\":\"l\"},"
+        + "{\"op\":\"locate\",\"requirement\":\"$s\",\"document\":\"" + pump.get("path").getAsString() + "\",\"quote\":\"The pump shall stop at 5 bar.\"},"
+        + "{\"op\":\"locate\",\"requirement\":\"$l\",\"document\":\"" + pump.get("path").getAsString() + "\",\"quote\":\"5\",\"occurrence\":2}]"));
+    File c2 = new File(root, "pump_v2.html");
+    Files.writeString(c2.toPath(), "<html><body><p>The pump shall stop at 5 bar. It shall alarm. In service mode the limit is 7 bar.</p>"
+        + "<table><tr><td>Limit</td><td>7</td></tr></table><p>Version 2025.</p></body></html>");
+    JsonObject pu = call("update_document_version", "project", P, "document", pump.get("path").getAsString(), "file", c2.getAbsolutePath());
+    Map<String, JsonObject> pr = new java.util.HashMap<>();
+    for (JsonElement e : pu.getAsJsonArray("requirements"))
+      pr.put(e.getAsJsonObject().get("requirement").getAsString(), e.getAsJsonObject());
+    JsonObject stop = pr.get("/Requirements/PUMP/STOP");
+    assertEquals("changed", stop.get("status").getAsString(), pu.toString());
+    JsonObject stopLoc = stop.getAsJsonArray("locations").get(0).getAsJsonObject();
+    assertTrue(stopLoc.get("text_same").getAsBoolean(), pu.toString());
+    assertEquals("[\"In service mode the limit is 7 bar.\"]", stopLoc.getAsJsonArray("paragraph_added").toString(), pu.toString());
+    assertEquals("lost", pr.get("/Requirements/PUMP/LIM").get("status").getAsString(), pu.toString());
+    // the new sentence with no word of a requirement is listed too
+    boolean service = false;
+    for (JsonElement e : pu.getAsJsonArray("new_sentences"))
+      if (e.getAsJsonObject().get("quote").getAsString().equals("In service mode the limit is 7 bar."))
+        service = !e.getAsJsonObject().get("statement").getAsBoolean();
+    assertTrue(service, pu.toString());
+
     // a review item of an update made in the GUI is resolved like Complete of the To-Do List view
     assertContains(callError("apply_changes", "project", P, "operations", ops("[{\"op\":\"resolve\",\"item\":\"/Requirements/SPEC/LOG\"}]")),
         "not a review item");
@@ -838,6 +1034,49 @@ class McpServerTest {
     assertTrue(Files.size(new File(files.get(0).getAsString()).toPath()) > 1000, rep.toString());
     // the temporary report settings are gone and not in the undo history
     assertEquals(1, call("get_tree", "project", P, "node", "/Reports", "depth", 1).getAsJsonArray("nodes").size());
+    // saved report settings of the project generate their report: the ones of the ETSI catalog use a template that is
+    // not installed; saved settings of the table view template work
+    JsonObject saved = call("search_nodes", "project", P, "type", "ReportSettings", "under", "/Reports");
+    String settings = saved.getAsJsonArray("matches").get(0).getAsJsonObject().get("path").getAsString();
+    assertContains(callError("generate_report", "project", P, "settings", settings, "output", new File(root, "report-x").getAbsolutePath()),
+        "com.unitesk.requality.reports.tps, which is not installed");
+    TreeDB db = Nodes.findDB("TS103096");
+    TreeNode reportsNode = Core.node(db, "/Reports");
+    String table = Core.write(db, "Saved settings", false, () -> {
+      com.unitesk.requality.nodetype.ReportSettings rs = (com.unitesk.requality.nodetype.ReportSettings) reportsNode.createChild("Table",
+          com.unitesk.requality.nodetype.ReportSettings.TYPE_NAME);
+      rs.attrs().setConstAttribute(com.unitesk.requality.nodetype.ReportSettings.ATTR_TEMPLATE, "com.unitesk.requality.reports.tableview", 0);
+      rs.attrs().setConstAttribute(com.unitesk.requality.nodetype.ReportSettings.ATTR_ROOT_REQUIREMENT, "/Requirements/SPEC", 0);
+      rs.commitAttributes();
+      return rs.getQualifiedId();
+    });
+    JsonObject fromSaved = call("generate_report", "project", P, "settings", table, "output", new File(root, "report-saved").getAbsolutePath());
+    assertTrue(fromSaved.getAsJsonArray("files").size() >= 1, fromSaved.toString());
+    call("get_node", "project", P, "node", table);
+    // the coverage report with the test coverage of a coverage file
+    File cov = new File(root, "coverage.xml");
+    JsonObject covRep = call("generate_report", "project", P, "template", "com.unitesk.requality.reports.coverage", "output",
+        new File(root, "report-coverage").getAbsolutePath(), "root", "/Requirements/SPEC", "coverage_file", cov.getAbsolutePath());
+    StringBuilder html = new StringBuilder();
+    for (JsonElement f : covRep.getAsJsonArray("files"))
+      if (f.getAsString().endsWith(".html"))
+        html.append(Files.readString(new File(f.getAsString()).toPath()));
+    assertContains(html.toString(), "test_log");
+
+    // a file changed on disk (git pull, another editor) is not written over: the change is refused until a load
+    File logFile = new File(workspace, "TS103096/root/Requirements/SPEC/LOG.json");
+    String json = Files.readString(logFile.toPath());
+    String current = call("get_node", "project", P, "node", "/Requirements/SPEC/LOG").get("name").getAsString();
+    assertContains(json, current);
+    Files.writeString(logFile.toPath(), json.replace(current, "Renamed on disk"));
+    String refused = callError("apply_changes", "project", P, "operations",
+        ops("[{\"op\":\"update\",\"node\":\"/Requirements/SPEC/LOG\",\"attributes\":{\"status\":\"checked\"}}]"));
+    assertContains(refused, "changed on disk");
+    assertContains(Files.readString(logFile.toPath()), "Renamed on disk");
+    assertEquals("loaded again", call("open_project", "project", P).get("state").getAsString());
+    assertEquals("Renamed on disk", call("get_node", "project", P, "node", "/Requirements/SPEC/LOG").get("name").getAsString());
+    call("apply_changes", "project", P, "operations",
+        ops("[{\"op\":\"update\",\"node\":\"/Requirements/SPEC/LOG\",\"attributes\":{\"status\":\"checked\"}}]"));
     assertEquals("AgentProject", call("create_project", "name", "AgentProject").get("project").getAsString());
     assertContains(callError("create_project", "name", "AgentProject"), "exists already");
     call("apply_changes", "project", "AgentProject", "operations",
@@ -849,5 +1088,10 @@ class McpServerTest {
     assertContains(callError("get_node", "project", "AgentProject", "node", "/Requirements/R1"), "closed");
     call("open_project", "project", "AgentProject");
     assertEquals("First", call("get_node", "project", "AgentProject", "node", "/Requirements/R1").get("name").getAsString());
+    // an idle catalog is released (--release-after) and loads again when a tool needs it
+    mcp.exclusive(() -> core.releaseIdle(0));
+    assertEquals("released", state("AgentProject"));
+    assertEquals("First", call("get_node", "project", "AgentProject", "node", "/Requirements/R1").get("name").getAsString());
+    assertEquals("ready", state("AgentProject"));
   }
 }

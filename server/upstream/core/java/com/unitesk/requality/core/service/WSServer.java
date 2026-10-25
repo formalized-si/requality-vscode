@@ -315,6 +315,15 @@ public class WSServer extends WebSocketHandler implements IPortStatusProvider{
       factory.setCreator(new WebSocketCreator() {
         @Override
         public Object createWebSocket(ServletUpgradeRequest arg0, ServletUpgradeResponse arg1) {
+          // VSCODE-PATCH: a web page of another site in a browser of this computer must not talk to the editors
+          if (!localOrigin(arg0.getHeader("Origin"))) {
+            try {
+              arg1.sendForbidden("Origin not allowed");
+            } catch (java.io.IOException e) {
+              RLogger.logError(e);
+            }
+            return null;
+          }
           Object ws = wsc.createWebSocket(arg0, arg1);
           if(ws!=null && (ws instanceof WSSocket)) {
             WSSocket wsa = (WSSocket) ws;
@@ -326,6 +335,25 @@ public class WSServer extends WebSocketHandler implements IPortStatusProvider{
           return ws;
         }
       });
+  }
+
+  /**
+   * VSCODE-PATCH: the origins of the web editors: their pages on this computer (http://127.0.0.1, localhost) and the
+   * webviews of VS Code. A client that is no browser sends no origin.
+   */
+  static boolean localOrigin(String origin) {
+    if (origin == null || origin.isEmpty())
+      return true;
+    if (origin.startsWith("vscode-webview://") || origin.startsWith("vscode-file://"))
+      return true;
+    try {
+      java.net.URI u = java.net.URI.create(origin);
+      String host = u.getHost();
+      return ("http".equals(u.getScheme()) || "https".equals(u.getScheme())) && host != null
+          && (host.equals("127.0.0.1") || host.equals("localhost") || host.equals("[::1]") || host.equals("::1"));
+    } catch (IllegalArgumentException e) {
+      return false;
+    }
   }
 
   public String dumpConnections() {

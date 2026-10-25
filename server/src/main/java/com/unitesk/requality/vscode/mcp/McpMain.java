@@ -43,6 +43,9 @@ public final class McpMain {
       + "  --allow <folder>    the agent may also import files from this folder and write reports into it\n"
       + "  --convert           convert catalogs in an old format when they open, without a backup (else the tool\n"
       + "                      convert_project converts one after a backup)\n"
+      + "  --release-after <minutes>\n"
+      + "                      release a catalog that no tool used for this time, for another session or VS Code\n"
+      + "                      (the next call loads it again); default: never\n"
       + "  --storage <folder>  caches, logs, change histories and backups (default ~/.requality-mcp)\n"
       + "  --version           print the version\n"
       + "  --help              print this text\n";
@@ -64,6 +67,11 @@ public final class McpMain {
     List<File> folders = new ArrayList<>();
     List<File> allowed = new ArrayList<>();
     boolean convert = false;
+    long releaseAfter = 0;
+    // the folder where relative arguments start: the launcher of Windows runs Java in its own folder and gives the
+    // current folder of the caller in REQUALITY_CWD
+    String cwd = System.getenv("REQUALITY_CWD");
+    File base = cwd != null && !cwd.isEmpty() ? new File(cwd) : new File(System.getProperty("user.dir"));
     try {
       for (int i = 0; i < args.length; i++) {
         switch (args[i]) {
@@ -78,24 +86,31 @@ public final class McpMain {
             System.exit(0);
             break;
           case "--resources":
-            resources = new File(value(args, ++i, "--resources"));
+            // the folder of the package, relative to the folder of Java (the launcher gives it)
+            resources = new File(value(args, ++i, "--resources")).getAbsoluteFile();
             break;
           case "--storage":
-            storage = new File(value(args, ++i, "--storage"));
+            storage = resolve(base, value(args, ++i, "--storage"));
             break;
           case "--allow":
-            allowed.add(new File(value(args, ++i, "--allow")).getAbsoluteFile());
+            allowed.add(folder(resolve(base, value(args, ++i, "--allow"))));
             break;
           case "--convert":
             convert = true;
             break;
+          case "--release-after":
+            try {
+              releaseAfter = Long.parseLong(value(args, ++i, "--release-after")) * 60_000L;
+            } catch (NumberFormatException e) {
+              throw new IllegalArgumentException("--release-after needs a number of minutes");
+            }
+            if (releaseAfter <= 0)
+              throw new IllegalArgumentException("--release-after needs a number of minutes above 0");
+            break;
           default:
             if (args[i].startsWith("--"))
               throw new IllegalArgumentException("Unknown option " + args[i]);
-            File f = new File(args[i]).getAbsoluteFile();
-            if (!f.isDirectory())
-              throw new IllegalArgumentException("No folder " + f);
-            folders.add(f);
+            folders.add(folder(resolve(base, args[i])));
         }
       }
     } catch (IllegalArgumentException e) {
@@ -105,10 +120,28 @@ public final class McpMain {
     }
     if (resources == null)
       resources = defaultResources();
-    if (folders.isEmpty())
-      folders.add(new File(System.getProperty("user.dir")).getAbsoluteFile());
+    if (folders.isEmpty()) {
+      // the agent may import and write in the folders: not in the whole file system or home folder by accident
+      File home = new File(System.getProperty("user.home"));
+      if (same(base, home) || base.getAbsoluteFile().toPath().getParent() == null) {
+        stderr.println("requality-mcp: give the folder that contains your Requality catalogs (the current folder is " + base
+            + ")");
+        stderr.print(USAGE);
+        System.exit(2);
+      }
+      folders.add(base.getAbsoluteFile());
+    }
     storage = storage.getAbsoluteFile();
-    storage.mkdirs();
+    if (!storage.isDirectory()) {
+      storage.mkdirs();
+      // the histories of the changes keep the content of documents: only the user reads them
+      storage.setReadable(false, false);
+      storage.setReadable(true, true);
+      storage.setWritable(false, false);
+      storage.setWritable(true, true);
+      storage.setExecutable(false, false);
+      storage.setExecutable(true, true);
+    }
     // The core writes its logs to <user.dir>/logs (RLogger reads the property when it is loaded): in the storage, as the
     // extension starts the server in its storage folder. The folders and paths above are absolute already.
     System.setProperty("user.dir", storage.getPath());
@@ -127,7 +160,28 @@ public final class McpMain {
       headless = new HeadlessClient(resources, storage, convert);
       headless.initialize(folders);
       McpServer mcp = new McpServer(mcpIn, mcpOut, workers, RequalityServer.VERSION, INSTRUCTIONS);
-      RequalityTools.register(mcp, headless, new Policy(roots));
+      Core core = RequalityTools.register(mcp, headless, new Policy(roots));
+      if (releaseAfter > 0) {
+        long after = releaseAfter;
+        java.util.concurrent.ScheduledExecutorService timer = Executors.newSingleThreadScheduledExecutor(r -> {
+          Thread t = new Thread(r, "requality-mcp-release");
+          t.setDaemon(true);
+          return t;
+        });
+        // a catalog is released only between calls: no tool runs then
+        timer.scheduleWithFixedDelay(() -> mcp.exclusive(() -> core.releaseIdle(after)), 30, 30,
+            java.util.concurrent.TimeUnit.SECONDS);
+      }
+      // a client that ends the server (SIGTERM) lets the running calls finish and the catalogs close
+      HeadlessClient h = headless;
+      Runtime.getRuntime().addShutdownHook(new Thread(() -> {
+        try {
+          mcp.awaitIdle(20_000);
+        } catch (InterruptedException e) {
+          Thread.currentThread().interrupt();
+        }
+        h.close();
+      }, "requality-mcp-shutdown"));
       mcp.listen();
       // the input ended: the calls that run end first (at most a minute), their results are sent
       if (!mcp.awaitIdle(60_000))
@@ -140,6 +194,26 @@ public final class McpMain {
       if (headless != null)
         headless.close();
       System.exit(code);
+    }
+  }
+
+  /** An absolute file: a relative path starts in the folder {@code base}. */
+  static File resolve(File base, String path) {
+    File f = new File(path);
+    return (f.isAbsolute() ? f : new File(base, path)).getAbsoluteFile();
+  }
+
+  private static File folder(File f) {
+    if (!f.isDirectory())
+      throw new IllegalArgumentException("No folder " + f);
+    return f;
+  }
+
+  private static boolean same(File a, File b) {
+    try {
+      return a.getCanonicalFile().equals(b.getCanonicalFile());
+    } catch (java.io.IOException e) {
+      return a.getAbsoluteFile().equals(b.getAbsoluteFile());
     }
   }
 

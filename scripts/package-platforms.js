@@ -1,6 +1,7 @@
-// Makes the packages of a release in release/: one VSIX for each platform with a Java runtime in jre/ (the latest
-// Eclipse Temurin 21 JRE of the platform, its SHA-256 checked), and one VSIX without a runtime for the other platforms
-// (it uses the Java of the system). The server and the extension are built once, first.
+// Makes the packages of a release in release/: one VSIX for each platform with a Java runtime in jre/ (the Eclipse
+// Temurin 21 JRE of scripts/jre-lock.json, its SHA-256 checked against the lock), and one VSIX without a runtime for the
+// other platforms (it uses the Java of the system). The server and the extension are built once, first.
+//   node scripts/package-platforms.js --update-jre   writes the newest Temurin 21 JRE release into the lock
 const { execFileSync } = require('child_process');
 const crypto = require('crypto');
 const fs = require('fs');
@@ -33,18 +34,57 @@ function sha256(file) {
   return crypto.createHash('sha256').update(fs.readFileSync(file)).digest('hex');
 }
 
-/** The JRE package of the latest Java release for an operating system and architecture: name, link and checksum. */
-async function jrePackage(osName, arch) {
-  const url = `https://api.adoptium.net/v3/assets/latest/${JAVA}/hotspot?image_type=jre&os=${osName}&architecture=${arch}&vendor=eclipse`;
+/** The pinned JRE: the Temurin release and the SHA-256 of the package of each platform. */
+const LOCK = path.join(__dirname, 'jre-lock.json');
+
+async function json(url) {
   const response = await fetch(url);
   if (!response.ok) {
     throw new Error(`${url}: HTTP ${response.status}`);
   }
-  const [asset] = await response.json();
+  return response.json();
+}
+
+/** The JRE package of the newest Java release for an operating system and architecture: name, link and checksum. */
+async function latestJrePackage(osName, arch) {
+  const [asset] = await json(`https://api.adoptium.net/v3/assets/latest/${JAVA}/hotspot?image_type=jre&os=${osName}&architecture=${arch}&vendor=eclipse`);
   if (!asset) {
     throw new Error(`no Java ${JAVA} runtime for ${osName} ${arch}`);
   }
   return { release: asset.release_name, ...asset.binary.package };
+}
+
+/**
+ * The JRE package of the pinned release (scripts/jre-lock.json) for an operating system and architecture. Its SHA-256
+ * must be the one of the lock, not only the one of the download site.
+ */
+async function jrePackage(osName, arch) {
+  const lock = JSON.parse(fs.readFileSync(LOCK, 'utf8'));
+  const target = Object.keys(TARGETS).find(t => TARGETS[t][0] === osName && TARGETS[t][1] === arch);
+  const pinned = lock.packages[target];
+  if (!pinned) {
+    throw new Error(`${LOCK} has no package for ${target}`);
+  }
+  const release = await json(`https://api.adoptium.net/v3/assets/release_name/eclipse/${encodeURIComponent(pinned.release)}?image_type=jre&os=${osName}&architecture=${arch}&jvm_impl=hotspot`);
+  const binary = (release.binaries || []).find(b => b.image_type === 'jre' && b.os === osName && b.architecture === arch);
+  if (!binary) {
+    throw new Error(`no JRE ${pinned.release} for ${osName} ${arch}`);
+  }
+  if (binary.package.name !== pinned.name || binary.package.checksum !== pinned.sha256) {
+    throw new Error(`${binary.package.name} ${binary.package.checksum} is not the package of ${LOCK}: ${pinned.name} ${pinned.sha256}`);
+  }
+  return { release: pinned.release, ...binary.package };
+}
+
+/** Writes the newest Temurin release of each platform into the lock (the platforms can have different releases). */
+async function updateLock() {
+  const packages = {};
+  for (const [target, [osName, arch]] of Object.entries(TARGETS)) {
+    const pkg = await latestJrePackage(osName, arch);
+    packages[target] = { release: pkg.release, name: pkg.name, sha256: pkg.checksum };
+    console.log(`${target}: ${pkg.release}`);
+  }
+  fs.writeFileSync(LOCK, JSON.stringify({ java: JAVA, packages }, null, 2) + '\n');
 }
 
 async function download(pkg) {
@@ -81,6 +121,10 @@ function unpack(archive, dest = JRE) {
 }
 
 async function main() {
+  if (process.argv.includes('--update-jre')) {
+    await updateLock();
+    return;
+  }
   const only = process.argv.slice(2).filter(a => !a.startsWith('--'));
   const targets = only.length ? only : Object.keys(TARGETS);
   for (const t of targets) {

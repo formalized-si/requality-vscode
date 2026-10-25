@@ -7,8 +7,9 @@
 #   REQUALITY_MCP_PRERELEASE  1: the newest release with an archive, also a pre-release
 #   REQUALITY_MCP_HOME        the installation folder (default: %LOCALAPPDATA%\Programs\requality-mcp)
 #   REQUALITY_MCP_ARCHIVE     a downloaded archive (.zip) to install instead of a download
-# The server keeps its caches and change histories in %USERPROFILE%\.requality-mcp, apart from the installation: an
-# uninstall (removing the installation folder) keeps them.
+#   REQUALITY_MCP_INSECURE    1: install also when the release gives no SHA-256 for the archive
+# When the GitHub CLI (gh) is installed and signed in, the script also verifies the build provenance attestation.
+# The server keeps its caches and change histories in %USERPROFILE%\.requality-mcp, apart from the installation.
 $ErrorActionPreference = 'Stop'
 # the progress bar of Invoke-WebRequest makes a large download very slow in Windows PowerShell 5.1
 $ProgressPreference = 'SilentlyContinue'
@@ -16,8 +17,15 @@ $repo = 'formalized-si/requality-vscode'
 $rqHome = if ($env:REQUALITY_MCP_HOME) { [System.IO.Path]::GetFullPath($env:REQUALITY_MCP_HOME) } else { Join-Path $env:LOCALAPPDATA 'Programs\requality-mcp' }
 $arch = if ($env:PROCESSOR_ARCHITECTURE -eq 'ARM64' -or $env:PROCESSOR_ARCHITEW6432 -eq 'ARM64') { 'arm64' } else { 'x64' }
 $target = "win32-$arch"
+$staging = $null
 $tmp = Join-Path ([System.IO.Path]::GetTempPath()) ("requality-mcp-" + [guid]::NewGuid())
 New-Item -ItemType Directory -Path $tmp | Out-Null
+
+# True when the system code page has all the letters of the path: the Java launcher reads its own folder in it
+function Test-CodePage([string] $path) {
+  $enc = [System.Text.Encoding]::GetEncoding([System.Globalization.CultureInfo]::CurrentCulture.TextInfo.ANSICodePage)
+  return $enc.GetString($enc.GetBytes($path)) -eq $path
+}
 
 function Find-Asset($releases) {
   $releases | ForEach-Object { $_.assets } | Where-Object { $_.name -like "requality-mcp-*-$target.zip" } | Select-Object -First 1
@@ -54,20 +62,47 @@ try {
       $actual = (Get-FileHash -Algorithm SHA256 $archive).Hash.ToLowerInvariant()
       if ($actual -ne $asset.digest.Substring(7)) { throw "The SHA-256 of the archive is $actual, the release gives $($asset.digest)." }
       Write-Host 'SHA-256 is correct.'
+    } elseif ($env:REQUALITY_MCP_INSECURE -eq '1') {
+      Write-Warning 'The release gives no SHA-256 for the archive; it is not checked (REQUALITY_MCP_INSECURE=1).'
     } else {
-      Write-Warning 'The release gives no SHA-256 for the archive; it is not checked.'
+      throw 'The release gives no SHA-256 for the archive. Set REQUALITY_MCP_INSECURE=1 to install it without the check.'
+    }
+    # the build provenance attestation of the release workflow, when the GitHub CLI can check it
+    if (Get-Command gh -ErrorAction SilentlyContinue) {
+      & gh auth status *> $null
+      if ($LASTEXITCODE -eq 0) {
+        & gh attestation verify $archive -R $repo *> $null
+        if ($LASTEXITCODE -ne 0) { throw "The archive has no valid build provenance attestation of $repo." }
+        Write-Host 'Build provenance attestation is correct.'
+      }
     }
   }
-  $x = Join-Path $tmp 'x'
-  Expand-Archive -Path $archive -DestinationPath $x
-  $dir = Get-ChildItem -Directory $x | Where-Object { $_.Name -like 'requality-mcp-*' } | Select-Object -First 1
+  New-Item -ItemType Directory -Force -Path $rqHome | Out-Null
+  if (-not (Test-CodePage $rqHome)) {
+    # the launcher uses the short (8.3) name of the folder, when the volume has short names
+    $short = (New-Object -ComObject Scripting.FileSystemObject).GetFolder($rqHome).ShortPath
+    if (-not (Test-CodePage $short)) {
+      Write-Warning ("The Java runtime cannot start from a folder with letters outside the code page of the system: $rqHome. " +
+        'If the server does not start, set REQUALITY_MCP_HOME to another folder, for example C:\requality-mcp.')
+    }
+  }
+  # the new version is unpacked and started in the installation folder
+  $staging = Join-Path $rqHome ('.staging-' + [guid]::NewGuid())
+  Expand-Archive -Path $archive -DestinationPath $staging
+  $dir = Get-ChildItem -Directory $staging | Where-Object { $_.Name -like 'requality-mcp-*' } | Select-Object -First 1
   if (-not $dir) { throw 'The archive has no requality-mcp folder.' }
   $name = $dir.Name
   # the new version must start before it replaces the installed one
   $version = & cmd /c "`"$($dir.FullName)\bin\requality-mcp.cmd`" --version"
-  if ($LASTEXITCODE -ne 0) { throw "$name does not start (it needs Java 17 or later when it has no jre\)." }
-  New-Item -ItemType Directory -Force -Path $rqHome | Out-Null
+  if ($LASTEXITCODE -ne 0) {
+    throw "$name does not start. It needs Java 17 or later when it has no jre\, and a folder whose name has only letters of the code page of the system."
+  }
+  # the marker of a folder this script installed: only such folders are replaced and removed
+  Set-Content -Path (Join-Path $dir.FullName '.requality-mcp-install') -Value $version -Encoding ASCII
   $dest = Join-Path $rqHome $name
+  if ((Test-Path $dest) -and -not (Test-Path (Join-Path $dest '.requality-mcp-install'))) {
+    throw "$dest exists and is not an installation of this script."
+  }
   $staged = "$dest.new"
   if (Test-Path $staged) { Remove-Item -Recurse -Force $staged }
   Move-Item $dir.FullName $staged
@@ -85,15 +120,17 @@ try {
   # file is ASCII also when the folder name is not
   $cmd = Join-Path $rqHome 'requality-mcp.cmd'
   Set-Content -Path $cmd -Encoding ASCII -Value "@echo off`r`n`"%~dp0$name\bin\requality-mcp.cmd`" %*`r`nexit /b %ERRORLEVEL%"
-  # the other versions go, when no server runs them
-  Get-ChildItem -Directory $rqHome | Where-Object { $_.Name -like 'requality-mcp-*' -and $_.Name -ne $name } |
-    ForEach-Object { Remove-Item -Recurse -Force $_.FullName -ErrorAction SilentlyContinue }
+  # the other versions this script installed go, when no server runs them
+  Get-ChildItem -Directory $rqHome | Where-Object {
+    $_.Name -like 'requality-mcp-*' -and $_.Name -ne $name -and (Test-Path (Join-Path $_.FullName '.requality-mcp-install'))
+  } | ForEach-Object { Remove-Item -Recurse -Force $_.FullName -ErrorAction SilentlyContinue }
   Write-Host "Installed $version in $dest."
   Write-Host "Command: $cmd"
   Write-Host ''
   Write-Host 'Connect Claude Code (the folder contains your Requality catalogs; a .cmd command starts through cmd /c):'
   Write-Host "  claude mcp add requality -- cmd /c `"$cmd`" C:\path\to\catalogs"
-  Write-Host "Uninstall: Remove-Item -Recurse `"$rqHome`""
+  Write-Host "Uninstall: Remove-Item -Recurse `"$dest`", `"$cmd`""
 } finally {
   Remove-Item -Recurse -Force $tmp -ErrorAction SilentlyContinue
+  if ($staging) { Remove-Item -Recurse -Force $staging -ErrorAction SilentlyContinue }
 }

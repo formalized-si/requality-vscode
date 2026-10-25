@@ -1,0 +1,35 @@
+{
+  "java": 21,
+  "packages": {
+    "win32-x64": {
+      "release": "jdk-21.0.12.1+1",
+      "name": "OpenJDK21U-jre_x64_windows_hotspot_21.0.12.1_1.zip",
+      "sha256": "d35f31e712f0fcf6ac5a093edc90204fbff22f720ba3950bd09d331d5e621636"
+    },
+    "win32-arm64": {
+      "release": "jdk-21.0.12.1+1",
+      "name": "OpenJDK21U-jre_aarch64_windows_hotspot_21.0.12.1_1.zip",
+      "sha256": "e82cc17e0bf89a25b0b0ed106d072f2ea420587d0a6870534b71b1dce3ae28c3"
+    },
+    "linux-x64": {
+      "release": "jdk-21.0.13+9",
+      "name": "OpenJDK21U-jre_x64_linux_hotspot_21.0.13_9.tar.gz",
+      "sha256": "a535a1df9c6284d9618872984e026ae0352d1f7e9e0605425c0e6114f47351dd"
+    },
+    "linux-arm64": {
+      "release": "jdk-21.0.13+9",
+      "name": "OpenJDK21U-jre_aarch64_linux_hotspot_21.0.13_9.tar.gz",
+      "sha256": "b1734db7ade49c3f6acc6ae06233b8c2dd90e3e2f00f67000ae1c972aaa64d8c"
+    },
+    "darwin-x64": {
+      "release": "jdk-21.0.13+9",
+      "name": "OpenJDK21U-jre_x64_mac_hotspot_21.0.13_9.tar.gz",
+      "sha256": "c909674b1c10c261b9a3fb7e9c0efebd303e33f88a4fe84be7135b5e2d711f89"
+    },
+    "darwin-arm64": {
+      "release": "jdk-21.0.13+9",
+      "name": "OpenJDK21U-jre_aarch64_mac_hotspot_21.0.13_9.tar.gz",
+      "sha256": "225bab0a09491ef06835488cd942f5d2befa9a0410a2484f0c8bbcf7506ec09a"
+    }
+  }
+}

@@ -70,19 +70,13 @@ final class Coverage {
         if (r.getWorkChildren(TestPurpose.TYPE_NAME).isEmpty())
           noTests.add(item(r));
       }
-      Map<String, ReferenceValue[]> links = RelManager.getLinksOrErrors(r, false);
-      if (links != null)
-        for (Map.Entry<String, ReferenceValue[]> e : links.entrySet()) {
-          if (e.getKey().startsWith("_") || e.getValue() == null)
-            continue;
-          for (ReferenceValue rv : e.getValue())
-            if (rv != null && rv.hasErrorsOnResolve(r.attrs())) {
-              JsonObject b = item(r);
-              b.addProperty("attribute", e.getKey());
-              b.addProperty("ref", rv.getRaw());
-              broken.add(b);
-            }
-        }
+      // a reference that resolves to no node (an error of the path, or a deleted target)
+      for (com.google.gson.JsonElement x : Core.brokenLinks(r)) {
+        JsonObject b = item(r);
+        b.add("attribute", x.getAsJsonObject().get("attribute"));
+        b.add("ref", x.getAsJsonObject().get("ref"));
+        broken.add(b);
+      }
       if (refresh)
         r.updateCheckerProblems();
       IMark[] marks = r.getCheckerProblems();

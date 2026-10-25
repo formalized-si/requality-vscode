@@ -63,12 +63,26 @@ final class Session {
     History h = history(db);
     History.Capture capture = new History.Capture(h.blobs());
     JsonArray ops = Core.transaction(db, label, true, true, capture, body);
-    JsonObject e = h.add(db.getSemiProjectName(), tool, label, summary, ops, capture, reverts);
+    JsonObject e;
+    try {
+      e = h.add(db.getSemiProjectName(), tool, label, summary, ops, capture, reverts);
+    } catch (RuntimeException x) {
+      // the change is made: the agent must not make it again
+      synchronized (steps) {
+        steps.add(new Object[] { capture.transaction, h, 0 });
+      }
+      throw new ToolError("The change was made, but the history could not record it (" + Core.message(x) + "). Do not "
+          + "repeat the call; undo takes the change back in this session");
+    }
     synchronized (steps) {
       steps.add(new Object[] { capture.transaction, h, e.get("change").getAsInt() });
       while (steps.size() > STEPS)
         steps.remove(0);
     }
+    if (!capture.unsaved.isEmpty())
+      throw new ToolError("Change " + e.get("change").getAsInt() + " was made in the project, but the catalog files differ "
+          + "from it: " + String.join("; ", capture.unsaved) + ". Load the project again with open_project and check these "
+          + "nodes; revert_change " + e.get("change").getAsInt() + " takes the change back");
     return e;
   }
 
@@ -108,13 +122,14 @@ final class Session {
       throw new ToolError((undo ? "Undo" : "Redo") + " of change " + n + " failed (see server_messages)");
     JsonObject e = h.entry(n);
     // the nodes the undo or redo brought back: the links to them are indexed again
-    JsonObject states = h.states(n);
+    JsonObject states = n > 0 ? h.states(n) : null;
     if (states != null && e != null)
       History.relink(core.db(e.get("project").getAsString()), uuids(states));
-    h.setState(n, undo ? "undone" : "done");
-    // the undo of a revert brings the reverted change back, its redo reverts it again
-    if (e != null && e.has("reverts"))
-      h.setState(e.get("reverts").getAsInt(), undo ? "done" : "reverted");
+    if (e != null) {
+      h.setState(n, undo ? "undone" : "done");
+      // the undo of a revert brings the reverted change back, its redo reverts it again
+      propagate(h, e);
+    }
     JsonObject o = new JsonObject();
     o.addProperty(undo ? "undone" : "redone", n);
     o.addProperty("project", e != null ? e.get("project").getAsString() : null);
@@ -179,14 +194,28 @@ final class Session {
         String summary = "Revert of change " + n + (e.has("summary") ? ": " + e.get("summary").getAsString() : "");
         JsonObject entry = change(db, "revert_change", label, summary, body, n);
         History.relink(db, uuids(states));
-        h.setState(n, "reverted");
-        // a revert of a revert brings the first change back
-        if (e.has("reverts"))
-          h.setState(e.get("reverts").getAsInt(), "done");
+        // the reverted change, and the change a reverted revert reverts (a chain)
+        propagate(h, entry);
         r.addProperty("change", entry.get("change").getAsInt());
       }
       r.add("nodes", plan[0]);
       return r;
+    }
+  }
+
+  /**
+   * The state of the changes a revert reverts: while the revert is done, the change it reverts is "reverted"; else it is
+   * done again. A change that is a revert decides the state of the change it reverts in turn.
+   */
+  private static void propagate(History h, JsonObject e) {
+    for (int guard = 0; e != null && e.has("reverts") && guard < 1000; guard++) {
+      JsonObject target = h.entry(e.get("reverts").getAsInt());
+      if (target == null)
+        return;
+      String want = "done".equals(e.get("state").getAsString()) ? "reverted" : "done";
+      if (!want.equals(target.get("state").getAsString()))
+        h.setState(target.get("change").getAsInt(), want);
+      e = target;
     }
   }
 
@@ -220,12 +249,42 @@ final class Session {
     JsonObject o = new JsonObject();
     o.addProperty("op", what);
     TreeNode n = db.getNode(u);
-    if (n != null && !n.isDisposed())
+    if (n != null && !n.isDisposed()) {
       o.addProperty("path", n.getQualifiedId());
-    else if (state != null)
+      o.addProperty("type", n.getType());
+      if (n instanceof com.unitesk.requality.nodetype.Location) {
+        // a location is known by its text and its document, not by its UUID
+        String d = n.getDescription();
+        if (d != null)
+          o.addProperty("text", Core.text(d).replaceAll("\\s+", " "));
+        TreeNode doc = n.getWorkParent();
+        if (doc != null)
+          o.addProperty("document", doc.getQualifiedId());
+      }
+    } else if (state != null) {
       o.addProperty("id", state.get("id").getAsString());
+      String type = attribute(state, "_type");
+      if (type != null)
+        o.addProperty("type", type);
+      String d = attribute(state, "_description");
+      if ("Location".equals(type) && d != null)
+        o.addProperty("text", Core.text(d).replaceAll("\\s+", " "));
+      TreeNode parent = state.has("parent") ? db.getNode(UUID.fromString(state.get("parent").getAsString())) : null;
+      if (parent != null && !parent.isDisposed())
+        o.addProperty("parent", parent.getQualifiedId());
+    }
     o.addProperty("uuid", u.toString());
     return o;
+  }
+
+  /** The value of a plain attribute of a saved state, or null. */
+  private static String attribute(JsonObject state, String key) {
+    try {
+      JsonElement v = state.getAsJsonObject("attributes").getAsJsonObject(key).getAsJsonObject("value").get("value");
+      return v != null && v.isJsonPrimitive() ? v.getAsString() : null;
+    } catch (RuntimeException e) {
+      return null;
+    }
   }
 
   // ---- review

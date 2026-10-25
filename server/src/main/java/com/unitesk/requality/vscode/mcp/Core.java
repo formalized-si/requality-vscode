@@ -129,13 +129,61 @@ final class Core {
     throw new ToolError("No project " + name + ". Projects: " + names);
   }
 
+  /**
+   * True when the catalog of a project has the format of an older Requality: the conversion question was cancelled in
+   * this session, or the project is closed (a cancelled conversion closes it) and its format is old.
+   */
+  boolean needsConversion(Workspace.Project p) {
+    if (headless.needsConversion(p.localName))
+      return true;
+    // a conversion closes the project for a moment: an allowed conversion is no need
+    if (headless.conversionAllowed(p.localName) || headless.converted(p.localName))
+      return false;
+    try {
+      return p.closed && !com.unitesk.requality.core.storage.IResTracker.storedVersionCorrect(p.dir.toURI());
+    } catch (RuntimeException e) {
+      return false;
+    }
+  }
+
+  /** The time each project was used last (by its local name). */
+  private final Map<String, Long> lastUse = new java.util.concurrent.ConcurrentHashMap<>();
+
+  /**
+   * Releases the catalogs of the ready projects that no tool used for {@code idleMs} (another session or VS Code can
+   * open them); a later call loads such a project again.
+   */
+  void releaseIdle(long idleMs) {
+    long now = System.currentTimeMillis();
+    for (Workspace.Project p : workspace().projects()) {
+      if (!p.requality || p.closed || p.released || p.loading || p.error != null)
+        continue;
+      TreeDB db = Nodes.findDB(p.localName);
+      if (db == null || !Nodes.isReady(db))
+        continue;
+      if (now - lastUse.getOrDefault(p.localName, 0L) >= idleMs) {
+        System.err.println("[mcp] releases the idle catalog " + p.dir);
+        workspace().releaseProject(p.dir);
+        // the release runs on the loader thread: it ends before a tool can start
+        long end = System.currentTimeMillis() + LOAD_WAIT_MS;
+        while (!p.released && System.currentTimeMillis() < end)
+          sleep(50);
+      }
+    }
+  }
+
   /** The tree of a project, after its loading ended (waits for it). */
   TreeDB db(String projectName) {
     Workspace.Project p = project(projectName);
+    lastUse.put(p.localName, System.currentTimeMillis());
+    // a catalog released when idle loads again (another process may hold it now: then the project tells it); until the
+    // load starts, the project stays released and the loop below waits
+    if (p.released)
+      workspace().loadProject(p.dir);
     long end = System.currentTimeMillis() + LOAD_WAIT_MS;
     long closedSince = 0;
     while (true) {
-      if (headless.needsConversion(p.localName))
+      if (needsConversion(p))
         throw new ToolError("Project " + projectName + " has the catalog format of an older Requality. Convert it with "
             + "convert_project (it makes a backup first), or start requality-mcp with --convert");
       // a format conversion closes the project and opens it again: a converted project is closed when it stays so
@@ -238,12 +286,66 @@ final class Core {
       return r;
     } finally {
       if (open)
+        rollback(db);
+    }
+  }
+
+  /**
+   * Rolls back the open transaction. The link index of the core follows the changes of a transaction as they are made
+   * and does not follow a rollback: the links of the nodes it touched, and the links to them, are indexed again.
+   */
+  private static void rollback(TreeDB db) {
+    java.util.Set<UUID> touched = java.util.Collections.emptySet();
+    // The rollback of the core writes the inverse of each operation to the files: the state the server loaded. A file
+    // that changed on disk meanwhile (git pull, another editor) is kept as it is.
+    Map<java.io.File, byte[]> external = new java.util.HashMap<>();
+    List<java.io.File> missing = new ArrayList<>();
+    if (db.getStorage() instanceof com.unitesk.requality.core.transaction.TransactionStorage) {
+      com.unitesk.requality.core.transaction.TransactionStorage ts = (com.unitesk.requality.core.transaction.TransactionStorage) db
+          .getStorage();
+      touched = ts.getTouchedNodes();
+      com.unitesk.requality.core.storage.ITreeStorage base = ts.getStorage();
+      for (UUID u : touched)
         try {
-          db.rollback();
-        } catch (RuntimeException e) {
-          // the exception of the body tells what failed
+          JsonObject st = History.state(base, u, null);
+          if (st == null || History.onDisk(base, u, st))
+            continue;
+          java.io.File f = base.getJSONResource(u, com.unitesk.requality.core.lock.LockType.NO_LOCK);
+          if (f == null)
+            continue;
+          if (f.isFile())
+            external.put(f, java.nio.file.Files.readAllBytes(f.toPath()));
+          else
+            missing.add(f);
+        } catch (Exception e) {
           e.printStackTrace(System.err);
         }
+    }
+    try {
+      db.rollback();
+    } catch (RuntimeException e) {
+      // the exception of the body tells what failed
+      e.printStackTrace(System.err);
+      return;
+    } finally {
+      for (Map.Entry<java.io.File, byte[]> e : external.entrySet())
+        try {
+          java.nio.file.Files.write(e.getKey().toPath(), e.getValue());
+        } catch (java.io.IOException x) {
+          x.printStackTrace(System.err);
+        }
+      for (java.io.File f : missing)
+        f.delete();
+    }
+    try {
+      for (UUID u : touched) {
+        TreeNode n = db.getNode(u);
+        if (n != null && !n.isDisposed())
+          db.getLinkResolver().initCache(n, true);
+      }
+      History.relink(db, touched);
+    } catch (RuntimeException e) {
+      e.printStackTrace(System.err);
     }
   }
 
@@ -399,6 +501,36 @@ final class Core {
         o.add(e.getKey(), arr);
     }
     return o;
+  }
+
+  /**
+   * The links of a node that resolve to no node (a deleted target, a wrong path): attribute and reference. The
+   * locations of a requirement are not links.
+   */
+  static JsonArray brokenLinks(TreeNode n) {
+    JsonArray out = new JsonArray();
+    for (String k : n.attrs().getLocalAttributeKeys()) {
+      if (k.startsWith("_"))
+        continue;
+      Attribute a = n.attrs().getAttribute(k);
+      if (a == null || !a.isReference() || a.getValue() == null)
+        continue;
+      for (ReferenceValue rv : History.references(a.getValue())) {
+        TreeNode[] targets;
+        try {
+          targets = rv.getNodes(n.attrs());
+        } catch (RuntimeException e) {
+          targets = null;
+        }
+        if (targets == null || targets.length == 0) {
+          JsonObject o = new JsonObject();
+          o.addProperty("attribute", k);
+          o.addProperty("ref", rv.getRaw());
+          out.add(o);
+        }
+      }
+    }
+    return out;
   }
 
   static JsonObject problem(IMark m, TreeNode where) {

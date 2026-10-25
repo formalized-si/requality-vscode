@@ -48,6 +48,8 @@ final class DocumentText {
     final int heading;
     int covered;
     final Set<Location> locations = new LinkedHashSet<>();
+    /** The sentences that no location covers (90% of their characters at least). */
+    final List<String> uncovered = new ArrayList<>();
 
     Paragraph(int index, int start, int end, String text, int heading) {
       this.index = index;
@@ -62,11 +64,11 @@ final class DocumentText {
       return text.replaceAll("\\s", "").length();
     }
 
+    /** none: no location covers the paragraph; full: locations cover each of its sentences; else partial. */
     String coverage() {
-      int w = weight();
-      if (covered == 0 || w == 0)
+      if (covered == 0 || weight() == 0)
         return "none";
-      return covered * 10 >= w * 9 ? "full" : "partial";
+      return uncovered.isEmpty() ? "full" : "partial";
     }
   }
 
@@ -162,6 +164,25 @@ final class DocumentText {
         }
     for (Paragraph p : dt.paragraphs)
       p.covered = Math.min(p.covered, p.weight());
+    // the coverage of each sentence: a paragraph is covered when each of its sentences is
+    boolean[] mask = new boolean[dt.text.length()];
+    for (Location l : dt.locations)
+      for (int[] f : fragments(l))
+        for (int i = Math.max(0, f[0]); i < Math.min(mask.length, f[1]); i++)
+          mask[i] = true;
+    for (SpecUpdate.Sentence st : SpecUpdate.sentences(dt)) {
+      int weight = 0;
+      int covered = 0;
+      for (int i = st.start; i < st.end; i++) {
+        if (Character.isWhitespace(dt.text.charAt(i)) || dt.text.charAt(i) == '\u00a0')
+          continue;
+        weight++;
+        if (mask[i])
+          covered++;
+      }
+      if (weight > 0 && covered * 10 < weight * 9)
+        dt.paragraphs.get(st.p).uncovered.add(st.text);
+    }
     return dt;
   }
 
@@ -225,6 +246,11 @@ final class DocumentText {
       o.addProperty("heading", p.heading);
     o.addProperty("coverage", p.coverage());
     o.addProperty("text", p.text);
+    if ("partial".equals(p.coverage())) {
+      JsonArray u = new JsonArray();
+      p.uncovered.forEach(u::add);
+      o.add("uncovered_text", u);
+    }
     if (!p.locations.isEmpty()) {
       JsonArray reqs = new JsonArray();
       Set<String> seen = new HashSet<>();

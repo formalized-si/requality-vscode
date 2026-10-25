@@ -141,6 +141,11 @@ public final class HeadlessClient implements AutoCloseable {
     conversionAllowed.add(folderName);
   }
 
+  /** True when the conversion of the catalog in the folder of this name is allowed (convert_project or --convert). */
+  public boolean conversionAllowed(String folderName) {
+    return convertAll || conversionAllowed.contains(folderName);
+  }
+
   /** True when this client confirmed the conversion of the catalog in the folder of this name. */
   public boolean converted(String folderName) {
     return converted.contains(folderName);
@@ -207,8 +212,13 @@ public final class HeadlessClient implements AutoCloseable {
     return call("initialize", p).getAsJsonObject();
   }
 
+  private final java.util.concurrent.atomic.AtomicBoolean closed = new java.util.concurrent.atomic.AtomicBoolean();
+
   @Override
   public void close() {
+    // the end of the input and the shutdown hook both close
+    if (!closed.compareAndSet(false, true))
+      return;
     try {
       // the core closes the catalogs and releases their locks; a stuck shutdown does not keep the process
       client.request("shutdown", null).get(30, java.util.concurrent.TimeUnit.SECONDS);

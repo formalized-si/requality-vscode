@@ -35,8 +35,11 @@ final class SpecUpdate {
   }
 
   /** The least similarity of a changed sentence; a suggestion for a lost text needs SUGGEST. */
-  static final double MOVE = 0.6;
+  static final double MOVE = 0.7;
   static final double SUGGEST = 0.5;
+  /** A marked text with fewer content words is found again only in a paragraph like its old one. */
+  static final int SHORT = 3;
+  static final double CONTEXT = 0.5;
   private static final int FLAGS = Pattern.CASE_INSENSITIVE | Pattern.UNICODE_CASE | Pattern.UNICODE_CHARACTER_CLASS;
   /** A requirement statement, in English or Russian. */
   static final Pattern STATEMENT = Pattern.compile("\\b(shall|must|should|required|requires|will|mandatory|"
@@ -166,8 +169,17 @@ final class SpecUpdate {
     return bestS == null ? null : new Object[] { bestS, score };
   }
 
-  /** The exact occurrence of a text (white space aside) nearest to the relative position, or null. */
-  private static int[] exact(DocumentText dt, String text, double relative) {
+  /** A text with all white space as single spaces, for comparisons. */
+  static String plain(String s) {
+    return s.replaceAll("[\\s\\u00a0]+", " ").trim();
+  }
+
+  /**
+   * The occurrence of a text (white space aside, whole words) in the new version: of several, the one in the paragraph
+   * most like the old paragraph of the text, then the nearest to its relative position. A short text (a number, a
+   * word) counts only in a paragraph like its old one. Null when there is none.
+   */
+  private static int[] exact(DocumentText dt, String text, String oldParagraph, double relative) {
     StringBuilder re = new StringBuilder();
     for (String w : text.trim().split("[\\s\\u00a0]+")) {
       if (w.isEmpty())
@@ -178,17 +190,44 @@ final class SpecUpdate {
     }
     if (re.length() == 0)
       return null;
+    // whole words: "5" is not the end of "2025" (the text of the blocks has no separator between them: the start and
+    // the end of a paragraph are the ends of a word too)
+    String t = text.trim();
+    boolean wordStart = Character.isLetterOrDigit(t.charAt(0));
+    boolean wordEnd = Character.isLetterOrDigit(t.charAt(t.length() - 1));
     Matcher m = Pattern.compile(re.toString()).matcher(dt.text);
     int[] best = null;
+    double bestContext = -1;
     double dist = Double.MAX_VALUE;
     while (m.find()) {
+      DocumentText.Paragraph p = dt.paragraphAt(m.start());
+      if (wordStart && m.start() > 0 && Character.isLetterOrDigit(dt.text.charAt(m.start() - 1))
+          && !(p != null && dt.text.substring(p.start, m.start()).isBlank()))
+        continue;
+      DocumentText.Paragraph q = dt.paragraphAt(m.end() - 1);
+      if (wordEnd && m.end() < dt.text.length() && Character.isLetterOrDigit(dt.text.charAt(m.end()))
+          && !(q != null && dt.text.substring(m.end(), q.end).isBlank()))
+        continue;
+      double context = p == null ? 0 : plain(p.text).equals(oldParagraph) ? 2 : similarity(oldParagraph, p.text);
       double d = Math.abs((double) m.start() / Math.max(1, dt.text.length()) - relative);
-      if (d < dist) {
+      if (context > bestContext || context == bestContext && d < dist) {
+        bestContext = context;
         dist = d;
         best = new int[] { m.start(), m.end() };
       }
     }
+    if (best != null && words(text).size() < SHORT && bestContext < CONTEXT)
+      return null;
     return best;
+  }
+
+  /** The sentences of a paragraph, as plain texts. */
+  private static List<String> sentencesOf(List<Sentence> all, int p) {
+    List<String> out = new ArrayList<>();
+    for (Sentence s : all)
+      if (s.p == p)
+        out.add(plain(s.text));
+    return out;
   }
 
   /** The plan for one location of the old document. */
@@ -203,6 +242,9 @@ final class SpecUpdate {
     int lost;
     boolean modalityChanged;
     boolean numbersChanged;
+    /** The sentences that came into and went out of the paragraphs of a text that stayed the same. */
+    final Set<String> added = new java.util.LinkedHashSet<>();
+    final Set<String> removed = new java.util.LinkedHashSet<>();
     JsonArray suggestions = new JsonArray();
     Location created;
 
@@ -213,7 +255,7 @@ final class SpecUpdate {
     String status() {
       if (newRanges.isEmpty())
         return "lost";
-      return lost == 0 && exact == oldTexts.size() ? "unchanged" : "changed";
+      return lost == 0 && exact == oldTexts.size() && added.isEmpty() && removed.isEmpty() ? "unchanged" : "changed";
     }
   }
 
@@ -233,6 +275,7 @@ final class SpecUpdate {
       throw new ToolError(oldDoc.getQualifiedId() + " has no locations: nothing to move. Import the new version with "
           + "import_document");
     List<Sentence> sentences = sentences(newT);
+    List<Sentence> oldSentences = sentences(oldT);
     List<Move> moves = new ArrayList<>();
     boolean owned = false;
     for (Location l : oldT.locations) {
@@ -250,11 +293,25 @@ final class SpecUpdate {
         if (text.isEmpty())
           continue;
         mv.oldTexts.add(text);
-        int[] ex = exact(newT, text, (double) f[0] / Math.max(1, oldT.text.length()));
+        DocumentText.Paragraph oldP = oldT.paragraphAt(f[0]);
+        String oldPara = oldP == null ? text : plain(oldP.text);
+        int[] ex = exact(newT, text, oldPara, (double) f[0] / Math.max(1, oldT.text.length()));
         if (ex != null) {
           mv.exact++;
           mv.newRanges.add(ex);
-          mv.newTexts.add(newT.text.substring(ex[0], ex[1]).replaceAll("[\\s\\u00a0]+", " ").trim());
+          mv.newTexts.add(plain(newT.text.substring(ex[0], ex[1])));
+          // the same text in a changed paragraph: the sentences around it can change its meaning
+          DocumentText.Paragraph newP = newT.paragraphAt(ex[0]);
+          if (oldP != null && newP != null && !plain(newP.text).equals(oldPara)) {
+            List<String> before = sentencesOf(oldSentences, oldP.index);
+            List<String> after = sentencesOf(sentences, newP.index);
+            for (String x : after)
+              if (!before.contains(x))
+                mv.added.add(x);
+            for (String x : before)
+              if (!after.contains(x))
+                mv.removed.add(x);
+          }
           continue;
         }
         Object[] b = best(newT, sentences, text);
@@ -268,13 +325,20 @@ final class SpecUpdate {
           mv.numbersChanged |= !numbers(text).equals(numbers(s.text));
         } else {
           mv.lost++;
-          // a suggestion is a statement of the new version like the lost text
-          if (b != null && sc >= SUGGEST && STATEMENT.matcher(((Sentence) b[0]).text).find()) {
-            Sentence s = (Sentence) b[0];
+          // the sentences of the new version most like the lost text: where it can be in other words
+          List<Object[]> scored = new ArrayList<>();
+          for (Sentence s : sentences) {
+            double x = similarity(text, s.text);
+            if (x >= SUGGEST)
+              scored.add(new Object[] { s, x });
+          }
+          scored.sort((x, y) -> Double.compare((double) y[1], (double) x[1]));
+          for (Object[] x : scored.subList(0, Math.min(3, scored.size()))) {
+            Sentence s = (Sentence) x[0];
             JsonObject sug = new JsonObject();
             sug.addProperty("p", s.p);
             sug.addProperty("quote", s.text);
-            sug.addProperty("similarity", Math.round(sc * 100) / 100.0);
+            sug.addProperty("similarity", Math.round((double) x[1] * 100) / 100.0);
             mv.suggestions.add(sug);
           }
         }
@@ -368,11 +432,24 @@ final class SpecUpdate {
           lo.addProperty("new_location", mv.created.getSUUId());
           lo.addProperty("new_text", String.join(" … ", new java.util.LinkedHashSet<>(mv.newTexts)));
           if ("changed".equals(mv.status())) {
-            lo.addProperty("similarity", Math.round(mv.similarity * 100) / 100.0);
+            if (mv.exact == mv.oldTexts.size() && mv.lost == 0)
+              lo.addProperty("text_same", true);
+            else
+              lo.addProperty("similarity", Math.round(mv.similarity * 100) / 100.0);
             if (mv.modalityChanged)
               lo.addProperty("modality_changed", true);
             if (mv.numbersChanged)
               lo.addProperty("numbers_changed", true);
+            if (!mv.added.isEmpty()) {
+              JsonArray x = new JsonArray();
+              mv.added.forEach(x::add);
+              lo.add("paragraph_added", x);
+            }
+            if (!mv.removed.isEmpty()) {
+              JsonArray x = new JsonArray();
+              mv.removed.forEach(x::add);
+              lo.add("paragraph_removed", x);
+            }
           }
         }
         if (mv.suggestions.size() > 0)
@@ -398,11 +475,15 @@ final class SpecUpdate {
         if (s.equals(reqs.get(i).getAsJsonObject().get("status").getAsString()))
           sorted.add(reqs.get(i));
     o.add("requirements", sorted);
-    // the statements of the new version that no requirement marks now: candidates for new requirements
+    // the sentences of the new version that the old one does not have and no requirement marks now: candidates for
+    // new requirements (statement: with a word of a requirement, such as shall or must)
+    Set<String> old = new HashSet<>();
+    for (Sentence s : oldSentences)
+      old.add(plain(s.text));
     DocumentText after = DocumentText.of(newDoc);
     JsonArray fresh = new JsonArray();
     for (Sentence s : sentences(after)) {
-      if (!STATEMENT.matcher(s.text).find())
+      if (old.contains(plain(s.text)))
         continue;
       boolean covered = false;
       for (Location l : after.locations)
@@ -412,14 +493,15 @@ final class SpecUpdate {
         JsonObject n = new JsonObject();
         n.addProperty("p", s.p);
         n.addProperty("quote", s.text);
+        n.addProperty("statement", STATEMENT.matcher(s.text).find());
         fresh.add(n);
       }
     }
-    o.add("uncovered_statements", fresh);
+    o.add("new_sentences", fresh);
     o.addProperty("note", (detachOld ? "The requirements have no locations in the old document now; the document stays. "
         : "The requirements keep their locations in the old document too (detach_old false). ")
-        + "Check the changed requirements (modality_changed and numbers_changed first), fix the lost ones, and add the "
-        + "uncovered statements with apply_changes.");
+        + "Check the changed requirements (modality_changed, numbers_changed and the paragraph changes first), fix the lost "
+        + "ones, and add requirements for the new sentences that are requirements, with apply_changes.");
     return o;
   }
 }

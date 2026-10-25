@@ -58,6 +58,8 @@ public final class Workspace {
      * Eclipse.
      */
     public volatile boolean loading;
+    /** The tree is stopped and the catalog released for another process (the MCP server does it when idle). */
+    public volatile boolean released;
 
     Project(File dir) {
       this(dir, true);
@@ -500,6 +502,27 @@ public final class Workspace {
     locks.releaseAll();
   }
 
+  /** The projects whose catalog lock a thread waits for. */
+  private final java.util.Set<String> lockWaits = java.util.concurrent.ConcurrentHashMap.newKeySet();
+
+  /** Waits a while for the lock of a catalog another process holds, then loads the project (once the lock is held). */
+  private void awaitLock(Project p) {
+    if (!lockWaits.add(p.localName))
+      return;
+    Thread t = new Thread(() -> {
+      try {
+        if (locks.acquire(p.dir))
+          run(() -> load(p));
+      } catch (IOException e) {
+        RLogger.logError(e);
+      } finally {
+        lockWaits.remove(p.localName);
+      }
+    }, "requality-catalog-lock-" + p.localName);
+    t.setDaemon(true);
+    t.start();
+  }
+
   /**
    * Takes the lock of a catalog this server is about to create: the tracker loads a catalog it creates itself, without
    * {@link #load}. False when another process holds it.
@@ -511,6 +534,45 @@ public final class Workspace {
   /** Releases the lock of {@link #lock} (the catalog was not created). */
   public void unlock(File dir) {
     locks.release(dir);
+  }
+
+  /**
+   * Loads a loaded project again from its files (on the loader thread): its tree is stopped and loaded. False when the
+   * folder is not a project of the workspace.
+   */
+  public boolean reloadProject(File dir) {
+    Project p;
+    synchronized (this) {
+      p = null;
+      for (Project x : projects.values())
+        if (x.dir.getAbsoluteFile().equals(dir.getAbsoluteFile()))
+          p = x;
+    }
+    if (p == null)
+      return false;
+    Project fp = p;
+    fp.loading = true;
+    run(() -> {
+      unload(fp);
+      fp.loading = false;
+      load(fp);
+    });
+    return true;
+  }
+
+  /**
+   * Stops the tree of a project and releases its catalog for another process; the project stays in the workspace (not
+   * closed). {@link #loadProject} loads it again.
+   */
+  public void releaseProject(File dir) {
+    Project p = byDir(dir);
+    if (p == null || p.closed || !p.requality)
+      return;
+    run(() -> {
+      unload(p);
+      p.released = true;
+      changed();
+    });
   }
 
   /** (Re)loads the workspace project in a folder (on the loader thread); false when the folder is not a project. */
@@ -550,10 +612,13 @@ public final class Workspace {
     }
     // a new load clears the error of the last one (a lock that another process held, for example)
     p.error = null;
+    p.released = false;
     try {
-      if (!locks.acquire(p.dir)) {
+      if (!locks.tryAcquire(p.dir)) {
         p.error = LOCKED + " (VS Code or requality-mcp): " + p.dir;
         changed();
+        // the wait for the other process runs apart: the other catalogs load meanwhile
+        awaitLock(p);
         return;
       }
     } catch (IOException e) {
@@ -643,6 +708,8 @@ public final class Workspace {
       String state;
       if (p.closed) {
         state = "closed";
+      } else if (p.released) {
+        state = "released";
       } else if (p.error != null || isBroken(p.dir)) {
         state = "broken";
       } else if (db == null || t == null) {

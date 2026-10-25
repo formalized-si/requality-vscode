@@ -73,6 +73,69 @@ final class Policy {
     return file(path, "document", DOCUMENT_TYPES);
   }
 
+  /** The HTML documents: the importer copies the files their references name (and downloads the CSS of a URL). */
+  private static final Set<String> HTML_TYPES = new HashSet<>(Arrays.asList("html", "htm", "xhtml"));
+
+  /**
+   * The references of an HTML document that the importer would copy into the catalog or download: a URL (other than
+   * data:), or an existing file outside the allowed folders. Empty when the import is safe.
+   */
+  List<String> unsafeReferences(File html) throws IOException {
+    String name = html.getName().toLowerCase(Locale.ROOT);
+    int dot = name.lastIndexOf('.');
+    if (dot < 0 || !HTML_TYPES.contains(name.substring(dot + 1)))
+      return new ArrayList<>();
+    org.jsoup.nodes.Document d = org.jsoup.Jsoup.parse(html, null);
+    List<String> refs = new ArrayList<>();
+    for (String[] q : new String[][] { { "img", "src" }, { "img", "alt" }, { "object", "data" }, { "script", "src" },
+        { "link", "href" }, { "embed", "src" } })
+      for (org.jsoup.nodes.Element e : d.select(q[0] + "[" + q[1] + "]"))
+        refs.add(e.attr(q[1]).trim());
+    List<String> bad = new ArrayList<>();
+    for (String r : refs) {
+      if (r.isEmpty() || r.regionMatches(true, 0, "data:", 0, 5) || bad.contains(r))
+        continue;
+      File f;
+      if (r.matches("(?i)^file:.*")) {
+        try {
+          f = new File(java.net.URI.create(r));
+        } catch (RuntimeException e) {
+          bad.add(r);
+          continue;
+        }
+      } else if (r.matches("^[a-zA-Z][a-zA-Z0-9+.-]+:.*") && !r.matches("^[a-zA-Z]:[\\\\/].*")) {
+        bad.add(r); // a URL: the importer downloads it (CSS) or the reference is copied as text
+        continue;
+      } else {
+        String path = r;
+        int cut = path.indexOf('#');
+        if (cut >= 0)
+          path = path.substring(0, cut);
+        cut = path.indexOf('?');
+        if (cut >= 0)
+          path = path.substring(0, cut);
+        if (path.isEmpty())
+          continue;
+        try {
+          path = java.net.URLDecoder.decode(path.replace("+", "%2B"), "UTF-8");
+        } catch (IllegalArgumentException e) {
+          // not encoded
+        }
+        File p = new File(path);
+        f = p.isAbsolute() ? p : new File(html.getParentFile(), path);
+      }
+      // a reference to no file copies nothing (an alt text, for example)
+      if (!f.exists())
+        continue;
+      try {
+        allowed(f.getAbsolutePath(), "The reference");
+      } catch (ToolError e) {
+        bad.add(r);
+      }
+    }
+    return bad;
+  }
+
   /** A file the agent may read: in an allowed folder, with one of the extensions. */
   File file(String path, String kind, Set<String> types) {
     File f = allowed(path, "The file");

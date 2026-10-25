@@ -61,6 +61,15 @@ public final class CatalogLocks {
 
   /** Takes the lock of the catalog; false when another process holds it (after waiting a while). */
   public boolean acquire(File catalog) throws IOException {
+    return acquire(catalog, waitMs);
+  }
+
+  /** Takes the lock of the catalog if no other process holds it now. */
+  public boolean tryAcquire(File catalog) throws IOException {
+    return acquire(catalog, 0);
+  }
+
+  private boolean acquire(File catalog, long waitMs) throws IOException {
     String k = key(catalog);
     synchronized (held) {
       if (held.containsKey(k))
