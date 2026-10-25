@@ -54,11 +54,12 @@ function check(cond, what) {
   check(init.result.serverInfo.name === 'requality', `initialize: ${init.result.serverInfo.name} ${init.result.serverInfo.version}`);
   proc.stdin.write(JSON.stringify({ jsonrpc: '2.0', method: 'notifications/initialized' }) + '\n');
   const tools = (await rpc('tools/list', {})).result.tools.map(t => t.name);
-  check(tools.includes('create_node') && tools.includes('get_document_text'), `tools/list: ${tools.length} tools`);
+  check(tools.includes('apply_changes') && tools.includes('read_document'), `tools/list: ${tools.length} tools`);
   check((await tool('create_project', { name: 'Smoke' })).project === 'Smoke', 'create_project');
-  await tool('create_node', { project: 'Smoke', parent: '/Requirements', id: 'R1', name: 'First requirement', description: 'The system shall start.' });
+  await tool('apply_changes', { project: 'Smoke', summary: 'First requirement', operations: [
+    { op: 'create', parent: '/Requirements', id: 'R1', name: 'First requirement', description: 'The system shall start.' }] });
   const node = await tool('get_node', { project: 'Smoke', node: '/Requirements/R1' });
-  check(node.name === 'First requirement' && node.description === 'The system shall start.', 'create_node and get_node');
+  check(node.name === 'First requirement' && node.description === 'The system shall start.', 'apply_changes and get_node');
   check(fs.existsSync(path.join(catalogs, 'Smoke', '.project')), 'the catalog is in the folder');
   proc.stdin.end();
   const code = await new Promise(r => proc.on('exit', r));

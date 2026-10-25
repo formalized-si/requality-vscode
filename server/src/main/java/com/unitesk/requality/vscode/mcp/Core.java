@@ -150,6 +150,11 @@ final class Core {
 
   /** {@link #write(TreeDB, String, Callable)}; {@code undoable} false keeps the change out of the undo history. */
   static <T> T write(TreeDB db, String name, boolean undoable, Callable<T> body) throws Exception {
+    return transaction(db, name, undoable, true, body);
+  }
+
+  /** A transaction that commits ({@code commit}) or rolls back (a dry run) when the body ends without an exception. */
+  static <T> T transaction(TreeDB db, String name, boolean undoable, boolean commit, Callable<T> body) throws Exception {
     long end = System.currentTimeMillis() + TRANSACTION_WAIT_MS;
     while (!db.startTransaction(name, true)) {
       if (System.currentTimeMillis() > end)
@@ -159,8 +164,10 @@ final class Core {
     boolean open = true;
     try {
       T r = body.call();
-      db.commit(undoable);
-      open = false;
+      if (commit) {
+        db.commit(undoable);
+        open = false;
+      }
       return r;
     } finally {
       if (open)

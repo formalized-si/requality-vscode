@@ -68,30 +68,39 @@ On Windows, use `C:\\path\\to\\requality-mcp\\bin\\requality-mcp.cmd` as the com
 
 ## Tools
 
+The tools follow the jobs of a requirements engineer.
+
 | Tool | Operation |
 | --- | --- |
 | `list_projects` | Lists the catalogs and their state (loading, ready, broken, closed). |
 | `get_tree` | Shows the nodes under a node, to a given depth. |
 | `get_node` | Shows one node: id, name, type, description, attributes, links, document locations, problems and children. |
 | `search_nodes` | Finds nodes by text or by an attribute value. |
-| `get_problems` | Shows the checker problems. It can run the checkers again. |
-| `get_document_text` | Shows the text of a document and its requirement locations. |
-| `list_report_templates` | Lists the report templates and their parameters. |
-| `server_messages` | Shows the messages of the Requality core (for example, the result of a format conversion). |
-| `create_node` | Creates a requirement, a test purpose, a comment or a document folder. |
-| `update_node` | Changes the id, the name, the description or the attributes of a node. |
-| `delete_node` | Deletes a node and the nodes under it. |
-| `move_node` | Moves a node to a different parent or to a different position. |
-| `add_link`, `remove_link` | Adds or removes a link between two nodes. |
-| `create_location` | Marks text of a document as a location of a requirement. |
 | `import_document` | Imports an HTML, XHTML, DOC, DOCX, ODT or PDF file as a document. |
-| `generate_report` | Generates a report from a template into a folder. |
+| `read_document` | Shows a document paragraph by paragraph, with the coverage of each paragraph by requirements. The filter `uncovered` shows only the text that no requirement covers. |
+| `apply_changes` | Makes a list of changes in one step: create, update, delete, move, link, unlink, locate (mark document text for a requirement), unlocate and resolve (close a review item). All changes are made, or none. `dry_run` checks the changes and makes none. |
+| `update_document_version` | Moves the requirement locations of a document to its new version. Tells for each requirement if its text is unchanged, changed or lost. |
+| `trace_coverage` | Shows the traceability: requirements without locations or test purposes, broken links, checker problems, document coverage and open review items. |
+| `review_changes` | Shows the changes of the agent in this session, with the values before and after. |
 | `undo`, `redo` | Undoes or redoes the last change. |
-| `open_project` | Opens a closed catalog. |
-| `create_project` | Creates an empty catalog. |
+| `list_report_templates`, `generate_report` | Generate a report from a template into a folder. |
+| `create_project`, `open_project` | Create an empty catalog, or open a closed catalog. |
+| `server_messages` | Shows the messages of the Requality core (for example, the result of a format conversion). |
 
 Address a node with its path (for example, `/Requirements/A/B`) or with its UUID.
 Give the project name with each call. `list_projects` gives the names.
+
+### Typical jobs
+
+- **Requirements from a specification.** `import_document`, then `read_document` with the filter `uncovered`.
+  The agent writes the requirements with `apply_changes` (operations `create` and `locate`).
+  It repeats until `read_document` shows no uncovered paragraph that contains a requirement.
+- **A new version of a specification.** `update_document_version` with the old document and the new file.
+  The agent examines the requirements with changed or lost text and corrects them with `apply_changes`.
+  It closes the review items of the update with the operation `resolve`.
+- **Traceability questions.** `trace_coverage` tells which requirements have no test purposes or no document text.
+- **Review.** `review_changes` shows each change of the agent. `undo` reverts the last change.
+  The journal is also in `<storage>/mcp-journal.jsonl`.
 
 ## One process for each catalog
 

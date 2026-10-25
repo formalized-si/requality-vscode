@@ -79,9 +79,9 @@ The **Requality** side bar and the **Requality** panel show the views of the Req
 ## Requality without a window (MCP server)
 
 The Requality MCP server is Requality without a window, for AI agents on your computer (Claude Code, Codex, Cursor
-and others). The agent starts the server and uses its tools through the Model Context Protocol. The tools read
-the catalogs, find nodes, create and change requirements, links and document locations, import documents, run the
-checkers and generate reports.
+and others). The agent starts the server and uses its tools through the Model Context Protocol. The tools follow the jobs of a requirements
+engineer: turn a specification into requirements with document locations, move the traceability to a new version of a
+specification, tell the coverage, and show the changes of the agent for a review (with undo).
 
 - The GitHub releases have the archives `requality-mcp-<version>-<platform>`. They contain a Java runtime.
 - The VS Code extension contains the same server: `dist/server/bin/requality-mcp`.

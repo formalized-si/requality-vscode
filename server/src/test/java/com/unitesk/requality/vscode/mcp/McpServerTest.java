@@ -159,6 +159,17 @@ class McpServerTest {
     return r;
   }
 
+  static JsonArray ops(String json) {
+    return JsonParser.parseString(json).getAsJsonArray();
+  }
+
+  static JsonObject paragraph(JsonObject doc, String textPart) {
+    for (JsonElement e : doc.getAsJsonArray("paragraphs"))
+      if (e.getAsJsonObject().get("text").getAsString().contains(textPart))
+        return e.getAsJsonObject();
+    return null;
+  }
+
   @Test
   @Order(1)
   void initializeNegotiatesTheVersionAndListsTheTools() throws Exception {
@@ -179,10 +190,9 @@ class McpServerTest {
       assertEquals("object", o.getAsJsonObject("inputSchema").get("type").getAsString(), o.toString());
       assertTrue(o.getAsJsonObject("annotations").has("readOnlyHint"), o.toString());
     }
-    for (String n : new String[] { "list_projects", "get_tree", "get_node", "search_nodes", "get_problems", "get_document_text",
-        "list_report_templates", "server_messages", "create_node", "update_node", "delete_node", "move_node", "add_link",
-        "remove_link", "create_location", "import_document", "generate_report", "undo", "redo", "open_project", "create_project" })
-      assertTrue(names.contains(n), n + " in " + names);
+    assertEquals(List.of("list_projects", "get_tree", "get_node", "search_nodes", "read_document", "apply_changes", "import_document",
+        "update_document_version", "trace_coverage", "review_changes", "undo", "redo", "list_report_templates", "generate_report",
+        "open_project", "create_project", "server_messages"), names);
     JsonObject unknown = new JsonObject();
     unknown.addProperty("name", "no_such_tool");
     assertEquals(-32602, rpc("tools/call", unknown).getAsJsonObject("error").get("code").getAsInt());
@@ -205,78 +215,145 @@ class McpServerTest {
     assertTrue(paths(found.getAsJsonArray("matches")).contains(R12), found.toString());
     JsonObject missing = callError("get_node", "project", P, "node", "/Requirements/NoSuchNode");
     assertTrue(missing.get("error").getAsString().startsWith("No node"), missing.toString());
+    // the paragraphs of the ETSI document: the existing locations cover the text they mark
+    JsonObject etsi = call("read_document", "project", P, "document", "/Documents/ts_103097v010201p.xhtml", "count", 5000);
+    JsonObject itsAid = paragraph(etsi, "For each ITS-AID only one ItsAidSsp shall be used.");
+    assertTrue(itsAid != null && itsAid.getAsJsonArray("requirements").toString().contains(R12), String.valueOf(itsAid));
+    assertTrue(etsi.get("covered_text_percent").getAsDouble() > 10, etsi.get("covered_text_percent").toString());
   }
 
   @Test
   @Order(3)
-  void anAgentCreatesAndLinksARequirement() throws Exception {
+  void anAgentTurnsADocumentIntoRequirements() throws Exception {
+    File html = new File(root, "spec.html");
+    Files.writeString(html.toPath(), "<html><body><h1>Spec</h1><p>The system shall log every access.</p>"
+        + "<p>The system shall encrypt\n   stored data.</p><p>The system shall keep logs for one year.</p></body></html>");
+    JsonObject doc = call("import_document", "project", P, "file", html.getAbsolutePath());
+    assertEquals("/Documents/spec.xhtml", doc.get("path").getAsString(), doc.toString());
+    assertEquals(4, doc.get("paragraphs").getAsInt(), doc.toString());
+    JsonObject read = call("read_document", "project", P, "document", "/Documents/spec.xhtml");
+    assertEquals("none", paragraph(read, "log every access").get("coverage").getAsString());
+    int encrypt = paragraph(read, "encrypt").get("p").getAsInt();
+
+    // a check changes nothing
+    JsonObject dry = call("apply_changes", "project", P, "dry_run", true, "operations",
+        ops("[{\"op\":\"create\",\"parent\":\"/Requirements\",\"id\":\"DRY\"}]"));
+    assertTrue(dry.get("dry_run").getAsBoolean());
+    callError("get_node", "project", P, "node", "/Requirements/DRY");
+    // all operations or none: the last one fails, the first one is not made
+    JsonObject failed = callError("apply_changes", "project", P, "operations",
+        ops("[{\"op\":\"create\",\"parent\":\"/Requirements\",\"id\":\"HALF\"},{\"op\":\"delete\",\"node\":\"/Requirements\"}]"));
+    assertTrue(failed.get("error").getAsString().startsWith("Operation 1 (delete)"), failed.toString());
+    callError("get_node", "project", P, "node", "/Requirements/HALF");
+
     JsonObject attrs = JsonParser.parseString("{\"priority\":2,\"status\":\"draft\",\"tags\":[\"a\",\"b\"]}").getAsJsonObject();
-    JsonObject n = call("create_node", "project", P, "parent", "/Requirements", "id", "MCP_1", "name", "Agent requirement",
-        "description", "First line.\n\nSecond paragraph.", "attributes", attrs);
-    assertEquals("/Requirements/MCP_1", n.get("path").getAsString());
-    assertEquals("First line.\n\nSecond paragraph.", n.get("description").getAsString());
-    assertEquals(2, n.getAsJsonObject("attributes").getAsJsonObject("priority").get("value").getAsInt());
-    JsonObject upd = JsonParser.parseString("{\"status\":\"approved\",\"tags\":null}").getAsJsonObject();
-    n = call("update_node", "project", P, "node", "/Requirements/MCP_1", "attributes", upd);
-    assertEquals("approved", n.getAsJsonObject("attributes").getAsJsonObject("status").get("value").getAsString());
-    assertFalse(n.getAsJsonObject("attributes").has("tags"), n.toString());
-    JsonObject l = call("add_link", "project", P, "from", "/Requirements/MCP_1", "to", R12);
-    assertEquals(R12, l.getAsJsonObject("links").getAsJsonArray("elaborates").get(0).getAsString(), l.toString());
-    JsonObject target = call("get_node", "project", P, "node", R12);
-    assertEquals("/Requirements/MCP_1", target.getAsJsonObject("linked_from").getAsJsonArray("elaborates").get(0).getAsString());
-    JsonObject tp = call("create_node", "project", P, "parent", "/Requirements/MCP_1", "type", "TestPurpose", "name", "Check it");
-    assertEquals("TestPurpose", tp.get("type").getAsString());
-    call("remove_link", "project", P, "from", "/Requirements/MCP_1", "to", R12);
-    assertFalse(call("get_node", "project", P, "node", "/Requirements/MCP_1").getAsJsonObject("links").has("elaborates"));
-    JsonObject bad = callError("create_node", "project", P, "parent", "/Requirements", "id", "a/b");
-    assertTrue(bad.get("error").getAsString().contains("not allowed"), bad.toString());
+    JsonArray batch = ops("[{\"op\":\"create\",\"parent\":\"/Requirements\",\"id\":\"SPEC\",\"name\":\"Specification\",\"as\":\"spec\"},"
+        + "{\"op\":\"create\",\"parent\":\"$spec\",\"id\":\"LOG\",\"name\":\"Access log\",\"description\":\"First line.\\n\\nSecond paragraph.\",\"as\":\"log\"},"
+        + "{\"op\":\"create\",\"parent\":\"$spec\",\"id\":\"ENC\",\"name\":\"Encryption\",\"as\":\"enc\"},"
+        + "{\"op\":\"locate\",\"requirement\":\"$log\",\"document\":\"/Documents/spec.xhtml\",\"quote\":\"The system shall log every access.\"},"
+        + "{\"op\":\"locate\",\"requirement\":\"$enc\",\"document\":\"/Documents/spec.xhtml\",\"paragraph\":" + encrypt + "},"
+        + "{\"op\":\"link\",\"from\":\"$enc\",\"to\":\"" + R12 + "\"},"
+        + "{\"op\":\"create\",\"parent\":\"$log\",\"type\":\"TestPurpose\",\"name\":\"Check the log\"}]");
+    batch.get(1).getAsJsonObject().add("attributes", attrs);
+    JsonObject applied = call("apply_changes", "project", P, "summary", "Requirements of spec.html", "operations", batch);
+    assertEquals(7, applied.getAsJsonArray("results").size(), applied.toString());
+    JsonObject log = call("get_node", "project", P, "node", "/Requirements/SPEC/LOG");
+    assertEquals("First line.\n\nSecond paragraph.", log.get("description").getAsString());
+    assertEquals(2, log.getAsJsonObject("attributes").getAsJsonObject("priority").get("value").getAsInt());
+    assertEquals("The system shall log every access.", log.getAsJsonArray("locations").get(0).getAsJsonObject().get("text").getAsString());
+    JsonObject enc = call("get_node", "project", P, "node", "/Requirements/SPEC/ENC");
+    assertEquals("The system shall encrypt stored data.", enc.getAsJsonArray("locations").get(0).getAsJsonObject().get("text").getAsString());
+    assertEquals(R12, enc.getAsJsonObject("links").getAsJsonArray("elaborates").get(0).getAsString(), enc.toString());
+    // the text no requirement covers yet
+    JsonObject uncovered = call("read_document", "project", P, "document", "/Documents/spec.xhtml", "filter", "uncovered");
+    List<String> left = new ArrayList<>();
+    for (JsonElement e : uncovered.getAsJsonArray("paragraphs"))
+      left.add(e.getAsJsonObject().get("text").getAsString());
+    assertEquals(List.of("Spec", "The system shall keep logs for one year."), left);
   }
 
   @Test
   @Order(4)
-  void anImportedDocumentGetsALocation() throws Exception {
-    File html = new File(root, "spec.html");
-    Files.writeString(html.toPath(), "<html><body><h1>Spec</h1><p>The system shall log every access.</p>"
-        + "<p>The system shall encrypt\n   stored data.</p></body></html>");
-    JsonObject doc = call("import_document", "project", P, "file", html.getAbsolutePath());
-    assertEquals("/Documents/spec.xhtml", doc.get("path").getAsString(), doc.toString());
-    JsonObject text = call("get_document_text", "project", P, "document", "/Documents/spec.xhtml");
-    assertTrue(text.get("text").getAsString().contains("The system shall log every access."), text.toString());
-    // the white space of the quote does not have to be the one of the document
-    JsonObject loc = call("create_location", "project", P, "document", "/Documents/spec.xhtml", "requirement", "/Requirements/MCP_1",
-        "quote", "The system shall encrypt stored data.");
-    assertEquals("The system shall encrypt stored data.", loc.get("text").getAsString(), loc.toString());
-    JsonObject req = call("get_node", "project", P, "node", "/Requirements/MCP_1");
-    JsonArray locs = req.getAsJsonArray("locations");
-    assertEquals(1, locs.size(), req.toString());
-    assertEquals("/Documents/spec.xhtml", locs.get(0).getAsJsonObject().get("document").getAsString());
-    // the ranges of the existing ETSI locations are ranges of the same text
-    JsonObject etsi = call("get_document_text", "project", P, "document", "/Documents/ts_103097v010201p.xhtml", "offset", 171850,
-        "length", 200);
-    boolean seen = false;
-    for (JsonElement e : etsi.getAsJsonArray("locations"))
-      seen |= e.getAsJsonObject().get("text").getAsString().equals("For each ITS-AID only one ItsAidSsp shall be used.");
-    assertTrue(seen, etsi.toString());
+  void thePersonReviewsAndUndoesTheChanges() throws Exception {
+    JsonObject review = call("review_changes", "project", P);
+    JsonObject last = review.getAsJsonArray("changes").get(0).getAsJsonObject();
+    assertEquals("apply_changes", last.get("tool").getAsString());
+    assertEquals("Requirements of spec.html", last.get("summary").getAsString());
+    assertEquals("done", last.get("state").getAsString());
+    JsonObject update = call("apply_changes", "project", P, "operations",
+        ops("[{\"op\":\"update\",\"node\":\"/Requirements/SPEC/LOG\",\"name\":\"Access logging\",\"attributes\":{\"status\":\"approved\",\"tags\":null}}]"));
+    JsonObject res = update.getAsJsonArray("results").get(0).getAsJsonObject();
+    assertEquals("Access log", res.getAsJsonObject("before").get("name").getAsString());
+    assertEquals("Access logging", res.getAsJsonObject("after").get("name").getAsString());
+    assertFalse(res.getAsJsonObject("after").getAsJsonObject("attributes").has("tags"), res.toString());
+    JsonObject undo = call("undo");
+    assertEquals(update.get("change").getAsInt(), undo.get("change").getAsInt(), undo.toString());
+    assertEquals("Access log", call("get_node", "project", P, "node", "/Requirements/SPEC/LOG").get("name").getAsString());
+    assertEquals("undone", call("review_changes", "project", P).getAsJsonArray("changes").get(0).getAsJsonObject().get("state").getAsString());
+    call("redo");
+    assertEquals("Access logging", call("get_node", "project", P, "node", "/Requirements/SPEC/LOG").get("name").getAsString());
+    // a move and a delete, undone
+    call("apply_changes", "project", P, "operations",
+        ops("[{\"op\":\"move\",\"node\":\"/Requirements/SPEC/ENC\",\"parent\":\"/Requirements/SEC_ITSS\"},{\"op\":\"delete\",\"node\":\"/Requirements/SEC_ITSS/ENC\"}]"));
+    callError("get_node", "project", P, "node", "/Requirements/SPEC/ENC");
+    call("undo");
+    call("get_node", "project", P, "node", "/Requirements/SPEC/ENC");
+    JsonObject cyc = callError("apply_changes", "project", P, "operations",
+        ops("[{\"op\":\"move\",\"node\":\"/Requirements/SPEC\",\"parent\":\"/Requirements/SPEC/LOG\"}]"));
+    assertTrue(cyc.get("error").getAsString().contains("own subtree"), cyc.toString());
   }
 
   @Test
   @Order(5)
-  void moveDeleteAndUndo() throws Exception {
-    call("move_node", "project", P, "node", "/Requirements/MCP_1", "parent", "/Requirements/SEC_ITSS");
-    call("get_node", "project", P, "node", "/Requirements/SEC_ITSS/MCP_1");
-    JsonObject cyc = callError("move_node", "project", P, "node", "/Requirements/SEC_ITSS", "parent", "/Requirements/SEC_ITSS/MCP_1");
-    assertTrue(cyc.get("error").getAsString().contains("own subtree"), cyc.toString());
-    call("delete_node", "project", P, "node", "/Requirements/SEC_ITSS/MCP_1");
-    callError("get_node", "project", P, "node", "/Requirements/SEC_ITSS/MCP_1");
-    assertEquals("Delete Requirement", call("undo").get("undone").getAsString());
-    call("get_node", "project", P, "node", "/Requirements/SEC_ITSS/MCP_1");
-    JsonObject top = callError("delete_node", "project", P, "node", "/Requirements");
-    assertTrue(top.get("error").getAsString().contains("cannot be deleted"), top.toString());
+  void theCoverageIsData() throws Exception {
+    JsonObject cov = call("trace_coverage", "project", P, "under", "/Requirements/SPEC", "refresh", true);
+    JsonObject reqs = cov.getAsJsonObject("requirements");
+    assertEquals(3, reqs.get("total").getAsInt(), cov.toString());
+    assertEquals(2, reqs.get("leaves").getAsInt(), cov.toString());
+    assertEquals(0, reqs.getAsJsonObject("leaves_without_locations").get("total").getAsInt(), cov.toString());
+    assertTrue(reqs.getAsJsonObject("leaves_without_test_purposes").toString().contains("/Requirements/SPEC/ENC"), cov.toString());
+    JsonObject spec = null;
+    for (JsonElement e : cov.getAsJsonArray("documents"))
+      if (e.getAsJsonObject().get("document").getAsString().equals("/Documents/spec.xhtml"))
+        spec = e.getAsJsonObject();
+    assertEquals(2, spec.get("uncovered_paragraphs").getAsInt(), spec.toString());
+    assertEquals(2, spec.get("covered_paragraphs").getAsInt(), spec.toString());
   }
 
   @Test
   @Order(6)
-  void reportsAndProblems() throws Exception {
+  void aNewSpecificationVersionKeepsTheTraceability() throws Exception {
+    File v2 = new File(root, "spec_v2.html");
+    Files.writeString(v2.toPath(), "<html><body><h1>Spec</h1><p>The system shall log every access.</p>"
+        + "<p>The system shall keep logs for two years.</p></body></html>");
+    JsonObject up = call("update_document_version", "project", P, "document", "/Documents/spec.xhtml", "file", v2.getAbsolutePath());
+    assertEquals("/Documents/spec_v2.xhtml", up.get("new_document").getAsString(), up.toString());
+    Map<String, String> status = new java.util.HashMap<>();
+    for (JsonElement e : up.getAsJsonArray("requirements"))
+      status.put(e.getAsJsonObject().get("requirement").getAsString(), e.getAsJsonObject().get("status").getAsString());
+    assertEquals("unchanged", status.get("/Requirements/SPEC/LOG"), up.toString());
+    // the sentence of ENC is gone: the processor keeps the text the versions share, the result shows it for a review
+    assertTrue(List.of("changed", "lost").contains(status.get("/Requirements/SPEC/ENC")), up.toString());
+    JsonObject enc = up.getAsJsonArray("requirements").get(0).getAsJsonObject();
+    assertEquals("/Requirements/SPEC/ENC", enc.get("requirement").getAsString(), "the ones to review come first: " + up);
+    assertEquals("The system shall encrypt stored data.", enc.getAsJsonArray("old_text").get(0).getAsString(), up.toString());
+    // the review items of the update are resolved like Complete of the To-Do List view
+    JsonArray items = up.getAsJsonArray("review_items");
+    assertFalse(items.isEmpty(), up.toString());
+    int open = call("trace_coverage", "project", P, "documents", false).getAsJsonObject("review_items").get("total").getAsInt();
+    String item = items.get(0).getAsJsonObject().get("path").getAsString();
+    call("apply_changes", "project", P, "operations", ops("[{\"op\":\"resolve\",\"item\":\"" + item + "\"}]"));
+    JsonObject after = call("trace_coverage", "project", P, "documents", false).getAsJsonObject("review_items");
+    assertEquals(open - 1, after.get("total").getAsInt(), after.toString());
+    assertEquals(1, after.get("completed").getAsInt(), after.toString());
+    JsonObject newDoc = call("read_document", "project", P, "document", "/Documents/spec_v2.xhtml");
+    assertTrue(paragraph(newDoc, "log every access").getAsJsonArray("requirements").toString().contains("/Requirements/SPEC/LOG"),
+        newDoc.toString());
+  }
+
+  @Test
+  @Order(7)
+  void reportsAndProjects() throws Exception {
     JsonArray templates = call("list_report_templates", "project", P).getAsJsonArray("templates");
     assertTrue(templates.toString().contains("com.unitesk.requality.reports.tableview"), templates.toString());
     File out = new File(root, "report");
@@ -287,17 +364,9 @@ class McpServerTest {
     assertTrue(Files.size(new File(files.get(0).getAsString()).toPath()) > 1000, rep.toString());
     // the temporary report settings are gone and not in the undo history
     assertEquals(1, call("get_tree", "project", P, "node", "/Reports", "depth", 1).getAsJsonArray("nodes").size());
-    JsonObject probs = call("get_problems", "project", P, "node", "/Requirements/SEC_ITSS", "refresh", true);
-    assertTrue(probs.get("checked_nodes").getAsInt() > 10, probs.toString());
-  }
-
-  @Test
-  @Order(7)
-  void anAgentCreatesAProject() throws Exception {
     assertEquals("AgentProject", call("create_project", "name", "AgentProject").get("project").getAsString());
-    JsonObject tree = call("get_tree", "project", "AgentProject", "depth", 1);
-    assertTrue(paths(tree.getAsJsonArray("nodes")).contains("/Requirements"), tree.toString());
-    call("create_node", "project", "AgentProject", "parent", "/Requirements", "id", "R1", "name", "First");
+    call("apply_changes", "project", "AgentProject", "operations",
+        ops("[{\"op\":\"create\",\"parent\":\"/Requirements\",\"id\":\"R1\",\"name\":\"First\"}]"));
     assertEquals("First", call("get_node", "project", "AgentProject", "node", "/Requirements/R1").get("name").getAsString());
   }
 }
