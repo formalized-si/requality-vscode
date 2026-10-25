@@ -259,7 +259,7 @@ public class RequalityPlugin {
     for(TreeDB db : ResManager.getManager().getTreeDBs()) {
       EclipseCheckerContainer ect = db.getMetaObject(META_CHECKER_CONTAINER);
       if(ect!=null)
-        ect.stopOldThread();
+        ect.stopOldThread(true);
     }
   }
   private static String META_CHECKER_CONTAINER = "CHECKER_CONTAINER";
@@ -372,7 +372,7 @@ public class RequalityPlugin {
           //TODO from editors
             //It is links in reports and another html places to nodes in tree 
             SelectionManager.getOne().updateSelection(SourcePriority.EDITOR, fromPlugin, node);
-            //SelectionManager.getOne().changeActiveSource(fromPlugin.getEventSource(), fromPlugin, true);
+            SelectionManager.getOne().changeActiveSource(SourcePriority.EDITOR, fromPlugin.getEventSource(), fromPlugin, true, false);
           }else
             RMessages.openInfo("Element not found", "Element not found for path '"+path+"'", false);
         }

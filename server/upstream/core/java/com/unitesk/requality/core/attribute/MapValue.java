@@ -1,6 +1,7 @@
 package com.unitesk.requality.core.attribute;
 
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Map.Entry;
@@ -9,13 +10,24 @@ public class MapValue implements /*Iterable<Object>,*/ Cloneable,IContextStringP
   private AttributeType type;
   private Map<String, Object> values;
 
+  public static Map<AttributeType, MapValue> EMTPY_VALUES = new HashMap<>();
+  public static Map<AttributeType, TypedValue> EMPTY_ANSWERS = new HashMap<>();
+  static{
+    for(AttributeType at:AttributeType.values()) 
+    {
+      MapValue mv = new MapValue(at, Collections.emptyMap());
+      EMTPY_VALUES.put(at, mv);
+      EMPTY_ANSWERS.put(at, new TypedValue(AttributeType.MAP, mv));
+    }
+  }
+  
   public MapValue(AttributeType atype, Map<String, Object> values) {
     this.type = atype;
     this.values = values;
   }
 
   public AttributeType getType() {
-    return type;
+    return type!=null?type:AttributeType.STRING;//adds default
   }
 //  public Set<Entry<String, Object>> iterator(){
 //    return values.entrySet(); 
@@ -108,6 +120,7 @@ public class MapValue implements /*Iterable<Object>,*/ Cloneable,IContextStringP
   @Override
   protected Object clone() throws CloneNotSupportedException {
     Map<String, Object> lst = new HashMap<>();
+    //TODO reference?
     for (Entry<String, Object> o : values.entrySet()) {
       if (type == AttributeType.ENUM) lst.put(o.getKey(),((AppliedEnumValue) o.getValue()).clone());
       else if (type == AttributeType.LIST) lst.put(o.getKey(),((ListValue) o.getValue()).clone());
@@ -115,7 +128,7 @@ public class MapValue implements /*Iterable<Object>,*/ Cloneable,IContextStringP
       else if (type == AttributeType.ENUM_DEFINITION) lst.put(o.getKey(),((EnumDefinitionValue) o.getValue()).clone());
       else lst.put(o.getKey(),o.getValue());
     }
-    return new MapValue(type, values);
+    return new MapValue(type, lst);
   }
   @Override
   public boolean equals(Object obj) {

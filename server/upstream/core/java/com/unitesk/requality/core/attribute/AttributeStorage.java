@@ -1680,9 +1680,9 @@ public class AttributeStorage implements Iterable<Attribute> {
               return ab.getDefinition();
             return null;
           }
-          attrs.remove(key);
-          // TODO delete from as?
-          return null;
+          // VSCODE-PATCH: the origin node is not in the catalog (old format copies): keep the stored value. The removal
+          // changed the attributes cached by the storage, so a node lost its _type and the format conversion failed.
+          return a;
         }
       } else return a;
     }

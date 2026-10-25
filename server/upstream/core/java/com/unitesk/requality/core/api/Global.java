@@ -371,7 +371,7 @@ public class Global {
   public static void runCheckers(TreeDB db,boolean tree, boolean nontree) {
     CheckerContainer container = db.getCheckerContainer();    
     if(nontree || tree) {
-      container.stopOldThread();
+      container.stopOldThread(false);
       CacheStorage cs = db.getTracker().getCPCacheStorage(db);
       CacheTransactionDescription ctd = null;
       try {

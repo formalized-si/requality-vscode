@@ -176,6 +176,12 @@ public class TreeDB implements ICacheStorageProvider, IMultiPartDataProvider{
   
   private Map<String, NodeType> defaultTypes = new HashMap<>();
 
+  public void unRegisterMetaObject(String name) {
+    synchronized (metaObjects) {
+      metaObjects.remove(name);
+    }
+  }
+  
   public void registerMetaObject(String name, Object obj) {
     synchronized (metaObjects) {
       metaObjects.put(name, obj);
@@ -800,7 +806,7 @@ public class TreeDB implements ICacheStorageProvider, IMultiPartDataProvider{
                 }
                 tsm.removeStateHook(lname, HALTED_STATES, this);
               }
-              getCheckerContainer().stopOldThread();
+              getCheckerContainer().stopOldThread(true);
             }
           };
         }
@@ -1625,7 +1631,8 @@ public class TreeDB implements ICacheStorageProvider, IMultiPartDataProvider{
       attrs = storage.getAttributes(uuid);
       Object ta = AttributeStorage.getAttributeDefValue(this, attrs, uuid, TreeNode.ATTR_TYPE);
       if (ta != null) type = ta.toString();
-      if (type != null) {
+      //old clones can have no type oO
+      {
         if (attrs != null) {
           canLoad = true;
           boolean virt = false;
@@ -3754,7 +3761,7 @@ public class TreeDB implements ICacheStorageProvider, IMultiPartDataProvider{
 //    }
 //  }
 
-  private void updateNodeChildren(TreeNode result, Collection<UUID> children, boolean init) {
+  void updateNodeChildren(TreeNode result, Collection<UUID> children, boolean init) {
     result.getChildrenRelatedVirtuals();
     result.setChildrenUUIDs(new ArrayList<>(children), init);
     result.updateLocalAttribute(TreeNode.ATTR_CHILDREN_UUIDS);//if called on init - may cause recursion
@@ -3789,11 +3796,6 @@ public class TreeDB implements ICacheStorageProvider, IMultiPartDataProvider{
       id = storage.getNodeId(uuid);
       puuid = storage.getParent(uuid);
     }
-    if (id == null) {
-      throw new RuntimeException("Id is null for" + uuid);
-    }
-    // if(isVirtual&&storage instanceof TreeInstancer)
-    // ((TreeInstancer)storage).createIfNeeded(uuid);
     UUID cloneP = null;
     if (attributes.containsKey(TreeNode.ATTR_CLONE_PARENT)
         && attributes.get(TreeNode.ATTR_CLONE_PARENT) != null) {
@@ -3805,6 +3807,15 @@ public class TreeDB implements ICacheStorageProvider, IMultiPartDataProvider{
       if (val != null) 
         cloneP = UUID.fromString(val.toString());
     }
+    if (id == null) {
+      if(cloneP == null)
+        throw new RuntimeException("Id is null for" + uuid);
+      else
+        id = AttributeDefinition.attrDescToStringValue(attributes.get("_id"), null);
+    }
+    // if(isVirtual&&storage instanceof TreeInstancer)
+    // ((TreeInstancer)storage).createIfNeeded(uuid);
+    
     if (CoreUtils.DEBUG_LEVEL > 7) {
       RLogger.logDebug("\t get cp " + (System.currentTimeMillis() - l));
       l = System.currentTimeMillis();
@@ -3820,12 +3831,10 @@ public class TreeDB implements ICacheStorageProvider, IMultiPartDataProvider{
       RLogger.logDebug("\t create model " + (System.currentTimeMillis() - l));
       l = System.currentTimeMillis();
     }
-    Collection<UUID> children = storage.getChildren(uuid);
     if (CoreUtils.DEBUG_LEVEL > 7) {
       RLogger.logDebug("\t get children " + (System.currentTimeMillis() - l));
       l = System.currentTimeMillis();
     }
-    updateNodeChildren(result, children, true);
     if (CoreUtils.DEBUG_LEVEL > 7) {
       RLogger.logDebug("\t update children " + (System.currentTimeMillis() - l));
       l = System.currentTimeMillis();
@@ -3837,6 +3846,9 @@ public class TreeDB implements ICacheStorageProvider, IMultiPartDataProvider{
       assert result.parent == null;
       root = result;
     }
+    Collection<IMark> problems = storage.getStorageNodeProblems(uuid);
+    if(problems!=null && problems.size()>0 && result!=null)
+      result.updateCheckerProblems();
     return result;
   }
 
@@ -4122,7 +4134,7 @@ public class TreeDB implements ICacheStorageProvider, IMultiPartDataProvider{
     }
     try{
       clearWarnings();
-      getCheckerContainer().stopOldThread();
+      getCheckerContainer().stopOldThread(true);
       TreeCacheManipulatorsManager man = getCMM();
       man.clearCaches(this, man.getSettingsStore());
       man.clearCMMCaches();

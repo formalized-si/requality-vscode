@@ -23,11 +23,14 @@ public class EclipseProgressMonitor implements IProgressMonitor {
   }
   @Override
   public void worked(int val) {
-    taskCnt.addLast(taskCnt.pollLast()+val);
+    Long last = taskCnt.pollLast();
+    if(last == null)
+      last = 0L;
+    taskCnt.addLast(last+val);
     Long maxv = taskMax.peekLast();
     if(maxv == 0)
-    	maxv = 1L;
-    int newMonPos = (int) (taskCnt.peekLast()*max/maxv); 
+      maxv = 1L;
+    int newMonPos = (int) (last*max/maxv); 
     monitor.worked(newMonPos-monPos);
     monPos = newMonPos;
   }
@@ -105,7 +108,7 @@ public class EclipseProgressMonitor implements IProgressMonitor {
   }
   @Override
   public String getTask() {
-    return taskName.isEmpty()?null:taskName.getFirst();
+    return taskName.isEmpty()?null:taskName.peekLast();
   }
   @Override
   public boolean isDBLocal() {

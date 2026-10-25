@@ -301,6 +301,9 @@ public class WSServer extends WebSocketHandler implements IPortStatusProvider{
 
   @Override
   public void configure(WebSocketServletFactory factory) {
+    factory.getExtensionFactory().unregister("x-webkit-deflate-frame");
+    factory.getExtensionFactory().unregister("deflate-frame"); 
+    factory.getExtensionFactory().unregister("permessage-deflate");
     factory.getPolicy().setIdleTimeout(IDLE_TIMEOUT);
     factory.getPolicy().setMaxTextMessageSize(TEXT_BUFFER);
     factory.getPolicy().setMaxTextMessageBufferSize(TEXT_BUFFER);

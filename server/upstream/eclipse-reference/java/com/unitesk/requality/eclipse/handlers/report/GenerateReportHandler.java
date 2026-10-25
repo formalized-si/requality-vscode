@@ -305,10 +305,6 @@ public class GenerateReportHandler extends AbstractHandler
   public String getLastError() {
     return base.getLastError();
   }
-  @Override
-  public ReportData getLastReport() {
-    return base.getLastReport();
-  }
   private static IGenerateReportHandlerProvider provider = null;
   public static IGenerateReportHandlerProvider getProvider() {
     if(provider == null)

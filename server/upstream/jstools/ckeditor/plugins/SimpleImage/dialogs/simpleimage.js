@@ -26,12 +26,24 @@ CKEDITOR.dialog.add("simpleimageDialog", function(editor) {
 					style: 'display:inline-block;margin-top:14px;',
 					label: 'Select Image',
 					onClick: function(e){
-						selectFileDialog("*.jpeg|*.png|*.jpg|*.gif|*.bmp");
+						selectFileDialog("*.jpeg;*.png;*.jpg;*.gif;*.bmp;*.webm");
 						var click = this;
 						window.reactOnSelectFileCall = function(path){
-							if(path!=null)
-								click.getDialog().getContentElement( 'SimpleImage', 'edp-src' ).setValue(path);
-							window.reactOnSelectFileCall = null;
+							if(path!=null){
+								var basePath = path;
+								window.imageUploaded = function(path, error){
+									if(path!=null)
+										click.getDialog().getContentElement( 'SimpleImage', 'edp-src' ).setValue(path);
+									else{
+										var message = "cannot load "+basePath;
+										if(error!=null)
+											message+=" "+error;
+										alert(message);
+									}
+									window.reactOnSelectFileCall = null;
+								};
+								sendUploadImage(path)
+							}
 						};
 					}
 				},

@@ -20,6 +20,7 @@ import java.io.File;
 import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.net.URI;
+import java.nio.file.Files;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
@@ -124,7 +125,7 @@ public class EclipseTracker extends AbstractResTracker {
   private static final long RENAME_STATE_TIMEOUT = 300000;
   public static final String REQ_CATALOG_NATURE = Consts.CATALOG_NATURE;
   public static final String NON_LOADABLE_NATURE = Consts.CATALOG_BROKEN_NATURE;
-  private static final int NEW_PROJET_TIMEOUT = 500; //Timeoout for actual project loading
+  private static final int NEW_PROJET_TIMEOUT = 500; // Timeoout for actual project loading
   private static boolean ignoreGUI = false;
   private static boolean updateAutoOk = true;
   private Map<URI, Long> timeoutToLoad = new ConcurrentHashMap<>();
@@ -140,7 +141,7 @@ public class EclipseTracker extends AbstractResTracker {
 
   private Map<IProject, TreeDB> treeByProject = new ConcurrentHashMap<>();
   private DBNamesManager dbnm = null;
-  //private Map<TreeDB, IProject> projectByTree = new ConcurrentHashMap<>();
+  // private Map<TreeDB, IProject> projectByTree = new ConcurrentHashMap<>();
   private Map<IProject, ResourceStorage> projectToStorage = new ConcurrentHashMap<>();
 
   private static EclipseTracker tracker;
@@ -167,7 +168,6 @@ public class EclipseTracker extends AbstractResTracker {
       return;
     }
     String lname = p.getLocation().lastSegment();
-    p.getName();
     String pname = getProjectName(p);
     lProjByName.put(lname, p);
     dbnm.register(DBLocalName.formLocalNameKey(lname, RevisionInfo.toString(null, null)), pname);
@@ -193,27 +193,30 @@ public class EclipseTracker extends AbstractResTracker {
       initNames();
     ResourcesPlugin.getWorkspace().addResourceChangeListener(resourceChangeListener);
   }
-  private static TreeState[] UNTRACK_STATES= new TreeState[] {TreeState.HALTED};
+
+  private static TreeState[] UNTRACK_STATES = new TreeState[] { TreeState.HALTED };
+
   public static EclipseTracker getTracker(DBNamesManager dbnm) {
     if (tracker == null) {
       tracker = new EclipseTracker(dbnm);
       tracker.getTreeStateManager().addStateHook("*", UNTRACK_STATES, tracker.stateChangeHandler);
-//      tracker.addsHaltTrackerReaction();
+      // tracker.addsHaltTrackerReaction();
     }
     return tracker;
   }
-  private IStateChangeHandler stateChangeHandler = new AAllTreeStateChangeHandler(){
+
+  private IStateChangeHandler stateChangeHandler = new AAllTreeStateChangeHandler() {
     @Override
     public void stateChanges(TreeDB db, String lname, String pname, RevisionInfo ri, TreeState oldState,
         TreeState state) {
       IProject p = db.getMetaObject(META_ECLIPSE_PROJECT);
-      if(p!=null ) {
-        stopTracking(p, db, null, lname, pname, false);//TODO gather deleted state?
+      if (p != null) {
+        stopTracking(p, db, null, lname, pname, false); // TODO gather deleted state?
       }
     }
-   
   };
   private static String META_ECLIPSE_PROJECT = "RELATED_ECLPSE_PROJECT";
+
   public IProject getProject(TreeDB db) {
     if (db == null)
       return null;
@@ -287,7 +290,6 @@ public class EclipseTracker extends AbstractResTracker {
     IProject p = extractProject(proj);
     if (p != null)
       markCacheFolder(p);
-
   }
 
   @Override
@@ -346,7 +348,12 @@ public class EclipseTracker extends AbstractResTracker {
         newNatures[i++] = s;
       newNatures[natures.length] = NON_LOADABLE_NATURE;
       description.setNatureIds(newNatures);
-      WorkspaceJob wj = new WorkspaceJob("Mark project "+p.getName()+" as non loadable") {
+      String name = p.getName();
+      try{
+        name = p.getDescription().getName();
+      }catch(CoreException ce){
+      }
+      WorkspaceJob wj = new WorkspaceJob("Mark project " + name + " as non loadable") {
         @Override
         public IStatus runInWorkspace(IProgressMonitor monitor) throws CoreException {
           p.setDescription(description, new NullProgressMonitor());
@@ -359,7 +366,6 @@ public class EclipseTracker extends AbstractResTracker {
       e1.printStackTrace();
     }
     ;
-
   }
 
   private IFolder markCacheFolder(IProject project) {
@@ -398,18 +404,18 @@ public class EclipseTracker extends AbstractResTracker {
 
   public boolean stopTracking(IProject project, TreeDB db, URI uri, String lname, String pnameReq, boolean deleted) {
     try {
-      RLogger.logDebug("before stopTracking: " + lname + " " + getTreeStateManager().getState(lname, null),3);
-      RLogger.logDebug(CoreUtils.getTrace(Thread.currentThread().getStackTrace()),3);
-      RLogger.logDebug("before stopTracking: " + lname + " " + getProjectLoadingState(uri),3);
+      RLogger.logDebug("before stopTracking: " + lname + " " + getTreeStateManager().getState(lname, null), 3);
+      RLogger.logDebug(CoreUtils.getTrace(Thread.currentThread().getStackTrace()), 3);
+      RLogger.logDebug("before stopTracking: " + lname + " " + getProjectLoadingState(uri), 3);
       String name = lname, pname = pnameReq;
       CacheStorage cs = null;
       try {
         if (uri == null)
-          uri = getUri(project, true);// here we use a cached url
-        if ((!isTracking(project)&&!treeByProject.containsKey(project)) || project == null) {
+          uri = getUri(project, true); // here we use a cached url
+        if ((!isTracking(project) && !treeByProject.containsKey(project)) || project == null) {
           return false;
         }
-        if(uri == null)
+        if (uri == null)
           return false;
         boolean isLatest = false;
         if (db == null)
@@ -435,30 +441,32 @@ public class EclipseTracker extends AbstractResTracker {
         ResourceStorage storage = null;
         if (ts instanceof TransactionStorage) {
           storage = (ResourceStorage) ((TransactionStorage) ts).getStorage();
-          if(!isVersUpdate) {
+          if (!isVersUpdate) {
             ((TransactionStorage) ts).rollback();
             ts = ((TransactionStorage) ts).getStorage();
           }
-        }else
+        } else
           storage = (ResourceStorage) ts;
         storage.forceNow = true; // avoid creating jobs
         try {
           ResourcesPlugin.getWorkspace().removeResourceChangeListener(storage.getResourceChangeListener());
           if (isVersUpdate)
             return false;
-        
-        // Global.onlyClearCaches(db, deleted, false);
-        // tends to be duplicate of notify
-        //ResourceStorage storage = (ResourceStorage) ts;
-  
+
+          // Global.onlyClearCaches(db, deleted, false);
+          // tends to be duplicate of notify
+          // ResourceStorage storage = (ResourceStorage) ts;
+
           if (!deleted) {
             notifyListeners(Moment.BEFORE, name, pname, db, TreeEvent.TREE_CLOSE);
           } else {
             try {
+              ResManager.markTreeAsDeleting(db);
               RepositoryProvider prov = RepositoryProvider.getProvider(project);
-              if(prov!=null)
+              if (prov != null)
                 prov.deconfigure();
             } catch (CoreException e) {
+            	RLogger.logDebug(e,1);
             }
             notifyListeners(Moment.BEFORE, name, pname, db, TreeEvent.TREE_DELETE);
             // db.getStorage().getCacheStorage().remove();//already in db reaction
@@ -469,41 +477,42 @@ public class EclipseTracker extends AbstractResTracker {
         }
       } finally {
         RevisionInfo ri = tsm.getRevisionInfo(db);
-        if(db!=null) {
+        if (db != null) {
           TreeStateManager tsm = TreeStateManager.getOne(db.getTracker());
-          unbindBaseFromProject(project, db, deleted);
+          unbindBaseFromProject(project, db, deleted, null);
         }
         disconnectStorage(project);
-        unRegisterNames(project, name);// TODO needed?
-  
-        if(db!=null) {
+        unRegisterNames(project, name); // TODO needed?
+
+        if (db != null) {
           db.setDisposed(true);
+          //if (tsm.getState(name, ri) != TreeState.RESTART)
           tsm.setState(name, pname, db, ri, TreeState.HALTED);
         }
         // if(deleted) {
         if (cs != null)
           cs.dispose();
         // }
-        if(db!=null) {
+        if (db != null) {
           if (!deleted) {
             notifyListeners(Moment.AFTER, name, pname, db, TreeEvent.TREE_CLOSE);
           } else {
             notifyListeners(Moment.AFTER, name, pname, db, TreeEvent.TREE_DELETE);
             // db.getStorage().getCacheStorage().remove();//already in db reaction
-            
+
           }
         }
-        uriCache.remove(project);// tends not to be excess for here
+        uriCache.remove(project); // tends not to be excess for here
         if (pname != null)
           setProjectLoadingState(uri, pname, ProjectLoadingState.NOT_LOADING);
       }
-      if(db!=null)
-        Global.fireClearingEvent(db, null, uri);//clear gitmanager for closed one
+      if (db != null)
+        Global.fireClearingEvent(db, null, uri); // clear gitmanager for closed one
       RLogger.logDebug("after stopTracking: " + lname + " " + getTreeStateManager().getState(lname, null), 3);
       RLogger.logDebug("after stopTracking: " + lname + " " + getProjectLoadingState(uri), 3);
-  
+
       return true;
-    }finally {
+    } finally {
       isClosing.remove(project);
     }
   }
@@ -516,13 +525,16 @@ public class EclipseTracker extends AbstractResTracker {
         cs.clearCached();
     }
   }
-
-  private void unbindBaseFromProject(IProject project, TreeDB db, boolean delete) {
+  @Override
+  public void unbindBaseFromProject(Object stored, TreeDB db, boolean delete, File ch) {
+    if(!(stored instanceof IProject))
+      throw new RuntimeException ("Incorrect stored object given");
+    IProject project = (IProject) stored;
     TreeDB dba = treeByProject.remove(project);
     if (dba != null)
-      dba.setDisposed(true);// TODO test it
-//    projectByTree.remove(db);
-//    projectByTree.remove();
+      dba.setDisposed(true); // TODO test it
+    // projectByTree.remove(db);
+    // projectByTree.remove();
     dbnm.forget(db);
     unRegisterNames(project, null);
   }
@@ -534,18 +546,17 @@ public class EclipseTracker extends AbstractResTracker {
     IProject project = (IProject) proj;
     db.registerMetaObject(META_ECLIPSE_PROJECT, project);
     TreeDB old = treeByProject.put(project, db);
-    if (old != null && db!=old) {
-      old.setDisposed(true);// TODO return clear cache?
+    if (old != null && db != old) {
+      old.setDisposed(true); // TODO return clear cache?
     }
-
   }
 
   public boolean isTracking(IProject project) {
     boolean result = treeByProject.containsKey(project);
-    if(!result)
+    if (!result)
       return false;
     TreeDB db = treeByProject.get(project);
-    if(db == null || db.isDisposed())
+    if (db == null || db.isDisposed())
       return false;
     return true;
   }
@@ -611,7 +622,7 @@ public class EclipseTracker extends AbstractResTracker {
     TreeState ts = tsm.getState(db.getLocalName(), tsm.getRevisionInfo(db));
 
     if (ts == TreeState.RESTART || ts == TreeState.DISPOSED || ts == TreeState.HALTED || ts == TreeState.NOT_LOADED)
-      return null;// calls on not loaded tree
+      return null; // calls on not loaded tree
     // if(node.isVirtual())
     // return null;
     ResourceStorage rs = getResourceStorage(db);
@@ -685,12 +696,12 @@ public class EclipseTracker extends AbstractResTracker {
       throw new RuntimeException("Tries to track null treeDB instance of " + lname);
     if (db.isBaseDisposed())
       throw new RuntimeException("Tries to track disposed treeDB instance of " + lname);
-    IProject p = extractProject(obj);// TODO checl
+    IProject p = extractProject(obj); // TODO checl
     if (p == null || p.getLocationURI() == null) {
       RLogger.logDebug("Provided object cannot be used to derive project on " + lname);
       return OperationResult.UNSUCEEDED;
     }
-    
+
     TreeStateManager tsm = TreeStateManager.getOne(db.getTracker());
     RevisionInfo ri = tsm.getRevisionInfo(db);
     TreeState ts = tsm.getState(lname, ri);
@@ -700,12 +711,12 @@ public class EclipseTracker extends AbstractResTracker {
     db.addTreeStateHooks(lname, pname);
     if (pname == null)
       pname = getProjectName(p);
-    URI uri = getUri(p, false);// here url is already needs to be loaded (or project is in incorrect state)
+    URI uri = getUri(p, false); // here url is already needs to be loaded (or project is in incorrect state)
 //    boolean wasNotLoading = getProjectLoadingState(uri, pname)==ProjectLoadingState.NOT_LOADING;
     final String fname = pname;
-//    if(wasNotLoading) {
-//      setProjectLoadingState(uri, pname, ProjectLoadingState.INITIAL_LOADING);
-//    }
+    // if(wasNotLoading) {
+    // setProjectLoadingState(uri, pname, ProjectLoadingState.INITIAL_LOADING);
+    // }
     ResourceStorage rs = (ResourceStorage) db.getStorage();
     projectToStorage.put(p, rs);
     bindTreeToProject(p, db, ri, lname, null);
@@ -715,77 +726,78 @@ public class EclipseTracker extends AbstractResTracker {
 
     IPath loc = getLocation(p);
     if (uri == null)
-      return OperationResult.UNSUCEEDED;// TODO clear?
+      return OperationResult.UNSUCEEDED; // TODO clear?
     OperationResult retRes = OperationResult.UNSUCEEDED;
-    com.unitesk.requality.core.operation.IProgressMonitor mon = db.getMonitor();// TODO IDE monitor
-  // updateVersion can reopen treedb
+    com.unitesk.requality.core.operation.IProgressMonitor mon = db.getMonitor(); // TODO IDE monitor
+    // updateVersion can reopen treedb
+    try {
       try {
-        try {
-          db.getStorage().initCaches(db.getStorage(), CacheInitializationStage.BEFORE_TRACK, mon);
-        } catch (Exception e1) {
-          RLogger.logError(e1);
-        }
-//        try {
-//          db = getTreeDB(p, ri, lname);
-//        } catch (IOException e) {
-//          e.printStackTrace();
-//        }
-        // tsm.setState(lname, ri, TreeState.READY_NO_CACHE);
-        // addStateHook(db);
-        // .getOne(db.getTracker()).setPartiallyReady(lname, ri);
-        ResourcesPlugin.getWorkspace()
-            .addResourceChangeListener(((ResourceStorage) db.getStorage()).getResourceChangeListener());
-        final TreeDB fdb = db;
-        Runnable r = new Runnable() {
-          @Override
-          public void run() {
-            CheckerContainer cc = fdb.getCheckerContainer(ri);
-            cc.attachGuiListener(fdb);
-            if (check)
-              cc.runCheckers();
-            WorkspaceJob runBuilder = new WorkspaceJob("Check Requality Project: " + getProjectName(p)) {
-              @Override
-              public IStatus runInWorkspace(IProgressMonitor monitor) throws CoreException {
-                try {
-                  p.build(IncrementalProjectBuilder.FULL_BUILD, monitor);
-                } catch (CoreException e) {
-                  RLogger.logError(e);
-                }
-                return Status.OK_STATUS;
-              }
-            };
-            runBuilder.setRule(ResourcesPlugin.getWorkspace().getRuleFactory().buildRule());
-            if (check)
-              runBuilder.schedule();
-          }
-        };
-        if (initCache) {
-          final TreeDB fdb2 = db;
-          tsm.addStateHook(lname, states, new IStateChangeHandler() {
+        db.getStorage().initCaches(db.getStorage(), CacheInitializationStage.BEFORE_TRACK, mon);
+      } catch (Exception e1) {
+        RLogger.logError(e1);
+      }
+      // try {
+      // db = getTreeDB(p, ri, lname);
+      // } catch (IOException e) {
+      // e.printStackTrace();
+      // }
+      // tsm.setState(lname, ri, TreeState.READY_NO_CACHE);
+      // addStateHook(db);
+      // .getOne(db.getTracker()).setPartiallyReady(lname, ri);
+      ResourcesPlugin.getWorkspace()
+          .addResourceChangeListener(((ResourceStorage) db.getStorage()).getResourceChangeListener());
+      final TreeDB fdb = db;
+      Runnable r = new Runnable() {
+        @Override
+        public void run() {
+          CheckerContainer cc = fdb.getCheckerContainer(ri);
+          cc.attachGuiListener(fdb);
+          if (check)
+            cc.runCheckers();
+          WorkspaceJob runBuilder = new WorkspaceJob("Check Requality Project: " + getProjectName(p)) {
             @Override
+            public IStatus runInWorkspace(IProgressMonitor monitor) throws CoreException {
+              try {
+                p.build(IncrementalProjectBuilder.FULL_BUILD, monitor);
+              } catch (CoreException e) {
+                RLogger.logError(e);
+              }
+              return Status.OK_STATUS;
+            }
+          };
+          runBuilder.setRule(ResourcesPlugin.getWorkspace().getRuleFactory().buildRule());
+          if (check)
+            runBuilder.schedule();
+        }
+      };
+      if (initCache) {
+        final TreeDB fdb2 = db;
+        tsm.addStateHook(lname, states, new IStateChangeHandler() {
+          @Override
             public void stateChanges(TreeDB db, String lname, String pname, RevisionInfo ri,
                 TreeState oldState, TreeState state) {
-              tsm.removeStateHook(lname, states, this);
+            tsm.removeStateHook(lname, states, this);
+            if(state == TreeState.READY)
               r.run();
-            }
+          }
 
-            @Override
-            public boolean filterTreeDB(TreeDB db) {
-              return db == fdb2;
-            }
-          });
-          db.initCaches(lname, pname, ri, noParallel);
-          retRes  = noParallel ? OperationResult.SUCEEDED : OperationResult.PARALLEL;
-        } else {
-          r.run();
-          retRes = OperationResult.SUCEEDED;
-        }
-      } finally {
-//        if(!wasIgnored) 
-//          hook.stateChanges(db, lname, ri, TreeState.READY, TreeState.READY);
+          @Override
+          public boolean filterTreeDB(TreeDB db) {
+            return db == fdb2;
+          }
+        });
+        db.initCaches(lname, pname, ri, noParallel);
+        retRes = noParallel ? OperationResult.SUCEEDED : OperationResult.PARALLEL;
+      } else {
+        r.run();
+        retRes = OperationResult.SUCEEDED;
       }
-//    }else
-//      tsm.removeStateHook(lname, tsa, hook);
+    } finally {
+      // if(!wasIgnored)
+      // hook.stateChanges(db, lname, ri, TreeState.READY, TreeState.READY);
+    }
+    // }else
+    // tsm.removeStateHook(lname, tsa, hook);
     return retRes;
   }
 
@@ -804,7 +816,7 @@ public class EclipseTracker extends AbstractResTracker {
     boolean ended = false;
     IStateChangeHandler ch = null;
     TreeStateManager tsm = TreeStateManager.getOne(this);
-    TreeDB old = getTreeDB(null, lname, pname, false, true, monitor);// TODO more proper monitor
+    TreeDB old = getTreeDB(null, lname, pname, false, true, monitor); // TODO more proper monitor
     if (old != null)
       throw new RuntimeException("Project with stored name " + pname + " already exist");
     TreeState ts = tsm.getState(lname, null);
@@ -820,7 +832,7 @@ public class EclipseTracker extends AbstractResTracker {
       // addNewHandling(nh,lname,pname, true);//to be sure no one more handles it at a
       // time
       dbnm.register(DBLocalName.formLocalNameKey(lname, null), pname);
-      tsm.setStateWithoutDB(lname, pname, (RevisionInfo) null, TreeState.NOT_LOADED);// TODO change?
+      tsm.setStateWithoutDB(lname, pname, (RevisionInfo) null, TreeState.NOT_LOADED); // TODO change?
       rl.lock();
       rlb = true;
       RevisionInfo ri = null;
@@ -836,7 +848,7 @@ public class EclipseTracker extends AbstractResTracker {
           project.open(null);
         AtomicBoolean isHookRemoved = new AtomicBoolean(false);
         final URI uri = getUri(project, true);
-        ch = new AAllTreeStateChangeHandler() {// TODO single?
+        ch = new AAllTreeStateChangeHandler() { // TODO single?
           private void removeIfNeeded(TreeStateManager ftsm, String lname, TreeState[] fstates,
               IStateChangeHandler sch) {
             synchronized (isHookRemoved) {
@@ -886,7 +898,7 @@ public class EclipseTracker extends AbstractResTracker {
         }
         // db = EclipseTracker.getTracker().getTree(project);//TODO look into
         ri = TreeStateManager.getRevisionInfo(db);
-        notifyListeners(Moment.AFTER, lname, null, db, TreeEvent.TREE_OPEN);// Update state on
+        notifyListeners(Moment.AFTER, lname, null, db, TreeEvent.TREE_OPEN); // Update state on
         return db;
       } finally {
       }
@@ -915,8 +927,8 @@ public class EclipseTracker extends AbstractResTracker {
       RLogger.logError("Paralllel operaton answer during the creation of project " + lname);
       return null;
     }
-    notifyListeners(Moment.BEFORE, lname, null, db, TreeEvent.TREE_OPEN);// Update state on
-    notifyListeners(Moment.AFTER, lname, null, db, TreeEvent.TREE_OPEN);// Update state on
+    notifyListeners(Moment.BEFORE, lname, null, db, TreeEvent.TREE_OPEN); // Update state on
+    notifyListeners(Moment.AFTER, lname, null, db, TreeEvent.TREE_OPEN); // Update state on
     return db;
   }
 
@@ -1009,8 +1021,8 @@ public class EclipseTracker extends AbstractResTracker {
             } else if (or == OperationResult.SUCEEDED || or == OperationResult.LOAD_AS_IT) {
               try {
                 TreeDB dba = getTreeDB(p, null, lname);
-                notifyListeners(Moment.BEFORE, lname, null, db, TreeEvent.TREE_OPEN);// Update state on
-                notifyListeners(Moment.AFTER, lname, null, db, TreeEvent.TREE_OPEN);// Update state on
+                notifyListeners(Moment.BEFORE, lname, null, db, TreeEvent.TREE_OPEN); // Update state on
+                notifyListeners(Moment.AFTER, lname, null, db, TreeEvent.TREE_OPEN); // Update state on
                 return dba;
               } catch (IOException e) {
                 RLogger.logError(e);
@@ -1038,7 +1050,7 @@ public class EclipseTracker extends AbstractResTracker {
   public void remove(String lname, String pname) {
     IProject p = null;
     // TODO test
-    TreeDB db = getTreeDB(null, lname, pname, true, false, monitor);// TODO IDE monitor
+    TreeDB db = getTreeDB(null, lname, pname, true, false, monitor); // TODO IDE monitor
     TreeStateManager tsm = this.tsm;
     RevisionInfo ri = null;
     if (db != null) {
@@ -1058,7 +1070,7 @@ public class EclipseTracker extends AbstractResTracker {
       stopTracking(p, db, null, lname, pname, true);
       unRegisterNames(p, lname);
       try {
-        p.delete(true, true, null);// TODO monitor
+        p.delete(true, true, null); // TODO monitor
       } catch (CoreException e) {
         // TODO Auto-generated catch block
         RLogger.logError(e);
@@ -1066,7 +1078,7 @@ public class EclipseTracker extends AbstractResTracker {
     }
   }
 
-  private Map<IProject, URI> uriCache = new HashMap<>();// needs to be cleared?
+  private Map<IProject, URI> uriCache = new HashMap<>(); // needs to be cleared?
 
   @Override
   public String getLocation(Object proj) {
@@ -1078,6 +1090,7 @@ public class EclipseTracker extends AbstractResTracker {
     }
     return null;
   }
+
   public String getLocation(IProject p, boolean noCache) {
     if (noCache) {
       URI uri = p.getLocationURI();
@@ -1093,15 +1106,16 @@ public class EclipseTracker extends AbstractResTracker {
     }
     return uri != null ? uri.toString() : null;
   }
+
   @Override
   public String getLocation(TreeDB db, boolean noCache) {
     IProject p = getProject(db);
     if (p == null) {
-      if(!noCache)
+      if (!noCache)
         return db.cachedLocation;
       return null;
     }
-    String uri = getLocation(p,noCache);
+    String uri = getLocation(p, noCache);
     return uri;
   }
 
@@ -1148,7 +1162,7 @@ public class EclipseTracker extends AbstractResTracker {
   }
 
   @Override
-  public void removeTemplate(File to, TreeDB tree, TemplateScope ts) {// TODO test?
+  public void removeTemplate(File to, TreeDB tree, TemplateScope ts) { // TODO test?
     CoreUtils.delete(to, true, false);
     // TODO return templates update?
   }
@@ -1196,7 +1210,7 @@ public class EclipseTracker extends AbstractResTracker {
   public void clearCache(TreeDB db, String localName, boolean delete) {
     IProject p = db.getMetaObject(META_ECLIPSE_PROJECT);
     if (p != null)
-      uriCache.remove(p);//we need it to call here for project share case
+      uriCache.remove(p); // we need it to call here for project share case
     super.clearCache(db, localName, delete);
     if (p != null) {
       // projectByTree.remove(db);
@@ -1205,12 +1219,12 @@ public class EclipseTracker extends AbstractResTracker {
         treeByProject.remove(p);
         projectToStorage.remove(p);
         lProjByName.remove(localName);
-      }else
-        RLogger.logDebug("Db not removed - another instance "+localName);
-//
-//      dba.setDisposed(!delete);
+      } else
+        RLogger.logDebug("Db not removed - another instance " + localName);
+      //
+      // dba.setDisposed(!delete);
     }
-    unRegisterNames(p, localName);// TODO needed?
+    unRegisterNames(p, localName); // TODO needed?
   }
 
   private IProject getProject(URI path) throws CoreException {
@@ -1226,7 +1240,7 @@ public class EclipseTracker extends AbstractResTracker {
       pd = w.loadProjectDescription(ipath);
     } catch (ResourceException re) {
       if (re.getCause() instanceof FileNotFoundException) {
-        return null;// desc file not found
+        return null; // desc file not found
       }
       throw re;
     } finally {
@@ -1241,10 +1255,10 @@ public class EclipseTracker extends AbstractResTracker {
     if (p == null || !p.exists()) {
       File pa = ipath.toFile().getParentFile();
       if (pa != null) {
-        p = getWorkspaceProject(path, pa.getName());
+        p = getWorkspaceProject(path, pa.getName()); // local name
         if (p != null && p.exists())
           return p;
-        p = getWorkspaceProject(path, pd.getName());
+        p = getWorkspaceProject(path, pd.getName()); // project name
         if (p == null || !p.exists())
           p = getWorkspaceProject(path, CoreUtils.getProjectName(pa));
         if (p == null || (!p.exists() || !p.getLocationURI().equals(path))) {
@@ -1275,6 +1289,7 @@ public class EclipseTracker extends AbstractResTracker {
     }
     return null;
   }
+
   @Override
   public String getProjectName(URI path) {
     IProject p;
@@ -1349,9 +1364,9 @@ public class EclipseTracker extends AbstractResTracker {
           return null;
         }
         ProjectLoadingState projectLoadingState = getProjectLoadingState(uri, lpartname);
-        if (!isCorrect(p) && projectLoadingState.isLoadable())// TODO
-                                                        // test
-                                                        // vars
+        if (!isCorrect(p) && projectLoadingState.isLoadable()) // TODO
+          // test
+          // vars
           throw new RuntimeException("Incorrect project! " + lpartname);
         if (!p.isOpen()) {
           RLogger.logInfo("Project is not opened " + lpartname);
@@ -1360,10 +1375,10 @@ public class EclipseTracker extends AbstractResTracker {
         mon.beginTask("Load project names " + lpartname, 1);
         String lname = getLocalName(p);
         String pname = CoreUtils.getProjectName(p.getLocation().toFile());
-        String rstring = RevisionInfo.toString(null, ri);// special case, we have
+        String rstring = RevisionInfo.toString(null, ri); // special case, we have
         // no dbs here, so use
         // full revision
-        
+
         ResourceStorage rs = null;
 
         rs = new ResourceStorage(p);
@@ -1374,10 +1389,10 @@ public class EclipseTracker extends AbstractResTracker {
           db = TreeDB.loadTreeInstance(lname, pname, ri, tr, rs);
           return db;
         } finally {
-          mon.doneTask();// TODO test
+          mon.doneTask(); // TODO test
         }
         // initDBLoading(p, ri, db);
-//      trackProject(p, ri, ingnoreStVersion);
+        // trackProject(p, ri, ingnoreStVersion);
       } else {
         // TODO implement import
       }
@@ -1420,7 +1435,7 @@ public class EclipseTracker extends AbstractResTracker {
         p.close(null);
         uriCache.remove(p);
         unRegisterNames(p, null);
-      } catch (CoreException e) {// TODO Auto-generated catch block
+      } catch (CoreException e) { // TODO Auto-generated catch block
         RLogger.logError(e);
       }
   }
@@ -1484,7 +1499,7 @@ public class EclipseTracker extends AbstractResTracker {
 
   public void handleProjectMove(URI oldURI, URI newURI, String pname) {
     projectLoadingLock.lock();
-    try{
+    try {
       if (oldURI != null) {
         IProject proj = extractProject(oldURI);
         if (proj != null && pname == null)
@@ -1497,10 +1512,11 @@ public class EclipseTracker extends AbstractResTracker {
           }
         }
       }
-    }finally {
+    } finally {
       projectLoadingLock.unlock();
     }
   }
+
   private File getFile(IProject p) {
     IPath pa = p.getLocation();
     if (pa != null)
@@ -1515,8 +1531,8 @@ public class EclipseTracker extends AbstractResTracker {
     File pname = p.toFile();
     if (pname != null) {
       String lname = getLocalName(project);
-      dbnm.register(DBLocalName.formLocalNameKey(lname, RevisionInfo.toString(null, null)), 
-        CoreUtils.getProjectName(pname));
+      dbnm.register(DBLocalName.formLocalNameKey(lname, RevisionInfo.toString(null, null)),
+          CoreUtils.getProjectName(pname));
     }
   }
 
@@ -1543,15 +1559,16 @@ public class EclipseTracker extends AbstractResTracker {
     }
   }
 
-//  public boolean getErrorState(IProject p) {
-//    return errorState.contains(p);
-//  }
+  // public boolean getErrorState(IProject p) {
+  // return errorState.contains(p);
+  // }
   private IProject lookFor(String pn, boolean onlyDB) {
     IProject pa = ResourcesPlugin.getWorkspace().getRoot().getProject(pn);
     if (pa != null && (!onlyDB || treeByProject.get(pa) != null && !treeByProject.get(pa).isDisposed()))
       return pa;
     for (Entry<IProject, TreeDB> en : treeByProject.entrySet())
-      if (getLocalName(en.getKey()).equals(pn) && (!onlyDB || en.getValue().getMetaObject(META_ECLIPSE_PROJECT) != null))
+      if (getLocalName(en.getKey()).equals(pn)
+          && (!onlyDB || en.getValue().getMetaObject(META_ECLIPSE_PROJECT) != null))
         return en.getKey();
     return null;
   }
@@ -1576,13 +1593,12 @@ public class EclipseTracker extends AbstractResTracker {
       }
     }
     return null;
-
   }
-  
-  public static IProject getProject(URI loc, String name){
+
+  public static IProject getProject(URI loc, String name) {
     IWorkspace w = ResourcesPlugin.getWorkspace();
     IWorkspaceRoot wr = w.getRoot();
-    IProject pnew = null; 
+    IProject pnew = null;
     for (IProject p : ResourcesPlugin.getWorkspace().getRoot().getProjects())
       if (p.exists() && name.equals(getProjectName(p, false))) {
         // such strange toURL because call upper forms it the same way
@@ -1592,27 +1608,48 @@ public class EclipseTracker extends AbstractResTracker {
     return pnew;
   }
 
-  public void callProjectRenameUpdate(URI oldURI, IProject pold, IProject pnew, TreeDB oldDB, RevisionInfo ri, String lname, String oldName, String newName) {
-    if(oldDB == null)
-      oldDB  = treeByProject.get(pold);
-    if(oldURI == null)
+  public void callProjectRenameUpdate(URI oldURI, IProject pold, IProject pnew, TreeDB oldDB, RevisionInfo ri,
+      String lname, String oldName, String newName) {
+    if (oldDB == null)
+      oldDB = treeByProject.get(pold);
+    if (oldURI == null)
       oldURI = getUri(pold, false);
-    if(oldDB!=null && !oldDB.isDisposed())
-      stopTracking(pold, oldDB, oldURI, lname, oldName, false);// for eclipse rename already called
+    if (oldDB != null && !oldDB.isDisposed())
+      stopTracking(pold, oldDB, oldURI, lname, oldName, false); // for eclipse rename already called
+    if (oldURI != null) {
+      java.nio.file.Path p = CoreUtils.getCacheDir(oldURI);
+      if (Files.exists(p))
+        CoreUtils.delete(p.toFile(), true, true);
+    }
     List<URI> newProjs = new LinkedList<>();
-    newProjs.add(pnew.getLocationURI());//TODO test?
-    enableListeners(DISABLED_NEW_PROJECTS);
-    handleNewProjects(newProjs);
-   // getTreeStateManager().waitState(lname, ri, states, RENAME_STATE_TIMEOUT);
-    //TODO new project?
+    newProjs.add(pnew.getLocationURI()); // TODO test?
+    boolean isDis = isDisabledListening(DISABLED_NEW_PROJECTS);
+    try {
+      enableListeners(DISABLED_NEW_PROJECTS);
+      handleNewProjects(newProjs);
+    } finally {
+      if (isDis)
+        isDisabledListening(DISABLED_NEW_PROJECTS);
+    }
+    // getTreeStateManager().waitState(lname, ri, states, RENAME_STATE_TIMEOUT);
+    // TODO new project?
   }
 
   public static IProject getWorkspaceProject(URI uri, String oldName) {
     IWorkspace ws = ResourcesPlugin.getWorkspace();
     IWorkspaceRoot wr = ws.getRoot();
-    for (IProject p : wr.getProjects())
-      if (p.getName().equals(oldName) || uri != null && p.getLocationURI().equals(uri))
+    for (IProject p : wr.getProjects()) {
+      if (p.getName().equals(oldName))
         return p;
+      if (uri != null) {
+        if (p.getLocationURI().equals(uri))
+          return p;
+        File pfile = new File(p.getLocationURI());
+        if (pfile.exists() && CoreUtils.getProjectName(pfile).equals(oldName))
+          return p;
+
+      }
+    }
     return null;
   }
 
@@ -1700,56 +1737,57 @@ public class EclipseTracker extends AbstractResTracker {
         setProjectLoadingState(loc, projectNameNew, ProjectLoadingState.NOT_LOADING);
         strangeEclipseMoveOperation(p, localName, projectNameOld, projectNameNew, monitor);
         TreeState[] states = new TreeState[] { TreeState.READY, TreeState.CANCELED };
-        tsm.waitState(localName, ri, states, RENAME_STATE_TIMEOUT*5);
+        tsm.waitState(localName, ri, states, RENAME_STATE_TIMEOUT * 5);
         TreeState state = tsm.getState(localName, ri);
-        if (state == TreeState.HALTED) {
+        if (state == TreeState.HALTED || state == TreeState.CANCELED) {
           return new Pair<Boolean, TreeDB>(false, project);
         }
       } finally {
       }
     }
-    return new Pair<Boolean,TreeDB>(true, null);
+    return new Pair<Boolean, TreeDB>(true, null);
   }
 
   private boolean strangeEclipseMoveOperation(IProject p, String lname, String projectOldName, String projectNameNew,
       IProgressMonitor pm) {
-    RenameResourceChange errc = new RenameResourceChange(p.getFullPath(), projectNameNew);
+    RenameResourceChange errc = new RenameResourceChange(p.getFullPath(), lname);
     EclipseTracker et = EclipseTracker.getTracker(DBNamesManager.DEFAULT);
     URI uri = et.getUri(p, false);
     et.disableListeners((byte) (IResTracker.DISABLED_LIS_EVENTS | IResTracker.DISABLED_NEW_PROJECTS));
     errc.initializeValidationData(pm);
-    
+
     ProjectRenameChange rrrc = new ProjectRenameChange(p, lname, projectOldName, projectNameNew);
     rrrc.initializeValidationData(pm);
-    
+
     try {
-      if(!p.isOpen())
+      if (!p.isOpen())
         p.open(pm);
       p.refreshLocal(IResource.DEPTH_INFINITE, pm);
-      errc.perform(pm);
+      if (!p.getName().equals(lname))//if the local name will be changed too
+        errc.perform(pm);
     } catch (CoreException e) {
       RLogger.logError(e);
     }
     try {
-      IProject pnew = et.getProject(uri, projectNameNew);
+      IProject pnew = EclipseTracker.getProject(uri, lname);
       rrrc.setProjectNew(pnew);
       try {
         ResourcesPlugin.getWorkspace().getRoot().refreshLocal(1, pm);
-        tsm.setState(lname, projectOldName, null, TreeState.NOT_LOADED);//TODO projectNewName
+        tsm.setState(lname, projectOldName, null, TreeState.NOT_LOADED); // TODO projectNewName
         rrrc.perform(pm);
       } catch (CoreException e) {
         RLogger.logError(e);
       }
-    }finally {
-      et.enableListeners((byte) (IResTracker.DISABLED_LIS_EVENTS| IResTracker.DISABLED_NEW_PROJECTS));
+    } finally {
+      et.enableListeners((byte) (IResTracker.DISABLED_LIS_EVENTS | IResTracker.DISABLED_NEW_PROJECTS));
     }
     return true;
   }
 
   private Change createRenameRefactoring(URI uri, IProject p, String projectNameOld, String projectNameNew) {
-//    Activator act = Activator.getDefault();
-//    act.setEnableListener(false);
-//    try {
+    // Activator act = Activator.getDefault();
+    // act.setEnableListener(false);
+    // try {
     String id = RenameResourceDescriptor.ID;
     RefactoringContribution contrib = RefactoringCore.getRefactoringContribution(id);
     RenameResourceDescriptor desc = (RenameResourceDescriptor) contrib.createDescriptor();
@@ -1772,9 +1810,9 @@ public class EclipseTracker extends AbstractResTracker {
     } catch (Exception e) {
       e.printStackTrace();
     }
-//    }finally {
-//      act.setEnableListener(true);
-//    }
+    // }finally {
+    // act.setEnableListener(true);
+    // }
     return null;
   }
 
@@ -1841,10 +1879,10 @@ public class EclipseTracker extends AbstractResTracker {
           return OperationResult.UNSUCEEDED;
         }
         return OperationResult.SUCEEDED;
-      } else if (state == ProjectLoadingState.LOADED){
-        return OperationResult.LOAD_AS_IT;//TODO test
-      } else 
-        RLogger.logDebug("Tries to load project in incorrect state "+lname+" be "+state);
+      } else if (state == ProjectLoadingState.LOADED) {
+        return OperationResult.LOAD_AS_IT; // TODO test
+      } else
+        RLogger.logDebug("Tries to load project in incorrect state " + lname + " be " + state);
     } catch (Exception e) {
       RLogger.logError(e);
       if (nhAdded.get())
@@ -1901,31 +1939,37 @@ public class EclipseTracker extends AbstractResTracker {
         if (changedProject.isAccessible() && (!tt.isTracking(changedProject) || TreeState.isDisposed(state))) {
           String name = tt.getLocalName(changedProject);
           String fcachedname = EclipseTracker.getProjectName(changedProject);
-          String fpname = EclipseTracker.getProjectName(changedProject, false);// needs to be non-cached
-          if (fcachedname != null
-              && (!fcachedname.equals(fpname) || !fcachedname.equals(changedProject.getName())))
+          String fpname = EclipseTracker.getProjectName(changedProject, false); // needs to be non-cached
+          String descName = changedProject.getName();
+          try{
+            descName = changedProject.getDescription().getName();
+          }catch(CoreException ce){
+          }
+          if (fcachedname != null && (!fcachedname.equals(fpname)
+              || !fcachedname.equals(descName)))
             return false;
-          tsm.setState(localName, fpname, null, RevisionInfo.NO_REV, TreeState.NOT_LOADED, true);// drop state
+          tsm.setState(localName, fpname, null, RevisionInfo.NO_REV, TreeState.NOT_LOADED, true); // drop
+                                                      // state
           // allowing to
           // reload a project
           TreeState[] states = new TreeState[] { TreeState.READY, TreeState.CANCELED };
           if (name != null) {
             // Good loading or loading fail
-            sh = new AAllTreeStateChangeHandler() {// tree can be changed after version update
+            sh = new AAllTreeStateChangeHandler() { // tree can be changed after version update
               @Override
               public void stateChanges(TreeDB db, String lname, String pname, RevisionInfo ri,
                   TreeState oldState, TreeState state) {
                 URI uri = changedProject.getLocationURI();
                 boolean isStoredCorrect = StoredFormatVersioning.getOne().storedVersionCorrect(uri);
                 if (state != TreeState.READY || isStoredCorrect) {
-                  if(hookAdded.get()) {
+                  if (hookAdded.get()) {
                     tsm.removeStateHook(name, states, this);
                     hookAdded.set(false);
                   }
                   // TODO check it, strange
                   if (state == TreeState.READY && isStoredCorrect)
                     if (tracker.getProjectLoadingState(uri, pname) != ProjectLoadingState.LOADED)
-                      tracker.setProjectLoadingState(uri, pname, ProjectLoadingState.LOADED);// TODO
+                      tracker.setProjectLoadingState(uri, pname, ProjectLoadingState.LOADED); // TODO
                   // move
                   // to
                   // single
@@ -1952,7 +1996,7 @@ public class EclipseTracker extends AbstractResTracker {
 
               @Override
               public boolean filterTreeDB(TreeDB db) {
-                return true;// TODO get instncae?
+                return true; // TODO get instncae?
               }
             };
             hookAdded.set(true);
@@ -1960,35 +2004,35 @@ public class EclipseTracker extends AbstractResTracker {
           }
           // URI uri = changedProject.getLocationURI();
           String name1 = tt.getLocalName(changedProject);
-          TreeDB old = tt.getTreeDB(changedProject, null, name1);// TODO reloading
+          TreeDB old = tt.getTreeDB(changedProject, null, name1); // TODO reloading
           TreeState ts = tsm.getState(name1, null);
           TreeDB n = null;
-          if (old == null || (TreeState.isProjectLoadable(ts))) {
+          if ((old == null || (TreeState.isProjectLoadable(ts))) && !tracker.isClosing.contains(changedProject)) {
             if (old != null) {
               old.setDisposed(false);
-              tsm.setState(name1, pname, null, TreeState.NOT_LOADED);//update state?
+              tsm.setState(name1, pname, null, TreeState.NOT_LOADED); // update state?
             }
             n = tt.getTreeDB(null, name1, pname, false, monitor);
-            if(n!=null && !n.isDisposed())
-              return false;//already loaded
+            if (n != null && !n.isDisposed())
+              return false; // already loaded
             n = tt.loadTreeDBDescription(changedProject, null, name1, monitor);
             OperationResult or = tt.trackTreeDB(changedProject, name1, pname, false, true, true, true, n);
             if (or == OperationResult.PARALLEL) {
               ts = tsm.getState(name1, null);
             } else if (or == OperationResult.UNSUCEEDED) {
               ts = tsm.getState(name1, null);
-              if(hookAdded.get()) {
+              if (hookAdded.get()) {
                 hookAdded.set(false);
                 tsm.removeStateHook(name, states, sh);// remove hook, new loading will be hold by updater
               }
-              IProject p = tt.extractProject(changedProject);// TODO checl
+              IProject p = tt.extractProject(changedProject); // TODO checl
               if (p != null && p.getLocationURI() != null) {
                 CacheStorage.closeRecConnection(new File(p.getLocationURI()));
               }
             } else {
-              TreeDB dba =tt.getTreeDB(changedProject, null, name1);
+              TreeDB dba = tt.getTreeDB(changedProject, null, name1);
               ts = tsm.getState(name1, null);
-              if(dba == n) {//if treeDB instance was not changed
+              if (dba == n) { // if treeDB instance was not changed
                 tracker.notifyListeners(Moment.BEFORE, name1, null, n, TreeEvent.TREE_OPEN);// Update state
                 // on
                 tracker.notifyListeners(Moment.AFTER, name1, null, n, TreeEvent.TREE_OPEN);// Update state
@@ -2002,7 +2046,7 @@ public class EclipseTracker extends AbstractResTracker {
         if (re != null && re.toString().startsWith("Cannot loc")) {
           RLogger.logDebug(CoreUtils.getTrace(re));
           return false;
-        }else
+        } else
           throw re;
       } finally {
         monitor.doneTask();
@@ -2054,15 +2098,14 @@ public class EclipseTracker extends AbstractResTracker {
 
       handleChange(eventKind, event.getResource());
     }
-    
 
     public void handleChange(int type, IResource resource) {
       if (type == IResourceChangeEvent.PRE_CLOSE) {
         EclipseTracker tracker = EclipseTracker.this;
         IProject p = (IProject) resource;
-        if(isClosing.contains(p))
+        if (isClosing.contains(p))
           return;
-        URI uri = tracker.getUri(p, true);// here we use a cached url
+        URI uri = tracker.getUri(p, true); // here we use a cached url
         String pname = uri != null ? CoreUtils.getProjectName(new File(uri)) : null;
         String lname = EclipseTracker.getLocalName(p);
         CoreUtils.lockWorkspace("close Project " + pname);
@@ -2077,9 +2120,9 @@ public class EclipseTracker extends AbstractResTracker {
       }
       if (type == IResourceChangeEvent.PRE_DELETE && (resource instanceof IProject)) {
         IProject p = (IProject) resource;
-        if(isClosing.contains(p))
+        if (isClosing.contains(p))
           return;
-        URI uri = tracker.getUri(p, true);// here we use a cached url
+        URI uri = tracker.getUri(p, true); // here we use a cached url
         String pname = uri != null ? CoreUtils.getProjectName(new File(uri)) : null;
         String lname = EclipseTracker.getLocalName(p);
         CoreUtils.lockWorkspace("delete Project " + pname);
@@ -2094,8 +2137,8 @@ public class EclipseTracker extends AbstractResTracker {
       if (type == IResourceChangeEvent.POST_CHANGE) {
         if (type == IResourceDelta.REMOVED)
           return;
-//              boolean isMove = type == IResourceChangeEvent.MOVED_TO ||
-//                  type == IResourceChangeEvent.MOVED_FROM;
+        // boolean isMove = type == IResourceChangeEvent.MOVED_TO ||
+        // type == IResourceChangeEvent.MOVED_FROM;
         // Track new
         final EclipseTracker tracker = Activator.getTracker();
         IProject newProjects[] = getNewProjects();
@@ -2107,7 +2150,7 @@ public class EclipseTracker extends AbstractResTracker {
             if (uri == null)
               continue;
             changed = true;
-            timeoutToLoad.put(uri, System.currentTimeMillis()+NEW_PROJET_TIMEOUT);
+            timeoutToLoad.put(uri, System.currentTimeMillis() + NEW_PROJET_TIMEOUT);
           }
           if (changed) {
             registerNewProjectLoader(timeoutToLoad);
@@ -2142,17 +2185,17 @@ public class EclipseTracker extends AbstractResTracker {
       String name = "Init Requality projects [" + Arrays.toString(loading.toArray()) + "]";
       CoreUtils.lockWorkspace(name);
       monitor.beginTask(name, loading.size());
-//                            for (IProject changedProject : reqProjects) 
-//                              changedProject.close(null);
-     // EclipseTracker tt = tracker;
-      //CacheStorage cs = tt.getCPCacheStorage(null);
+      // for (IProject changedProject : reqProjects)
+      // changedProject.close(null);
+      // EclipseTracker tt = tracker;
+      // CacheStorage cs = tt.getCPCacheStorage(null);
       // String cp = cs.startCacheTransaction("Init crossproject storage during init
       // ", CacheStorage.COMMIT_ALL);
       try {
         for (IProject changedProject : loading) {
           URI uri = changedProject.getLocationURI();
           String pname = EclipseTracker.getProjectName(changedProject);
-          if (pname == null || tracker.getProjectLoadingState(uri, pname)!= ProjectLoadingState.NOT_LOADING)
+          if (pname == null || tracker.getProjectLoadingState(uri, pname) != ProjectLoadingState.NOT_LOADING)
             continue;
           String flname = tracker.getLocalName(changedProject);
           if (!tracker.isClosing.contains(changedProject))
@@ -2167,38 +2210,38 @@ public class EclipseTracker extends AbstractResTracker {
     }
   }
 
-//  private void initLoadingJob() {
-//    loadingLock.lock();
-//    try {
-//      if (loadingJon == null || loadingTaked.get()) {
-//        loadingTaked.set(false);
-//        loadingJon = new WorkspaceJob("Init Requality projects") {
-//          @Override
+  // private void initLoadingJob() {
+  // loadingLock.lock();
+  // try {
+  // if (loadingJon == null || loadingTaked.get()) {
+  // loadingTaked.set(false);
+  // loadingJon = new WorkspaceJob("Init Requality projects") {
+  // @Override
 //          public IStatus runInWorkspace(IProgressMonitor monitor) throws CoreException {
-//            
-//          }
-//        };
-//        loadingJon.schedule();
-//      }
-//    } finally {
-//      loadingLock.unlock();
-//    }
-//  }
+  //
+  // }
+  // };
+  // loadingJon.schedule();
+  // }
+  // } finally {
+  // loadingLock.unlock();
+  // }
+  // }
 
   @Override
   public boolean isDisabledListening(byte b) {
     return (disabledLis & b) == b;
   }
 
-  public void addIsClosing(IProject p){
+  public void addIsClosing(IProject p) {
     isClosing.add(p);
   }
 
   private IProject[] getNewProjects() {
     Set<IProject> openProjects = new HashSet<>();
     for (IProject proj : ResourcesPlugin.getWorkspace().getRoot().getProjects()) {
-      if (proj.isOpen() && isLoadableRequalityProject(proj) && isCorrect(proj) && !isClosing.contains(proj) 
-        && proj.getLocationURI()!=null) {
+      if (proj.isOpen() && isLoadableRequalityProject(proj) && isCorrect(proj) && !isClosing.contains(proj)
+          && proj.getLocationURI() != null) {
         String lname = EclipseTracker.getLocalName(proj);
         TreeState ts = tracker.getTreeStateManager().getState(lname, RevisionInfo.NO_REV);
         if (TreeState.isProjectLoadable(ts))
@@ -2230,7 +2273,7 @@ public class EclipseTracker extends AbstractResTracker {
   public static boolean isBroken(IProject proj) {
     IFile f = proj.getFile("root.json");
     if (!f.exists())
-      return true;// broken project
+      return true; // broken project
     return false;
   }
 
@@ -2240,56 +2283,59 @@ public class EclipseTracker extends AbstractResTracker {
       return false;
     return true;
   }
+
   private ConcurrentLinkedDeque<IProject> onUpdateQueue = new ConcurrentLinkedDeque<>();
   private AtomicBoolean newProviderLoaderStopped = new AtomicBoolean(true);
+
   public void registerNewProjectLoader(Map<URI, Long> newProjs) {
     projectLoadingLock.lock();
-    try{
-      if(!newProviderLoaderStopped.get())
+    try {
+      if (!newProviderLoaderStopped.get())
         return;
       JobManager.jm.startJob("Load projects", new RunnableWithMonitor() {
         @Override
         public void run(com.unitesk.requality.core.operation.IProgressMonitor pm) {
-          synchronized(EclipseTracker.this) {
-            if(!newProviderLoaderStopped.get())
+          synchronized (EclipseTracker.this) {
+            if (!newProviderLoaderStopped.get())
               return;
             newProviderLoaderStopped.set(false);
           }
           List<URI> toLoad = null;
-          while(!newProjs.isEmpty()){
+          while (!newProjs.isEmpty()) {
             long min = Long.MAX_VALUE;
             boolean minChanged = false;
-            for(Entry<URI, Long> en:newProjs.entrySet()){
-              if(en.getValue()<System.currentTimeMillis()){
-                if(toLoad == null)
+            for (Entry<URI, Long> en : newProjs.entrySet()) {
+              if (en.getValue() < System.currentTimeMillis()) {
+                if (toLoad == null)
                   toLoad = new ArrayList<>();
                 toLoad.add(en.getKey());
-              }else {
+              } else {
                 min = Math.min(min, en.getValue());
                 minChanged = true;
               }
             }
-            if(toLoad!=null) {
-              for(URI ur:toLoad)
+            if (toLoad != null) {
+              for (URI ur : toLoad)
                 newProjs.remove(ur);
               handleNewProjects(toLoad);
             }
-            long waitTime = min-System.currentTimeMillis();
-            if(minChanged && waitTime>0)
+            long waitTime = min - System.currentTimeMillis();
+            if (minChanged && waitTime > 0)
               try {
                 Thread.currentThread().join(waitTime);
               } catch (InterruptedException e) {
               }
           }
-          synchronized(EclipseTracker.this) {
+          synchronized (EclipseTracker.this) {
             newProviderLoaderStopped.set(true);
           }
         }
       }, true);
-    }finally {
+    } finally {
       projectLoadingLock.unlock();
     }
   }
+
   @Override
   public void handleNewProjects(List<URI> reqProjects) {
     List<IProject> toLoad = new LinkedList<>();
@@ -2300,17 +2346,17 @@ public class EclipseTracker extends AbstractResTracker {
       } catch (CoreException e1) {
         RLogger.logError(e1);
       }
-      if (changedProject!=null && changedProject.isAccessible() && isLoadableRequalityProject(changedProject)) {
+      if (changedProject != null && changedProject.isAccessible() && isLoadableRequalityProject(changedProject)) {
         String pname = EclipseTracker.getProjectName(changedProject);
         if (!isCorrect(changedProject))
           RLogger.logError("Project " + pname + " has corrupted structure!");
         else {
-//          if (loadingJob != null)
-//            loadingEnded.set(true);
-//          loadingEnded = new AtomicBoolean(false);
-//          final AtomicBoolean ab = loadingEnded;
+          // if (loadingJob != null)
+          // loadingEnded.set(true);
+          // loadingEnded = new AtomicBoolean(false);
+          // final AtomicBoolean ab = loadingEnded;
           synchronized (onUpdateQueue) {
-            if(!onUpdateQueue.contains(changedProject)) {
+            if (!onUpdateQueue.contains(changedProject)) {
               onUpdateQueue.add(changedProject);
               toLoad.add(changedProject);
             }
@@ -2324,7 +2370,7 @@ public class EclipseTracker extends AbstractResTracker {
         boolean locked = false;
         while (!locked) {
           try {
-            locked = loadingLock.tryLock(500,TimeUnit.MILLISECONDS);
+            locked = loadingLock.tryLock(500, TimeUnit.MILLISECONDS);
           } catch (InterruptedException e) {
             RLogger.logError(e);
             return;
@@ -2339,13 +2385,16 @@ public class EclipseTracker extends AbstractResTracker {
             try {
               newProjectsActions(toLoad, pm);
               return;
-            } catch (Exception e) {
+            }catch (RuntimeException e) {
+              RLogger.logInfo(e);
+            } 
+            catch (Exception e) {
               RLogger.logError(e);
             }
             return;
           }
         } finally {
-          if(locked)
+          if (locked)
             loadingLock.unlock();
           synchronized (onUpdateQueue) {
             onUpdateQueue.removeAll(toLoad);
@@ -2353,7 +2402,7 @@ public class EclipseTracker extends AbstractResTracker {
         }
       }
     };
-    if(toLoad.size()>0)
+    if (toLoad.size() > 0)
       JobManager.jm.startJob("Init loading for projects " + Arrays.toString(toLoad.toArray()),
         projsLoadingJob, true);
   }

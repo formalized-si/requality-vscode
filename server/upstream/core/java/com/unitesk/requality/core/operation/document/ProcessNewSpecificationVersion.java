@@ -412,6 +412,7 @@ public class ProcessNewSpecificationVersion extends DocumentProcessor {
             }else {
               List<Object> arr = loc.attrs().getListAttributeValue(Location.ATTR_MARKUP);
               arr.add(spanToTransfer.getLocation().getStart()+Location.FRAGMENT_SEPARATOR+spanToTransfer.getLocation().getEnd());
+              arr.sort(Location.FRAGMENT_SORTER);
               loc.attrs().setConstAttribute(Location.ATTR_MARKUP, new ListValue(AttributeType.STRING, arr),
                   AttributeDefinition.detectFlags(Location.TYPE_NAME));
               loc.commitAttributes();

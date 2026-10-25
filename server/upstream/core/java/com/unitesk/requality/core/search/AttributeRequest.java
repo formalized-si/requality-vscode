@@ -1,9 +1,10 @@
 package com.unitesk.requality.core.search;
 
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
-import java.util.Set;
+
 import com.unitesk.requality.core.attribute.Attribute;
 import com.unitesk.requality.core.attribute.AttributeType;
 import com.unitesk.requality.core.attribute.SystemNames;
@@ -62,7 +63,7 @@ public class AttributeRequest implements ISearchRequest {
   }
 
   @Override
-  public boolean test(TreeNode node) {
+  public void test(TreeNode node, List<String> attrFound) {
     if(key.equals(USER_VISIBLE_KEY)) {
       for(Entry<String, Attribute> e:node.attrs().getActiveAttributes().entrySet()) {
         String akey = e.getKey();
@@ -74,58 +75,67 @@ public class AttributeRequest implements ISearchRequest {
 //        if(op == AttributeOperator.EXISTS && 
 //            (a != null && a.getValue() != null))
 //          return true;
-        if(a == null || a.getValue() == null || !a.isUserVisible() && SystemNames.getOne(node.getTreeDB()).getVisSysName(e.getKey())==null)
+        if(!filteredUserVisible(node, e.getKey(), a))
           continue;//check only exist
         String aval = a.getValue().toString();
         if(!cs) 
-        	aval = aval.toLowerCase();
+          aval = aval.toLowerCase();
         if(op == AttributeOperator.EQUALS)
           if(ra.equals(aval))
-            return true;
+            attrFound.add(akey);
         if(op == AttributeOperator.NOT_EQUALS&&!ra.equals(aval))
-          return true;
+          attrFound.add(akey);
         if(op == AttributeOperator.CONTAINS_SINGLE_SPACE && 
         		(aval.contains(ra)||
         		  CoreUtils.filterOutText(aval,false).contains(ra)||
         		  CoreUtils.filterOutText(aval,true).contains(CoreUtils.spaceOne(ra))))
-          return true;
+          attrFound.add(akey);
         if(op == AttributeOperator.CONTAINS && aval.contains(ra))
-          return true;
+          attrFound.add(akey);
         if(op == AttributeOperator.NOT_CONTAINS&&!aval.contains(ra))//TODO mb use contains logic
-          return true;
+          attrFound.add(akey);
       }
-      return false;
     }else {
       Attribute a = node.attrs().getAttribute(key);
       if(op == AttributeOperator.NOT_EXISTS && 
           (a == null || a.getValue() == null))
-        return true;
+        attrFound.add(key);
       if(op == AttributeOperator.EXISTS && 
           (a != null && a.getValue() != null))
-        return true;
-      if(a == null || a.getValue() == null)
-        return false;//check only exist
-      String aval = a.getValue().toString();
+        attrFound.add(key);
+      String aval = null;
+      if(a == null || a.getValue() == null){
+        aval = "";
+      }else
+        aval = a.getValue().toString();
       if(!cs) 
       	aval = aval.toLowerCase();
       if(op == AttributeOperator.EQUALS)
-        return ra.equals(aval);
+        if(ra.equals(aval))
+          attrFound.add(key);
       if(op == AttributeOperator.NOT_EQUALS)
-        return !ra.equals(aval);
+        if(!ra.equals(aval))
+          attrFound.add(key);
       if(op == AttributeOperator.CONTAINS)
-        return aval.contains(ra);
+        if(aval.contains(ra))
+          attrFound.add(key);
       if(op == AttributeOperator.CONTAINS_SINGLE_SPACE)
-        return aval.contains(ra)||
+        if(aval.contains(ra)||
         		CoreUtils.filterOutText(aval,false).contains(ra)||
-        		CoreUtils.filterOutText(aval,true).contains(CoreUtils.spaceOne(ra));
+        		CoreUtils.filterOutText(aval,true).contains(CoreUtils.spaceOne(ra)))
+          attrFound.add(key);
       if(op == AttributeOperator.NOT_CONTAINS)
-        return !aval.contains(ra);
+        if(!aval.contains(ra))
+          attrFound.add(key);
     }
-    return false;
   }
 
+  public static boolean filteredUserVisible(TreeNode node, String key2,Attribute a){// TODO Auto-generated method stub
+     return a != null && a.getValue() != null && (a.isUserVisible() || SystemNames.getOne(node.getTreeDB()).getVisSysName(key2)!=null);
+  }
+ 
   @Override
-  public boolean actionAndIgore(TreeNode root, Set<TreeNode> matches) {
+  public boolean actionAndIgore(TreeNode root, List<Pair<? extends TreeNode, List<String>>> matches) {
     return false;
   }
   public String get(String string) {

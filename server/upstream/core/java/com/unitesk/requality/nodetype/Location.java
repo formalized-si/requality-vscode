@@ -53,6 +53,22 @@ public class Location extends TreeNode{
   public static final String TYPE_NAME = "Location";
   public static final String FRAGMENT_SEPARATOR = "|";
   public static final String FRAGMENT_SEPARATOR_REGEXP = "\\|";
+  public static final Comparator<Object> FRAGMENT_SORTER=new Comparator<Object>() {
+    @Override
+    public int compare(Object o1, Object o2) {
+      if(o1 == null)
+        return o2 == null ? -1 : 0;
+      if(o2 == null)
+        return 1;
+      String os1 = o1.toString(), os2 = o2.toString();
+      String[]osa1 = os1.split(FRAGMENT_SEPARATOR_REGEXP), osa2 = os2.split(FRAGMENT_SEPARATOR_REGEXP);
+      if(osa1.length<2)
+        return osa1.length<2 ? -1 : 0;
+      if(osa2.length<2)
+        return 1;
+      return Integer.compare(Integer.parseInt(osa1[0]), Integer.parseInt(osa2[0]));
+    }  
+  };
   public static String ATTR_MARKUP = "_markup";
   //private String label;
   // private boolean isTransferred = false;

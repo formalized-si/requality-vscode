@@ -120,7 +120,13 @@ function printToConsole(msg)
 			"message":msg==null?"null":msg
 		}));
 }
-	
+function sendUploadImage(url){
+	waitSend(JSON.stringify({
+			"operation": "uploadImage",
+			"path":url==null?"null":url
+		}));
+}
+
 function callOpenTemplates(node)
 {
 	waitSend("{\"operation\":\"callOpenTemplates\",\"node\":\""+(!node?"null":node)+"\"}");

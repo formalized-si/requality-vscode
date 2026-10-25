@@ -2,10 +2,10 @@ package com.unitesk.requality.core.secure;
 
 import java.io.File;
 import java.io.IOException;
-import java.net.URI;
 import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
+import java.nio.file.Path;
 import java.security.InvalidKeyException;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
@@ -14,6 +14,7 @@ import java.security.spec.InvalidKeySpecException;
 import java.util.Arrays;
 import java.util.Base64;
 import java.util.Optional;
+
 import javax.crypto.BadPaddingException;
 import javax.crypto.Cipher;
 import javax.crypto.IllegalBlockSizeException;
@@ -21,8 +22,10 @@ import javax.crypto.NoSuchPaddingException;
 import javax.crypto.SecretKeyFactory;
 import javax.crypto.spec.PBEKeySpec;
 import javax.crypto.spec.SecretKeySpec;
+
 import com.unitesk.requality.core.secure.SecureStorage.PassProvider;
 import com.unitesk.requality.core.storage.IResTracker;
+import com.unitesk.requality.tool.CoreUtils;
 
 public class SecureDataManager {
 	boolean inited = false;
@@ -45,10 +48,10 @@ public class SecureDataManager {
       return Optional.of(salt);
     }
     public SecureDataManager(IResTracker tracker) {
-      URI loc = tracker.getGlobalCacheLocation();
+      Path loc = CoreUtils.getCacheDir(tracker.getGlobalCacheLocation());
       File salt = null;
       if(loc!=null)  
-        salt = new File(loc).toPath().resolve("salt").toFile();
+        salt = loc.resolve("salt").toFile();
       if(salt == null || !salt.exists()) {
           Optional<byte[]>salta = generateSalt(KEY_LENGTH);
           if(salta.isEmpty())

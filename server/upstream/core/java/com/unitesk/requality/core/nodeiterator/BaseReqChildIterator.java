@@ -113,8 +113,24 @@ public class BaseReqChildIterator extends RequalityChildIterator {
     TreeNode targ = virtualNode.getTarget();
     if (targ != null) {
       StringBuffer sb = new StringBuffer();
-      for (UUID uid : targ.getWorkChildrenUUIDs()) sb.append(uid.toString());
-      if (lastChistr == null || !sb.toString().equals(lastChistr)) return true;
+      TreeDB vdb = Instantiator.getExistVirtualTreeDB(virtualNode.getTreeDB(), virtualNode.getVRoot());
+      TreeInstancer ti = vdb.getVStorage();
+      for (UUID uid : targ.getWorkChildrenUUIDs()) {
+        sb.append(uid);
+      }
+      if (lastChistr != null && !sb.toString().equals(lastChistr)) { 
+        return true;
+      }
+      if(lastChistr == null) {
+        String targetState = sb.toString();
+        sb.setLength(0);
+        for (UUID uid : virtualNode.getWorkChildrenUUIDs()) {
+          UUID cp = ti.getCloneParent(uid);
+          sb.append(cp);
+        }
+        if(!sb.toString().equals(targetState))
+          return true;
+      }
     }
     return false;
   }

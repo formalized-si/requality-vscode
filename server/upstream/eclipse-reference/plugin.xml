@@ -878,13 +878,11 @@
    </extension>
          <extension
                point="org.eclipse.ui.menus">
+            <!--
             <menuContribution
-                  locationURI="menu:org.eclipse.ui.main.menu">
-               <menu
-                     id="edit?after=find"
-                     label="Edit">
-                  <command
-                        commandId="org.eclipse.ui.edit.findNext">
+                  locationURI="menu:edit?after=find">
+               <command
+                     commandId="org.eclipse.ui.edit.findPrevious">
                      <visibleWhen
                            checkEnabled="false">
                         <with
@@ -894,9 +892,9 @@
                            </equals>
                         </with>
                      </visibleWhen>
-                  </command>
-                  <command
-                        commandId="org.eclipse.ui.edit.findPrevious">
+               </command>
+               <command
+                     commandId="org.eclipse.ui.edit.findNext">
                      <visibleWhen
                            checkEnabled="false">
                         <with
@@ -906,10 +904,9 @@
                            </equals>
                         </with>
                      </visibleWhen>
-                  </command>
-               </menu>
+               </command>
             </menuContribution>
-            
+            -->
             <menuContribution
                   locationURI="popup:com.unitesk.requality.views.RequalityExplorer.popup?after=group.edit">
                <command

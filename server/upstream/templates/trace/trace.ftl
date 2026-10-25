@@ -25,6 +25,12 @@
 
 <style>
 
+<#if fitImages?? >
+  img,object{
+    max-width: 100%;
+    object-fit: contain;
+  }
+</#if>
 .maintable{
 	background: white;
 	border-collapse: collapse;

@@ -54,7 +54,8 @@ public class RepoTracker extends AbstractResTracker {
   private CacheStorageManager csm = null;;
   private Path cpPath = null;
   private DBSlice sliceNow = DBSlice.EMPTY;
-  private DBSlice sliceHead = null;
+  private DBSlice sliceHead = null;//head of branch
+  private DBSlice sliceCurrentRev = null;//current revision
   //private Map<String, DBSlice> sliceHeads = new HashMap<>();
 
   public DBSlice getHeadSlice(RepoManager rm, TreeDB db, IProgressMonitor mon) throws Exception {
@@ -68,13 +69,13 @@ public class RepoTracker extends AbstractResTracker {
         mon.beginTask("Slice init - not in cache, loading", 1);
         try {
           RelationsTreeContext related = CoreUtils.gatherRelatedTrees(db, null, -1, null, true);
-          RevisionInfo ri = rm.getHeadRevision();
+          RevisionInfo ri = rm.getCurrentRevision();//use this instead of head allowing to load from current repo state
           
           HashMap<TreeDB, RevisionInfo> riMap = new HashMap<>();
           for(TreeDB dba:related.allRelated) {
             RepoManager rma = Global.getRepoManager(dba);
             if(rma!=null)
-              riMap.put(dba, rma.getHeadRevision());
+              riMap.put(dba, rma.getCurrentRevision());//use this instead of head allowing to load from current repo state
           }
           RevisionInfo headRev = new SliceRevisonInfo(ri, riMap);
           
@@ -93,6 +94,45 @@ public class RepoTracker extends AbstractResTracker {
     }
   }
 
+  public DBSlice getCurrentRevisionSlice(RepoManager rm, TreeDB db, IProgressMonitor mon) throws Exception {
+    synchronized (this) {
+      String dbname = db.getLocalName();
+      DBSlice selSlice = sliceCurrentRev;
+      mon.beginTask("Slice init - check cache", 1);
+      // TODO sync?
+      if (selSlice == null) {
+        mon.doneTask();
+        mon.beginTask("Slice init - not in cache, loading", 1);
+        try {
+          RelationsTreeContext related = CoreUtils.gatherRelatedTrees(db, null, -1, null, true);
+          RevisionInfo ri = rm.getCurrentRevision();
+          
+          HashMap<TreeDB, RevisionInfo> riMap = new HashMap<>();
+          for(TreeDB dba:related.allRelated) {
+            RepoManager rma = Global.getRepoManager(dba);
+            if(rma!=null) {
+              RevisionInfo dbaInfo = rma.getCurrentRevision();
+              if(dbaInfo == null)
+                dbaInfo = rma.getCurrentRevision();
+              riMap.put(dba, dbaInfo);
+            }
+          }
+          RevisionInfo headRev = new SliceRevisonInfo(ri, riMap);
+          
+          selSlice = DBSlice.create(getCacheStorageManager(), related.allRelated.toArray(new TreeDB[0]), // TODO
+                                                          // more
+                                                          // proper
+                                                          // use
+              rm, db, headRev, mon);
+        } finally {
+          mon.doneTask();
+        }
+      } else {
+        mon.doneTask();
+      }
+      return selSlice;
+    }
+  }
   public static RepoTracker getRepoTracker(IResTracker tr) {
     if (tr instanceof RepoTracker)
       return (RepoTracker) tr;
@@ -258,7 +298,8 @@ public class RepoTracker extends AbstractResTracker {
 
   @Override
   public void refresh(Object storingEnt, int depth) throws Exception {
-    baseTracker.refresh(storingEnt, depth);// TODO mb bug
+    ft.refresh(storingEnt, depth);//ft tends to be better, base tracker forces eclipse to update caches for all clones that is 
+    //quite more resource-intensive
   }
 
   @Override
@@ -550,6 +591,12 @@ public class RepoTracker extends AbstractResTracker {
   @Override
   public void bindTreeToProject(Object proj, TreeDB db, RevisionInfo ri, String lname, File ch) {
     ft.bindTreeToProject(proj, db, ri, lname, ch);
+  }
+
+
+  @Override
+  public void unbindBaseFromProject(Object project, TreeDB db, boolean delete, File ch) {
+    ft.unbindBaseFromProject(project, db, delete, ch);
   }
 
   @Override

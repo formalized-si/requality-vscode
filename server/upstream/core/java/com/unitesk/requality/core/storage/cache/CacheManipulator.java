@@ -19,10 +19,10 @@ public abstract class CacheManipulator<T> {
   private Thread processUpdating = null;
   public static String getCPTreeDBId(String cachename, TreeDB db){
     //Local name seems to be more proper for cache init
-    return cachename+db.getLocalName()+TreeStateManager.getOne(db.getTracker()).getRevisionOrHeadString(db);
+    return cachename+db.getLocalName()+TreeStateManager.getOne(db.getTracker()).getActiveCommitString(db);
   }
   public static String getTreeDBId(String cachename, TreeDB db){
-    return cachename+db.getLocalName()+TreeStateManager.getOne(db.getTracker()).getRevisionOrHeadString(db);
+    return cachename+db.getLocalName()+TreeStateManager.getOne(db.getTracker()).getActiveCommitString(db);
   }
   protected IProgressMonitor parallelMon = null;
   protected abstract String[] getSettingsNames(T db);

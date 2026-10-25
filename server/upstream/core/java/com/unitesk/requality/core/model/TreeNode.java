@@ -232,21 +232,30 @@ public class TreeNode implements Comparable<TreeNode>, ITreeNodeProvider {
   }
   public IMark[] getCheckerProblems(){
     ConcurrentLinkedQueue<IMark> warnings = getTreeDB().getWarnings(this);
-    if(checkerTreeProblems!=null || warnings!=null){
-      IMark[]ret = new IMark[checkerProblems.length+(checkerTreeProblems!=null?checkerTreeProblems.size():0)+
-                             (warnings!=null?warnings.size():0)];
+    Collection<IMark> storageProblems = getTreeDB().getStorage().getStorageNodeProblems(uuid);
+    IMark[] storedCheckerProblems = checkerProblems;
+    ConcurrentLinkedQueue<IMark> storedCheckerTreeProblems = 
+       checkerTreeProblems == null? null:
+         new ConcurrentLinkedQueue<>(checkerTreeProblems);
+    if(storedCheckerTreeProblems!=null || warnings!=null || storageProblems!=null || storedCheckerProblems.length>0){
+      IMark[]ret = new IMark[storedCheckerProblems.length+
+                             (storedCheckerTreeProblems!=null?storedCheckerTreeProblems.size():0)+
+                             (warnings!=null?warnings.size():0) + (storageProblems == null?0:storageProblems.size())];
       int i = 0;
-      if(checkerTreeProblems!=null)
-        for(IMark r:checkerTreeProblems)
-          ret[i++]=r;
-      for(IMark r:checkerProblems)
+      for(IMark r:storedCheckerProblems)
         ret[i++]=r;
+      if(storedCheckerTreeProblems!=null)
+        for(IMark r:storedCheckerTreeProblems)
+          ret[i++]=r;
       if(warnings!=null)
         for(IMark r:warnings)
           ret[i++]=r;
+      if(storageProblems!=null)
+        for(IMark r: storageProblems)
+          ret[i++] = r;
       return ret;
     }
-    return checkerProblems;
+    return storedCheckerProblems;
   }
   public void removeTreeCheckerProblems(Class cl) {
     int cnt = 0;
@@ -278,12 +287,13 @@ public class TreeNode implements Comparable<TreeNode>, ITreeNodeProvider {
     TreeDB db = getTreeDB();
     if(db.revision==null || db.revision==RevisionInfo.NO_REV)
     {
-      checkerProblems = db.getCheckerContainer().gatherProblems(this);
-      db.getCheckerContainer().registerProblems(this,getCheckerProblems());
-      Collection<IMark> warns = getTreeDB().getWarnings(this);
-      if(warns!=null)
-        db.getCheckerContainer().registerProblems(this, warns.toArray(new IMark[warns.size()]));
+      CheckerContainer cc = db.getCheckerContainer();
+      checkerProblems = cc.gatherProblems(this);
+      cc.registerProblems(this,getCheckerProblems());
     }
+  }
+  private IMark[] adaptStorageMarks(TreeNode treeNode,Collection<IMark> storageErrors){// TODO Auto-generated method stub
+    return storageErrors.toArray(new IMark[0]);
   }
   public boolean canBeCheckedIn(CheckerContainer cc){
     if(db.revision!=null && db.revision!=RevisionInfo.NO_REV)
@@ -990,6 +1000,24 @@ public class TreeNode implements Comparable<TreeNode>, ITreeNodeProvider {
     }
         
     return ret;
+  }
+  
+
+  public String getRawDescription(String prefix, String postfix, String basePath,
+      IReqURIResolver reslv) {
+    String separator = " ";
+    String desc = getRawDescription(reslv);
+    if (desc == null)
+      return null;
+    try {
+      URI path = getNodeResourcesPath();
+      return CoreUtils.htmlEncapsulate(prefix+
+          RequalityCLI.getReportDescription(
+              this, TreeNode.ATTR_DESCRIPTION, path != null ? path.toString() : null, desc, prefix, postfix, basePath)+postfix);
+    } catch (Exception e) { // TODO Auto-generated catch block
+      e.printStackTrace();
+    }
+    return CoreUtils.htmlEncapsulate(prefix+desc+postfix);
   }
 
   /**

@@ -6,6 +6,7 @@ import java.util.HashMap;
 import java.util.Iterator;
 import java.util.LinkedList;
 import java.util.Map;
+import java.util.function.Predicate;
 
 import com.unitesk.requality.vscode.ui.runtime.WorkspaceJob;
 import com.unitesk.requality.vscode.ui.runtime.IProgressMonitor;
@@ -41,10 +42,12 @@ public class RevisionsPanel {
   private String[]slist;
 //  int b = 0;
   private java.util.List<FileSpaceTimePoint> points;
+  private Predicate<FileSpaceTimePoint> filter;
   public static String WS = "Workspace", HEAD = "HEAD";
   Map<String,Integer> index = new HashMap<>();
   
-  public RevisionsPanel(final Composite parent, int selCount, int swt) {
+  public RevisionsPanel(final Composite parent, Predicate<FileSpaceTimePoint> filter, int selCount, int swt) {
+    this.filter = filter;
     sind = new int[selCount];
     slist = new String[selCount];
     Arrays.fill(slist, "");
@@ -64,9 +67,14 @@ public class RevisionsPanel {
             obj[1] = HEAD;
             //Iterator<FileSpaceTimePoint> it = l.iterator();
             int i = 2;
-            for(FileSpaceTimePoint it:l)
+            for(FileSpaceTimePoint it:l) {
+              if(filter!=null && !filter.test(it))
+                continue;
             //while(it.hasNext())
               obj[i++] = it;
+            }
+            if(i<obj.length)
+              obj = Arrays.copyOf(obj, i);
             return obj;
           }
         }

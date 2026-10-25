@@ -85,91 +85,102 @@ import com.unitesk.requality.tool.cli.RequalityCLI;
 
 public class CoreUtils {
   public static TreeNode[] NO_NODES = new TreeNode[0];
-  private static List<IFileDeleteListener> listeners = new LinkedList<>();  
+  private static List<IFileDeleteListener> listeners = new LinkedList<>();
   public static final DateFormat SQL_DATE_FORMAT = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss");
   public static final String CACHE_FOLDER_NAME = ".reqcache";
   public static int DEBUG_LEVEL = 0;
   private static final String REQ_URI_START = "requality://";
   private static String locked = "";
-  private static Map<File,String> names = new HashMap<>();
+  private static Map<File, String> names = new HashMap<>();
   private static Map<File, Long> lchange = new HashMap<>();
-  
-  public static void addFileDeleteListener(IFileDeleteListener fdl)
-  {
+
+  public static void addFileDeleteListener(IFileDeleteListener fdl) {
     listeners.add(fdl);
   }
-  public static List<IFileDeleteListener> getListeners(){
+
+  public static List<IFileDeleteListener> getListeners() {
     return listeners;
   }
-  public static String getWorkspaceOperation(){
+
+  public static String getWorkspaceOperation() {
     synchronized (NO_NODES) {
       return locked;
     }
   }
-  public static void lockWorkspace(String message){
+
+  public static void lockWorkspace(String message) {
     synchronized (NO_NODES) {
       locked = message;
     }
   }
-  public static void unlockWorkspace(){
+
+  public static void unlockWorkspace() {
     synchronized (NO_NODES) {
       locked = "";
     }
   }
-  public static DeleteHandler deleteHandler = new DeleteHandler(), 
-		  					  baseDeleteHandler = deleteHandler;
-  public static class DeleteHandler{
-    public boolean delete(File f, boolean forceNow, boolean clearRec, int depth){
+
+  public static DeleteHandler deleteHandler = new DeleteHandler(),
+      baseDeleteHandler = deleteHandler;
+
+  public static class DeleteHandler {
+    public boolean delete(File f, boolean forceNow, boolean clearRec, int depth) {
       boolean del = true;
       boolean canDel = true;
 
-        if(clearRec)
-          CacheStorage.closeRecConnection(f);
-	    if(f.isDirectory()){
-	      canDel = false;
-	      if(depth==-2||depth>0){
-	        for(File c:f.listFiles())
-	          del = del && delete(c, forceNow, false, depth!=-2?depth-1:-2);
-	        if(f.listFiles().length == 0)
-	          canDel = true;
-	      }
-	      else
-	        canDel = f.list().length==0;
-	    }
-	    if(del && canDel){
-	      java.nio.file.Path p = f.toPath();
-	      if(forceNow){
-	        for(IFileDeleteListener fdl:listeners)fdl.fileWillBeDeleted(p);
-	        //problems with git pach objects on win now
-	        if(f.exists()) {
-	          if(!f.delete())
-	          {
-	    	    try {
-	              Thread.currentThread().join(500);
-	            } catch (InterruptedException e) {
-	            }
-	    	    if(!f.delete())
-	              throw new RuntimeException("Cannot delete "+f.toPath());
-	          }
-	        }
-	        for(IFileDeleteListener fdl:listeners)fdl.fileWasDeleted(p);
-	        return del;
-	      }
-	      else{
-	        for(IFileDeleteListener fdl:listeners)fdl.fileWillBeDeleted(p);
-	        f.deleteOnExit();
-	        for(IFileDeleteListener fdl:listeners)fdl.fileWasDeleted(p);
-	        return true;
-	      }
-	    }else
-	      return !canDel;
+      if (clearRec) CacheStorage.closeRecConnection(f);
+      if (f.isDirectory()) {
+        canDel = false;
+        if (depth == -2 || depth > 0) {
+          for (File c : f.listFiles())
+            del = del && delete(c, forceNow, false, depth != -2 ? depth - 1 : -2);
+          if (f.listFiles().length == 0) canDel = true;
+        } else canDel = f.list().length == 0;
+      }
+      if (del && canDel) {
+        java.nio.file.Path p = f.toPath();
+        if (forceNow) {
+          for (IFileDeleteListener fdl : listeners) fdl.fileWillBeDeleted(p);
+          // problems with git pach objects on win now
+          if (f.exists()) {
+            if (!f.delete()) {
+              try {
+                Thread.currentThread().join(500);
+              } catch (InterruptedException e) {
+              }
+              if (!f.canWrite()) f.setWritable(true); // win fix
+              if (!f.delete()) {
+                java.nio.file.Path f2 =
+                    f.getParentFile().toPath().resolve(f.getName() + "__renamed");
+                // fix for stuck files (it is also possible to just change writtable here)
+                if (f.renameTo(f2.toFile())) {
+                  File file = f2.toFile();
+                  if (file.exists()) {
+                    file.setWritable(true);
+                    if (!file.delete()) {
+                      throw new RuntimeException("Cannot delete " + f.toPath());
+                    }
+                  }
+                } else throw new RuntimeException("Cannot delete " + f.toPath());
+              }
+            }
+          }
+          for (IFileDeleteListener fdl : listeners) fdl.fileWasDeleted(p);
+          return del;
+        } else {
+          for (IFileDeleteListener fdl : listeners) fdl.fileWillBeDeleted(p);
+          f.deleteOnExit();
+          for (IFileDeleteListener fdl : listeners) fdl.fileWasDeleted(p);
+          return true;
+        }
+      } else return !canDel;
     }
   }
 
   public static String getParentQualifiedId(String QId) {
     return QId.substring(0, QId.lastIndexOf("/"));
   }
-  
+
   private static int compareNumbers(String in1, String in2) {
     while (in1.length() > in2.length()) in2 = "0" + in2;
     while (in1.length() < in2.length()) in1 = "0" + in1;
@@ -180,6 +191,7 @@ public class CoreUtils {
     if (c1 < c2) return -1;
     return 0;
   }
+
   public static int compareNumberedStrings(String s1, String s2) {
     int k = 0;
     StringBuffer l1 = new StringBuffer(),
@@ -187,10 +199,8 @@ public class CoreUtils {
         nu1 = new StringBuffer(),
         nu2 = new StringBuffer();
     int i1 = 0, i2 = 0;
-    if(s1 == null)
-      return -1;
-    if(s2 == null)
-      return 1;
+    if (s1 == null) return -1;
+    if (s2 == null) return 1;
     for (; i1 < s1.length() && i2 < s2.length(); ) {
       while (i1 < s1.length() && Character.isDigit(s1.charAt(i1))) {
         nu1.append(s1.charAt(i1));
@@ -223,18 +233,18 @@ public class CoreUtils {
     }
     return s1.substring(i1).compareToIgnoreCase(s2.substring(i2));
   }
+
   private static int countRTNChilds(TreeNode node) {
     int cnt = 0;
-    for(TreeNode tn:node.getActiveWorkChildren())
-      if(tn.getType().equals(Requirement.TYPE_NAME)||tn.getType().equals(TextNode.TYPE_NAME))
+    for (TreeNode tn : node.getActiveWorkChildren())
+      if (tn.getType().equals(Requirement.TYPE_NAME) || tn.getType().equals(TextNode.TYPE_NAME))
         cnt++;
     return cnt;
   }
+
   public static boolean streamEquals(InputStream i1, InputStream i2) throws IOException {
-    if(i1 == null)
-      return i2 != null;
-    if(i2 == null)
-      return false;
+    if (i1 == null) return i2 != null;
+    if (i2 == null) return false;
     ReadableByteChannel ch1 = Channels.newChannel(i1);
     ReadableByteChannel ch2 = Channels.newChannel(i2);
 
@@ -242,23 +252,21 @@ public class CoreUtils {
     ByteBuffer buf2 = ByteBuffer.allocateDirect(1024);
 
     try {
-        while (true) {
+      while (true) {
 
-            int n1 = ch1.read(buf1);
-            int n2 = ch2.read(buf2);
+        int n1 = ch1.read(buf1);
+        int n2 = ch2.read(buf2);
 
-            if (n1 == -1 || n2 == -1) return n1 == n2;
+        if (n1 == -1 || n2 == -1) return n1 == n2;
 
-            buf1.flip();
-            buf2.flip();
+        buf1.flip();
+        buf2.flip();
 
-            for (int i = 0; i < Math.min(n1, n2); i++)
-                if (buf1.get() != buf2.get())
-                    return false;
+        for (int i = 0; i < Math.min(n1, n2); i++) if (buf1.get() != buf2.get()) return false;
 
-            buf1.compact();
-            buf2.compact();
-        }
+        buf1.compact();
+        buf2.compact();
+      }
 
     } finally {
       if (ch1 != null) ch1.close();
@@ -267,24 +275,26 @@ public class CoreUtils {
       if (i2 != null) i2.close();
     }
   }
-  public static boolean isHeader(TreeNode node){
-    String ctype = node.getType(); 
+
+  public static boolean isHeader(TreeNode node) {
+    String ctype = node.getType();
     boolean isReq = ctype.equals(Requirement.TYPE_NAME);
     boolean isTxt = ctype.equals(TextNode.TYPE_NAME);
     boolean isVN = ctype.equals(VirtualNode.TYPE_NAME);
     boolean isTS = ctype.equals("TestStep");
-    if(isReq || isTxt || isVN || isTS){
+    if (isReq || isTxt || isVN || isTS) {
       //  var child = getNodeByUUID(uuid);
-        if (isTS || (isReq || isVN) && node.getActiveWorkChildren().size()>0 && 
-        (countRTNChilds(node))>0 
-                || node.hasHeaderAttribute())
-                    return true;
+      if (isTS
+          || (isReq || isVN)
+              && node.getActiveWorkChildren().size() > 0
+              && (countRTNChilds(node)) > 0
+          || node.hasHeaderAttribute()) return true;
     }
-    //TODO remove or make it customizable?
-    if(node.attrs().getStringAttributeValue("Вид", "Требование").equals("Заголовок"))
-      return true;
+    // TODO remove or make it customizable?
+    if (node.attrs().getStringAttributeValue("Вид", "Требование").equals("Заголовок")) return true;
     return false;
   }
+
   public static String splitWords(String s) {
     if (s == null) return null;
     for (int i = 1; i < s.length(); i++) // s.length() is variable
@@ -296,11 +306,14 @@ public class CoreUtils {
       }
     return s;
   }
-  public static Map<Character, String> getRepl(){
+
+  public static Map<Character, String> getRepl() {
     return repl;
   }
+
   static Map<Character, String> repl = new HashMap<>();
-  static{
+
+  static {
     repl.put('%', "%25");
     repl.put('!', "%21");
     repl.put('*', "%2A");
@@ -317,73 +330,76 @@ public class CoreUtils {
     repl.put('+', "%2B");
     repl.put('$', "%24");
     repl.put(',', "%2C");
-    //repl.put('/', "%2f");
+    // repl.put('/', "%2f");
     repl.put('?', "%3F");
     repl.put('#', "%23");
     repl.put('[', "%5B");
     repl.put(']', "%5D");
   }
-  private static String escapeString(String s){
+
+  private static String escapeString(String s) {
     StringBuilder sb = new StringBuilder();
-    for(int i = 0;i<s.length();i++)
-    {
+    for (int i = 0; i < s.length(); i++) {
       char c = s.charAt(i);
-      sb.append(repl.getOrDefault(c,Character.toString(c)));
+      sb.append(repl.getOrDefault(c, Character.toString(c)));
     }
     return sb.toString();
   }
+
   private static Charset charset = StandardCharsets.UTF_8;
-  private static String deEscapeString(String s){
-    return URIUtil.decodePath(s);//TODO test properly and maybe replace
+
+  private static String deEscapeString(String s) {
+    return URIUtil.decodePath(s); // TODO test properly and maybe replace
   }
+
   private static int hexNum(char next) {
-    if(Character.isDigit(next))
-      return next-'0';
-    if(Character.isUpperCase(next))
-      return next-'A'+10;
-    return next-'a'+10;
+    if (Character.isDigit(next)) return next - '0';
+    if (Character.isUpperCase(next)) return next - 'A' + 10;
+    return next - 'a' + 10;
   }
+
   private static boolean isHex(char ch) {
-    return Character.isDigit(ch)||(ch>='a'&&ch<='f')||(ch>='A'&&ch<='F');
+    return Character.isDigit(ch) || (ch >= 'a' && ch <= 'f') || (ch >= 'A' && ch <= 'F');
   }
-  public static String URLStrictEncodePart(String filename){// TODO Auto-generated method stub
-    return URLEncoder.encode(filename.replace(" ", (char)7+""), StandardCharsets.UTF_8).replace("%07", "%20");
+
+  public static String URLStrictEncodePart(String filename) { // TODO Auto-generated method stub
+    return URLEncoder.encode(filename.replace(" ", (char) 7 + ""), StandardCharsets.UTF_8)
+        .replace("%07", "%20");
   }
+
   public static String URLEncode(String s) {
     StringBuilder sb = new StringBuilder();
     int i = 0, j = 0, lh = -1;
-    while(i<s.length()){
-      if(j>=s.length()||!Character.isLetterOrDigit(s.charAt(j))){
-        sb.append(s.substring(i,j));        
-        if(lh == -1){
+    while (i < s.length()) {
+      if (j >= s.length() || !Character.isLetterOrDigit(s.charAt(j))) {
+        sb.append(s.substring(i, j));
+        if (lh == -1) {
           lh = j;
           i = j;
         }
         i++;
         j = i;
       }
-      while(j<s.length()&&Character.isLetterOrDigit(s.charAt(j))){
+      while (j < s.length() && Character.isLetterOrDigit(s.charAt(j))) {
         j++;
       }
-      if(lh>-1&&i>0&&i<s.length()&&Character.isLetterOrDigit(s.charAt(i)))
-      {
-        sb.append(URIParserUtil.escapeChars(escapeString(s.substring(lh,i))));
+      if (lh > -1 && i > 0 && i < s.length() && Character.isLetterOrDigit(s.charAt(i))) {
+        sb.append(URIParserUtil.escapeChars(escapeString(s.substring(lh, i))));
         lh = -1;
       }
     }
-    if(lh!=-1)
-      sb.append(URIParserUtil.escapeChars(escapeString( s.substring(lh,s.length()))));
-    if(j>i)
-      sb.append(s.substring(i,j));
+    if (lh != -1) sb.append(URIParserUtil.escapeChars(escapeString(s.substring(lh, s.length()))));
+    if (j > i) sb.append(s.substring(i, j));
     return sb.toString();
   }
 
   public static String URLDecode(String s) {
     return clearURIChars(deEscapeString(s));
   }
+
   public static String htmlDeescape(String str) {
     if (str == null) return null;
-    return htmlDespaces(str.replace("&lt;","<").replace("&gt;",">").replace("&amp;","&"));
+    return htmlDespaces(str.replace("&lt;", "<").replace("&gt;", ">").replace("&amp;", "&"));
   }
 
   public static String htmlEscape(String str) {
@@ -394,37 +410,34 @@ public class CoreUtils {
   public static String adaptTables(String str, String width, String targetwidth) {
     int ind = str.indexOf("<table");
     int last = 0;
-    while(ind>-1)
-    {
+    while (ind > -1) {
       last = ind;
-      int end = str.indexOf(">",ind);
+      int end = str.indexOf(">", ind);
       int w = str.indexOf("width");
-      if(w<end){
-        int c = w+6;
-        while(Character.isWhitespace(str.charAt(c)))
-          c++;
+      if (w < end) {
+        int c = w + 6;
+        while (Character.isWhitespace(str.charAt(c))) c++;
         char ch = str.charAt(c);
         char br = ' ';
-        if(!Character.isDigit(ch))
-          br = ch;
-        else 
-          c--;
-        int wend =  Math.min(str.indexOf(br,c+1), end)-1;
-        String wdth = str.substring(c+1,wend);
-        if(wdth.contains(width))
-          str = str.substring(last, c)+targetwidth+str.substring(wend);
+        if (!Character.isDigit(ch)) br = ch;
+        else c--;
+        int wend = Math.min(str.indexOf(br, c + 1), end) - 1;
+        String wdth = str.substring(c + 1, wend);
+        if (wdth.contains(width)) str = str.substring(last, c) + targetwidth + str.substring(wend);
       }
-      ind = str.indexOf("<table",ind+10);
+      ind = str.indexOf("<table", ind + 10);
     }
     return str;
   }
+
   public static String htmlSpaces(String str) {
     if (str == null) return null;
     return str.replace("  ", (char) 160 + "" + (char) 160);
   }
+
   public static String htmlDespaces(String str) {
     if (str == null) return null;
-    return str.replace((char) 160 + "" + (char) 160,"  ");
+    return str.replace((char) 160 + "" + (char) 160, "  ");
   }
 
   public static String listToString(List<String> list, String separator) {
@@ -451,6 +464,7 @@ public class CoreUtils {
       gclosed = new HashMap<>(),
       gclosedNames = new HashMap<>(),
       gtagsBasic = new HashMap<>();
+
   public static String htmlEncapsulate(String newDescr) {
     return htmlEncapsulate(newDescr, false);
   }
@@ -469,30 +483,28 @@ public class CoreUtils {
    */
   public static String htmlEncapsulate(String newDescr, boolean replamp) {
     if (newDescr == null) return null;
-    //Whitelist wl = Whitelist.relaxed();
-    //wl.addTags("svg");
-//    wl.addTags("img");
-//    wl.addAttributes("img", "alt");
-//    wl.addAttributes("img", "src");
-//    wl.addProtocols("a", "href", "requality");
-//    wl.addTags("table", "td", "tr");
+    // Whitelist wl = Whitelist.relaxed();
+    // wl.addTags("svg");
+    //    wl.addTags("img");
+    //    wl.addAttributes("img", "alt");
+    //    wl.addAttributes("img", "src");
+    //    wl.addProtocols("a", "href", "requality");
+    //    wl.addTags("table", "td", "tr");
     OutputSettings os = new OutputSettings();
     os.syntax(Document.OutputSettings.Syntax.xml);
     os.escapeMode(EscapeMode.xhtml);
     os.prettyPrint(false);
     os.charset(Charset.forName("UTF-8"));
-    Document doc = 
-        Jsoup.parse("<html><body>"+newDescr+"</body></html>");
+    Document doc = Jsoup.parse("<html><body>" + newDescr + "</body></html>");
     doc.outputSettings(os);
     String ret = doc.body().html();
-//    if(replamp)
-//      ret = replAmp(ret);
+    //    if(replamp)
+    //      ret = replAmp(ret);
     return ret;
   }
 
   public static String replAmp(String string) {
-    if(string == null)
-      return null;
+    if (string == null) return null;
     int ind = string.indexOf("&");
     while (ind > -1) {
       int pos = ind + 1;
@@ -518,6 +530,7 @@ public class CoreUtils {
     }
     return string;
   }
+
   public static String replHtmlChars(String string) {
     int ind = string.indexOf("&");
     while (ind > -1) {
@@ -533,23 +546,22 @@ public class CoreUtils {
       if (end > -1) {
         String substr = string.substring(ind + 1, end);
         String repl = HTMLSpecChars.getCode(substr);
-        if(repl == null) {
-          if(substr.equals("lt")) repl = Integer.toString((int)'<'); 
-          if(substr.equals("gt")) repl = Integer.toString((int)'>');
-          if(substr.equals("amp")) repl = Integer.toString((int)'&');
+        if (repl == null) {
+          if (substr.equals("lt")) repl = Integer.toString((int) '<');
+          if (substr.equals("gt")) repl = Integer.toString((int) '>');
+          if (substr.equals("amp")) repl = Integer.toString((int) '&');
         }
         if (repl != null) {
           try {
             int replI = Integer.parseInt(repl);
-        	repl = Character.toString((char)replI);
-          }catch(NumberFormatException nfe) {
-        	repl = "&"+repl+";";
+            repl = Character.toString((char) replI);
+          } catch (NumberFormatException nfe) {
+            repl = "&" + repl + ";";
           }
-          string = string.substring(0, ind) + repl + string.substring(end+1);
+          string = string.substring(0, ind) + repl + string.substring(end + 1);
           ind += repl.length() - substr.length();
           ;
-        }else if(!substr.isEmpty())
-          RLogger.logDebug("Unknown character for replace "+substr);
+        } else if (!substr.isEmpty()) RLogger.logDebug("Unknown character for replace " + substr);
       }
       ind = string.indexOf("&", ind + 1);
     }
@@ -571,8 +583,7 @@ public class CoreUtils {
   }
 
   public static String htmlClear(String content) {
-    if(content == null)
-      return null;
+    if (content == null) return null;
     int lpos = content.indexOf("<");
     while (lpos > -1) {
       int rpos = content.indexOf(">", lpos);
@@ -638,14 +649,15 @@ public class CoreUtils {
             if (link.indexOf("|") > -1) link = link.substring(0, link.indexOf("|"));
             List<TreeNode> rnode = null;
             try {
-              rnode = node.getTreeDB()
-                 .getLinkResolver()
-                 .findNodesByPathIgnoreDisposed(
-                    node,
-                    null,
-                    node.getTreeDB(),
-                    link,
-                    Path.XPATH | Path.QID | Path.UUID | Path.UV);
+              rnode =
+                  node.getTreeDB()
+                      .getLinkResolver()
+                      .findNodesByPathIgnoreDisposed(
+                          node,
+                          null,
+                          node.getTreeDB(),
+                          link,
+                          Path.XPATH | Path.QID | Path.UUID | Path.UV);
             } catch (NodeNotFoundException e) {
               // TODO Auto-generated catch block
               e.printStackTrace();
@@ -710,705 +722,707 @@ public class CoreUtils {
   }
 
   private static java.nio.file.Path dir = null;
+
   public static java.nio.file.Path getMainDir(URI p) {
-    if(p == null)
-      return null;
+    if (p == null) return null;
     File f = new File(p);
     File nf = f.toPath().toFile();
-    if(!nf.exists())
-      nf.mkdirs();
+    if (!nf.exists()) nf.mkdirs();
     return nf.toPath();
   }
+
   public static java.nio.file.Path getCacheDir(URI p) {
-    if(p == null)
-      return null;
+    if (p == null) return null;
     File f = new File(p);
     File nf = f.toPath().resolve(CACHE_FOLDER_NAME).toFile();
-    
-    if(!nf.exists())
-      nf.mkdirs();
+
+    if (!nf.exists()) nf.mkdirs();
     File fi = f.toPath().resolve(".gitignore").toFile();
     try {
-      addIgnore(fi, CACHE_FOLDER_NAME+"/");
+      addIgnore(fi, CACHE_FOLDER_NAME + "/");
     } catch (IOException e) {
       // TODO Auto-generated catch block
       e.printStackTrace();
     }
     return nf.toPath();
   }
-  private static void addIgnore(File fi,String st) throws IOException {
-    if(!fi.exists())
+
+  private static void addIgnore(File fi, String st) throws IOException {
+    if (!fi.exists())
       try {
         fi.createNewFile();
       } catch (IOException e) {
         // TODO Auto-generated catch block
         e.printStackTrace();
       }
-    FileReader fr = new FileReader(fi);
-    BufferedReader br = new BufferedReader(fr);
     boolean found = false;
     boolean single = false;
-    try{
-      while(br.ready()){
-        String s = br.readLine();
-        single = true;
-        if(s.equals(st)){
-          found = true;
-          break;
+    try (FileReader fr = new FileReader(fi)) {
+      try (BufferedReader br = new BufferedReader(fr)) {
+        while (br.ready()) {
+          String s = br.readLine();
+          single = true;
+          if (s.equals(st)) {
+            found = true;
+            break;
+          }
         }
       }
-    }finally{
-      br.close();
-      fr.close();
     }
-    if(!found)
-    {
-      FileWriter fw = new FileWriter(fi,true);
-      BufferedWriter bw = new BufferedWriter(fw);
-      try{
-        if(single)
-          bw.write("\n");
+    if (!found) {
+      try (FileWriter fw = new FileWriter(fi, true);
+          BufferedWriter bw = new BufferedWriter(fw)) {
+        if (single) bw.write("\n");
         bw.append(st);
-      }
-      finally{
-        bw.close();
-        fw.close();
       }
     }
   }
+
   public static java.nio.file.Path getTempDir() {
-    if(dir == null) {
+    if (dir == null) {
       synchronized (CoreUtils.class) {
-        if(dir!=null)
-          return dir;
+        if (dir != null) return dir;
         try {
           dir = Files.createTempDirectory("requality");
           File df = dir.toFile();
-          if(!df.exists())
-            df.mkdirs();
-          df.deleteOnExit();//remove temp folders after run
+          if (!df.exists()) df.mkdirs();
+          df.deleteOnExit(); // remove temp folders after run
         } catch (IOException e) {
           // TODO Auto-generated catch block
           e.printStackTrace();
         }
-        Runtime.getRuntime().addShutdownHook(new Thread(new Runnable() {
-          @Override
-          public void run() {
-            delete(dir.toFile(), true, false);
-          }
-        }));
+        Runtime.getRuntime()
+            .addShutdownHook(
+                new Thread(
+                    new Runnable() {
+                      @Override
+                      public void run() {
+                        delete(dir.toFile(), true, false);
+                      }
+                    }));
       }
     }
     return dir;
   }
+
   public static String getTrace(StackTraceElement[] stackTrace) {
     StringBuilder sb = new StringBuilder();
-    for(StackTraceElement s:stackTrace){
+    for (StackTraceElement s : stackTrace) {
       sb.append(s);
       sb.append("\n");
     }
     return sb.toString();
   }
-  //Pattern.compile("[_]{0,2}[%]{0,1}[A-Za-z0-9а-яА-Я_[$].,-]+[A-Za-z0-9а-яА-Я,._[$] -]*");
+  // Pattern.compile("[_]{0,2}[%]{0,1}[A-Za-z0-9а-яА-Я_[$].,-]+[A-Za-z0-9а-яА-Я,._[$] -]*");
   private static Set<Character> allowedIdChars = new HashSet<>();
-  static{
+
+  static {
     allowedIdChars.add('_');
     allowedIdChars.add('$');
     allowedIdChars.add(',');
     allowedIdChars.add('.');
     allowedIdChars.add('-');
   }
-  
-  public static String filterNodeId (String nameOrId) {
+
+  public static String filterNodeId(String nameOrId) {
     return filterNodeId(nameOrId, Collections.emptySet());
   }
+
   public static String filterNodeId(String nameOrId, Set<Character> extraAllowed) {
     StringBuilder sb = new StringBuilder();
-    for(int i = 0;i<nameOrId.length();i++){
+    for (int i = 0; i < nameOrId.length(); i++) {
       char c = nameOrId.charAt(i);
-      if(Character.isLetterOrDigit(c)||allowedIdChars.contains(c)||Character.isWhitespace(c)||extraAllowed.contains(c))
-        sb.append(c);
+      if (Character.isLetterOrDigit(c)
+          || allowedIdChars.contains(c)
+          || Character.isWhitespace(c)
+          || extraAllowed.contains(c)) sb.append(c);
     }
     return sb.toString();
   }
-  public static final String GIT_MERGE_START = "<<<<<<< ",GIT_MERGE_MIDDLE = "=======", GIT_MERGE_END = ">>>>>>> ";
-  public static String filterGitJson(String s,boolean first){
-    if(s == null)
-      return null;
-    if(s.isEmpty())
-      return s;
+
+  public static final String GIT_MERGE_START = "<<<<<<< ",
+      GIT_MERGE_MIDDLE = "=======",
+      GIT_MERGE_END = ">>>>>>> ";
+
+  public static String filterGitJson(String s, boolean first) {
+    if (s == null) return null;
+    if (s.isEmpty()) return s;
     StringBuilder ret = new StringBuilder();
     int ind = s.indexOf(GIT_MERGE_START);
-    if(ind == -1)
-      return s;
-    while(ind>-1){
-      int nexteol = s.indexOf("\n",ind+1);
-      if(nexteol == -1)
-        nexteol = s.length();
-      int neq = s.indexOf(GIT_MERGE_MIDDLE,ind+1);
-      if(neq>-1){
-        int neqn = s.indexOf("\n",neq+1);
-        if(neqn == -1)
-          neqn = s.length();
-          
-        int nff = s.indexOf(GIT_MERGE_END,neq+1);
-        int nexteol2 = s.indexOf("\n",nff+1);
-        if(nexteol2 == -1)
-          nexteol2 = s.length();
-        if(ind>0)
-          ret.append(s.substring(0, ind-1));
-        if(first){
+    if (ind == -1) return s;
+    while (ind > -1) {
+      int nexteol = s.indexOf("\n", ind + 1);
+      if (nexteol == -1) nexteol = s.length();
+      int neq = s.indexOf(GIT_MERGE_MIDDLE, ind + 1);
+      if (neq > -1) {
+        int neqn = s.indexOf("\n", neq + 1);
+        if (neqn == -1) neqn = s.length();
+
+        int nff = s.indexOf(GIT_MERGE_END, neq + 1);
+        int nexteol2 = s.indexOf("\n", nff + 1);
+        if (nexteol2 == -1) nexteol2 = s.length();
+        if (ind > 0) ret.append(s.substring(0, ind - 1));
+        if (first) {
           ret.append(s.substring(nexteol, neq));
-          ret.append(s.substring(nexteol2+1));
-        }else{
-          ret.append(s.substring(neqn+1, nff));
-          ret.append(s.substring(nexteol2+1));
+          ret.append(s.substring(nexteol2 + 1));
+        } else {
+          ret.append(s.substring(neqn + 1, nff));
+          ret.append(s.substring(nexteol2 + 1));
         }
-        ind = s.indexOf(GIT_MERGE_START, ind+1);
+        ind = s.indexOf(GIT_MERGE_START, ind + 1);
       }
     }
     return ret.toString();
   }
 
-  public static java.nio.file.Path getCacheDir(TreeDB proj){// TODO Auto-generated method stub
+  public static java.nio.file.Path getCacheDir(TreeDB proj) { // TODO Auto-generated method stub
     return getCacheDir(proj.getStorage().getLocation());
   }
-  public static java.nio.file.Path getMainDir(TreeDB db){
-    return getMainDir(db.getStorage().getLocation());  
+
+  public static java.nio.file.Path getMainDir(TreeDB db) {
+    return getMainDir(db.getStorage().getLocation());
   }
-  public static java.nio.file.Path getCacheDir(ITreeStorage s){// TODO Auto-generated method stub
+
+  public static java.nio.file.Path getCacheDir(ITreeStorage s) { // TODO Auto-generated method stub
     return getCacheDir(s.getLocation());
   }
-  public static RelationsTreeContext gatherRelatedTrees(TreeDB db, IProgressMonitor monitor, int iterations, Set<String> names, boolean addSelf) {
-    if(db==null)
-      throw new RuntimeException ("null tree during related tree gathering");
-    if(names == null)
-      names = new HashSet<String>();
+
+  public static RelationsTreeContext gatherRelatedTrees(
+      TreeDB db, IProgressMonitor monitor, int iterations, Set<String> names, boolean addSelf) {
+    if (db == null) throw new RuntimeException("null tree during related tree gathering");
+    if (names == null) names = new HashSet<String>();
     return gatherRelatedTrees(db.getTracker(), db, monitor, iterations, names, addSelf);
   }
-  public static RelationsTreeContext gatherRelatedTrees(IResTracker tracker, TreeDB dbfrom, IProgressMonitor monitor, int iterations, Set<String> namesAlt, boolean addSelf) {    
-    RelationsTreeContext rtc = new RelationsTreeContext(); 
+
+  public static RelationsTreeContext gatherRelatedTrees(
+      IResTracker tracker,
+      TreeDB dbfrom,
+      IProgressMonitor monitor,
+      int iterations,
+      Set<String> namesAlt,
+      boolean addSelf) {
+    RelationsTreeContext rtc = new RelationsTreeContext();
     LinkedList<String> hndl = new LinkedList<>();
     LinkedList<String> hndled = new LinkedList<>();
-    if(namesAlt!=null)
-      hndl.addAll(namesAlt);
-    if(dbfrom!=null && dbfrom.getProjectName()!=null && !hndl.contains(dbfrom.getProjectName()))
-      hndl.add(dbfrom.getProjectName());
-    if(dbfrom!=null && dbfrom.getLocalName()!=null && !hndl.contains(dbfrom.getLocalName()))
+    if (namesAlt != null) hndl.addAll(namesAlt);
+    if (dbfrom != null
+        && dbfrom.getProjectName() != null
+        && !hndl.contains(dbfrom.getProjectName())) hndl.add(dbfrom.getProjectName());
+    if (dbfrom != null && dbfrom.getLocalName() != null && !hndl.contains(dbfrom.getLocalName()))
       hndl.add(dbfrom.getLocalName());
-    //rtc.allRelated.add(dbfrom);
-    //rtc.allRelatedNames.add(dbfrom.getProjectName());
+    // rtc.allRelated.add(dbfrom);
+    // rtc.allRelatedNames.add(dbfrom.getProjectName());
     Map<String, Integer> deepMap = new HashMap<>();
-    for(String s:hndl)
-      deepMap.put(s,0);
+    for (String s : hndl) deepMap.put(s, 0);
     TrackerCacheManipulatorsManager cmm = tracker.getCMM(dbfrom);
     CacheStorage cs = cmm.getLinkManipulator().getLCM().getStorage(dbfrom);
-    Map<String, List<LateResolveRequest>> map = tracker.getCMM(dbfrom).getLinkManipulator().getLCM().loadLates(tracker.getCPCacheStorage(dbfrom));
-    while(!hndl.isEmpty())
-    {
+    Map<String, List<LateResolveRequest>> map =
+        tracker
+            .getCMM(dbfrom)
+            .getLinkManipulator()
+            .getLCM()
+            .loadLates(tracker.getCPCacheStorage(dbfrom));
+    while (!hndl.isEmpty()) {
       String dbname = hndl.removeFirst();
       Integer deep = deepMap.getOrDefault(dbname, 0);
-      TreeDB db = tracker.getTreeDB(dbfrom, dbname, dbname, true, monitor);//TODO IDE monitor?
-//      if(db == null) {
-//        RLogger.logError("found non-existing tree "+dbname+" during related tree collection on report generation for "+dbfrom!=null?dbfrom.getSemiProjectName():dbname);
-//        continue;
-//      }
-      if(!rtc.allRelatedNames.contains(dbname)){
-        String lname = db == null?dbname:db.getLocalName();
-        String pname = db == null?dbname:db.getProjectName();
+      TreeDB db = tracker.getTreeDB(dbfrom, dbname, dbname, true, monitor); // TODO IDE monitor?
+      //      if(db == null) {
+      //        RLogger.logError("found non-existing tree "+dbname+" during related tree collection
+      // on report generation for "+dbfrom!=null?dbfrom.getSemiProjectName():dbname);
+      //        continue;
+      //      }
+      if (!rtc.allRelatedNames.contains(dbname)) {
+        String lname = db == null ? dbname : db.getLocalName();
+        String pname = db == null ? dbname : db.getProjectName();
         hndled.add(lname);
-        if(!hndled.contains(dbname))
-          hndled.add(dbname);
-        if(!hndled.contains(pname))
-          hndled.add(pname);
-        Pair<TreeRelationsCounter, TreeRelationsCounter> rel = collectDBs(cmm, cs, lname,pname, rtc, map);//TODO is dbname correct?
+        if (!hndled.contains(dbname)) hndled.add(dbname);
+        if (!hndled.contains(pname)) hndled.add(pname);
+        Pair<TreeRelationsCounter, TreeRelationsCounter> rel =
+            collectDBs(cmm, cs, lname, pname, rtc, map); // TODO is dbname correct?
         Set<String> set = Collections.emptySet();
-        if(!rel.getFirst().isEmpty())
-        {
-           set = new HashSet<>();
-           set.addAll(rel.getFirst().linksInfo.keySet());
-           set.addAll(rel.getFirst().termsLinksInfo.keySet());
-           
+        if (!rel.getFirst().isEmpty()) {
+          set = new HashSet<>();
+          set.addAll(rel.getFirst().linksInfo.keySet());
+          set.addAll(rel.getFirst().termsLinksInfo.keySet());
         }
-        if(!rel.getSecond().isEmpty())
-        {
-           if(set.isEmpty())
-             set = new HashSet<>();
-           set.addAll(rel.getSecond().linksInfo.keySet());
-           set.addAll(rel.getSecond().termsLinksInfo.keySet());
+        if (!rel.getSecond().isEmpty()) {
+          if (set.isEmpty()) set = new HashSet<>();
+          set.addAll(rel.getSecond().linksInfo.keySet());
+          set.addAll(rel.getSecond().termsLinksInfo.keySet());
         }
         rtc.addLinksInfo(lname, rel.getFirst(), rel.getSecond());
 
         set.removeAll(rtc.allRelatedNames);
-        if(db!=null && (addSelf || namesAlt == null || !namesAlt.contains(dbname)) && db.getProjectName() != null)//TODO test null pname?
-          rtc.allRelated.add(db);
+        if (db != null
+            && (addSelf || namesAlt == null || !namesAlt.contains(dbname))
+            && db.getProjectName() != null) // TODO test null pname?
+        rtc.allRelated.add(db);
         rtc.allRelatedNames.add(lname);
         rtc.allRelatedNames.add(pname);
-        if(db!=null)
-          rtc.registerName(DBLocalName.formLocalNameKey(db, lname, db.revision),
-            db.getProjectName());
+        if (db != null)
+          rtc.registerName(
+              DBLocalName.formLocalNameKey(db, lname, db.revision), db.getProjectName());
         rtc.addLinksInfo(lname, rel.getFirst(), rel.getSecond());
-        for(String s:set) {
-          if(!hndl.contains(s) && !hndled.contains(s)) {
-            if(iterations==-1 || deep<iterations) {
-              deepMap.put(s, deep+1);
+        for (String s : set) {
+          if (!hndl.contains(s) && !hndled.contains(s)) {
+            if (iterations == -1 || deep < iterations) {
+              deepMap.put(s, deep + 1);
             }
             hndl.add(s);
           }
         }
       }
     }
-    if(dbfrom!=null && !rtc.allRelatedNames.contains(dbfrom.getProjectName()))
+    if (dbfrom != null && !rtc.allRelatedNames.contains(dbfrom.getProjectName()))
       rtc.allRelatedNames.add(dbfrom.getProjectName());
     return rtc;
   }
-  private static Pair<TreeRelationsCounter, TreeRelationsCounter> collectDBs(TrackerCacheManipulatorsManager cmm, CacheStorage cs, String lname, String pname, RelationsTreeContext rtc, Map<String, List<LateResolveRequest>> map) {
+
+  private static Pair<TreeRelationsCounter, TreeRelationsCounter> collectDBs(
+      TrackerCacheManipulatorsManager cmm,
+      CacheStorage cs,
+      String lname,
+      String pname,
+      RelationsTreeContext rtc,
+      Map<String, List<LateResolveRequest>> map) {
     return RelManager.getRelatedProjects(cmm, cs, lname, pname, map);
   }
-  private static boolean delete(File f, boolean forceNow,boolean remcache, int depth) {
-    return deleteHandler.delete(f,forceNow,remcache,depth);
+
+  private static boolean delete(File f, boolean forceNow, boolean remcache, int depth) {
+    return deleteHandler.delete(f, forceNow, remcache, depth);
   }
-  public static void delete(File f, boolean forceNow, boolean remcache){
-    delete(f, forceNow,remcache, false);
+
+  public static void delete(File f, boolean forceNow, boolean remcache) {
+    delete(f, forceNow, remcache, false);
   }
+
   public static void delete(File f, boolean forceNow, boolean remcache, boolean singleLevel) {
-    delete(f, forceNow,remcache, singleLevel?1:-2);
+    delete(f, forceNow, remcache, singleLevel ? 1 : -2);
   }
+
   public static void markDeleteOnExit(File f) {
-    if(f.isDirectory())
-      for(File c:f.listFiles())
-        markDeleteOnExit(c);
+    if (f.isDirectory()) for (File c : f.listFiles()) markDeleteOnExit(c);
     f.deleteOnExit();
   }
+
   public static String resolveURI(TreeNode node, IReqURIResolver rslv, String descr) {
-    //TODO use it in reports
-    if(rslv == null || descr == null || rslv == IReqURIResolver.EMPTY)
-      return descr;
+    // TODO use it in reports
+    if (rslv == null || descr == null || rslv == IReqURIResolver.EMPTY) return descr;
     StringBuffer ret = new StringBuffer();
     int im = descr.indexOf("<a"), lim = 0; // ,im2=descr.indexOf("<object");
     while (im > -1) {
       ret.append(descr.substring(lim, im));
       int end = descr.indexOf(">", im);
       if (end == -1) break; // not ended one
-      int be = end-1;
-      while(be>im && Character.isWhitespace(descr.charAt(be))){
+      int be = end - 1;
+      while (be > im && Character.isWhitespace(descr.charAt(be))) {
         be--;
       }
       boolean nosec = descr.charAt(be) == '/';
       String val = "";
       int endatag = -1;
-      if(!nosec){
-        endatag = descr.indexOf("</a",end);
-        val = descr.substring(end+1, endatag);
+      if (!nosec) {
+        endatag = descr.indexOf("</a", end);
+        val = descr.substring(end + 1, endatag);
       }
       int hndl = im + 2;
-      Map<String, Pair<Integer, String>> params = RequalityCLI.gatherParams(descr,hndl,end);
+      Map<String, Pair<Integer, String>> params = RequalityCLI.gatherParams(descr, hndl, end);
       Pair<Integer, String> par = null;
-      Pair<Integer, String> cl=null;
-      for(Entry<String, Pair<Integer, String>> pp: params.entrySet()){
-        String key = pp.getKey().toLowerCase(); 
-        if(key.endsWith(":href")||key.equals("href"))
-            par = pp.getValue();
-        if(key.endsWith(":class")||key.equals("class"))
-          cl = pp.getValue();
+      Pair<Integer, String> cl = null;
+      for (Entry<String, Pair<Integer, String>> pp : params.entrySet()) {
+        String key = pp.getKey().toLowerCase();
+        if (key.endsWith(":href") || key.equals("href")) par = pp.getValue();
+        if (key.endsWith(":class") || key.equals("class")) cl = pp.getValue();
       }
-      //par = params.get("href");
+      // par = params.get("href");
       {
-        char pth = 0;;
+        char pth = 0;
+        ;
         byte state = 0;
-        if(par!=null && par.getFirst()>-1){
+        if (par != null && par.getFirst() > -1) {
           String href = par.getSecond().trim();
-          if(href.startsWith(REQ_URI_START)){
+          if (href.startsWith(REQ_URI_START)) {
             href = href.substring(REQ_URI_START.length());
             ReqURIResolveResult rs = rslv.resolve(node, href, val);
-            if (rs!=ReqURIResolveResult.NF) {
+            if (rs != ReqURIResolveResult.NF) {
               ret.append(descr.substring(im, par.getFirst()));
               ret.append(rs.link);
-              im = par.getFirst()+par.getSecond().length();
-              if(nosec){
+              im = par.getFirst() + par.getSecond().length();
+              if (nosec) {
                 ret.append(descr.substring(im, be));
                 ret.append(">");
                 ret.append(val);
-                //replaced 
+                // replaced
                 ret.append("</a>");
-                im = end+1;
-              }else
-              {
-                
-                ret.append(descr.substring(im, end+1));
+                im = end + 1;
+              } else {
+
+                ret.append(descr.substring(im, end + 1));
                 ret.append(val);
-                //replaced
-                //ret.append(rs.value);
+                // replaced
+                // ret.append(rs.value);
                 im = endatag;
               }
             } else {
               String cls = null;
-              //String pref = detectPrefix(params);
-              if(cl != null)
-              {
-                cls = cl.getSecond() +" notResolved";
-              }else{
+              // String pref = detectPrefix(params);
+              if (cl != null) {
+                cls = cl.getSecond() + " notResolved";
+              } else {
                 cls = "notResolved";
               }
-              if(nosec){
+              if (nosec) {
                 ret.append(descr.substring(im, be));
                 ret.append(" ");
-//                if(pref!=null){
-//                  ret.append(pref);
-//                  ret.append(":");
-//                }
+                //                if(pref!=null){
+                //                  ret.append(pref);
+                //                  ret.append(":");
+                //                }
                 ret.append("class = \"");
                 ret.append(cls);
                 ret.append("\">");
                 ret.append(val);
-                //replaced 
+                // replaced
                 ret.append("</a>");
-                im = end+1;
-              }else
-              {
+                im = end + 1;
+              } else {
                 ret.append(descr.substring(im, end));
                 ret.append(" ");
-//                if(pref!=null){
-//                  ret.append(pref);
-//                  ret.append(":");
-//                  
-//                }
+                //                if(pref!=null){
+                //                  ret.append(pref);
+                //                  ret.append(":");
+                //
+                //                }
                 ret.append("class = \"");
-                ret.append(cls+"\">");
+                ret.append(cls + "\">");
                 ret.append(val);
-                //replaced
-                //ret.append(rs.value);
+                // replaced
+                // ret.append(rs.value);
                 im = endatag;
               }
               // ret.append(path);
             }
           }
         }
-        
+
         lim = im;
       }
-      im = descr.indexOf("<a",end);
+      im = descr.indexOf("<a", end);
     }
     if (lim > -1) ret.append(descr.substring(lim));
     return ret.toString();
   }
 
   private static String detectPrefix(Map<String, Pair<Integer, String>> params) {
-    for(String s:params.keySet()){
+    for (String s : params.keySet()) {
       int ind = s.indexOf(":");
-      if(ind>-1)
-        return s.substring(0, ind);
+      if (ind > -1) return s.substring(0, ind);
     }
     return null;
   }
+
   public static boolean busyCondition(SelectionRecord nodes) {
-    for(TreeNode node: nodes.fullSelection) {
-      if(node == null)
+    for (TreeNode node : nodes.fullSelection) {
+      if (node == null)
         RLogger.logDebug(CoreUtils.getTrace(Thread.currentThread().getStackTrace()));
-      if(node!=null && busyCondition(node.getTreeDB()))
-        return true;
+      if (node != null && busyCondition(node.getTreeDB())) return true;
     }
     return false;
   }
 
   public static boolean busyCondition(TreeDB db) {
-    boolean tl = TreeStateManager.getOne(db.getTracker()).getState(db.getLocalName(), 
-    		TreeStateManager.getOne(db.getTracker()).getRevisionInfo(db))==TreeState.READY;
-    if(db.getCacheStorage().inTransaction() || !tl){
+    boolean tl =
+        TreeStateManager.getOne(db.getTracker())
+                .getState(
+                    db.getLocalName(), TreeStateManager.getOne(db.getTracker()).getRevisionInfo(db))
+            == TreeState.READY;
+    if (db.getCacheStorage().inTransaction() || !tl) {
       return true;
     }
     return false;
   }
 
   public static String getTreeUniqueId(TreeDB db, RevisionInfo ri) {
-    return ri!=null?db.getLocalName()+":"+ri.toString():db.getLocalName();
+    return ri != null ? db.getLocalName() + ":" + ri.toString() : db.getLocalName();
   }
 
   public static String getFileName(String fid, boolean withext) {
     int lastsl = fid.lastIndexOf("/");
     int s = 0, e = fid.length();
-    if(lastsl>-1)
-      s = lastsl+1;
-    if(!withext){
+    if (lastsl > -1) s = lastsl + 1;
+    if (!withext) {
       int p = fid.lastIndexOf(".");
-      if(p>-1)
-        e = p;
+      if (p > -1) e = p;
     }
     return fid.substring(s, e);
   }
 
   public static String getFileName(java.nio.file.Path fid, boolean withext) {
     int cnt = fid.getNameCount();
-    String name =  fid.subpath(cnt-1, cnt).toString();
-    if(!withext){
+    String name = fid.subpath(cnt - 1, cnt).toString();
+    if (!withext) {
       int p = name.lastIndexOf(".");
-      return name.substring(0,p);
+      return name.substring(0, p);
     }
     return name;
   }
+
   public static java.nio.file.Path getJsonPathParentJsonPath(java.nio.file.Path relPath) {
     java.nio.file.Path folderPath = relPath.getParent();
-    if(folderPath == null)
-      return null;
+    if (folderPath == null) return null;
     String fname = getFileName(folderPath, true);
-//    if(fname.indexOf(".")>-1)
-//      return folderPath;
-    return folderPath.resolveSibling(fname+".json");
+    //    if(fname.indexOf(".")>-1)
+    //      return folderPath;
+    return folderPath.resolveSibling(fname + ".json");
   }
+
   public static String getFileParentFile(String file) {
     int lastsl = file.lastIndexOf("/");
-    if(lastsl == -1 || lastsl == 1)// ./ case
-      return null;//no parent
-    return file.substring(0,lastsl)+".json";
+    if (lastsl == -1 || lastsl == 1) // ./ case
+    return null; // no parent
+    return file.substring(0, lastsl) + ".json";
   }
-  public static String getRelativePath(FileSystem fs,String s1, String s2) {
+
+  public static String getRelativePath(FileSystem fs, String s1, String s2) {
 
     int sim = 0;
     while (sim < s1.length() && sim < s2.length() && s1.charAt(sim) == s2.charAt(sim)) sim++;
     if (sim == 0) {
-      for(java.nio.file.Path pa : fs.getRootDirectories())
-        if(s2.startsWith(pa.toString().replace(File.separator, "/")))
-          return s2;
-      while(s1.startsWith("/"))
-        s1 = s1.substring(1);
-      while(s1.endsWith("/"))
-        s1 = s1.substring(0,s1.length()-1);
+      for (java.nio.file.Path pa : fs.getRootDirectories())
+        if (s2.startsWith(pa.toString().replace(File.separator, "/"))) return s2;
+      while (s1.startsWith("/")) s1 = s1.substring(1);
+      while (s1.endsWith("/")) s1 = s1.substring(0, s1.length() - 1);
       StringBuilder sb = new StringBuilder();
       int cnt = 0;
       int i = -2;
-      do{
-        i = s1.indexOf("/",i+1);
+      do {
+        i = s1.indexOf("/", i + 1);
         cnt++;
-      }
-      while(i<s1.length() && i!=-1);
-      for(int j = 0;j<cnt;j++)
-        sb.append("../");
+      } while (i < s1.length() && i != -1);
+      for (int j = 0; j < cnt; j++) sb.append("../");
       sb.append(s2);
       return sb.toString();
-    }else{
-    	int ls = s1.substring(0,sim).lastIndexOf("/");
-        if (ls != -1 && sim > ls) sim = ls + 1;
+    } else {
+      int ls = s1.substring(0, sim).lastIndexOf("/");
+      if (ls != -1 && sim > ls) sim = ls + 1;
     }
     String sims = s1.substring(0, sim);
     s1 = s1.substring(sim);
     s2 = s2.substring(sim);
-    for(java.nio.file.Path pa : fs.getRootDirectories()){
-      if(s2.startsWith(pa.toString().replace(File.separator, "/")))
-        return (sims+s2);//we have to use absolute path;
+    for (java.nio.file.Path pa : fs.getRootDirectories()) {
+      if (s2.startsWith(pa.toString().replace(File.separator, "/")))
+        return (sims + s2); // we have to use absolute path;
     }
-    if(s2.isEmpty()){
+    if (s2.isEmpty()) {
 
       StringBuilder sb = new StringBuilder();
 
-      while(s1.startsWith("/"))
-        s1 = s1.substring(1);
-      while(s1.endsWith("/"))
-        s1 = s1.substring(0,s1.length()-1);
+      while (s1.startsWith("/")) s1 = s1.substring(1);
+      while (s1.endsWith("/")) s1 = s1.substring(0, s1.length() - 1);
       int cnt = 0;
       int i = -2;
-      do{
-        i = s1.indexOf("/",i+1);
+      do {
+        i = s1.indexOf("/", i + 1);
         cnt++;
-      }
-      while(i<s1.length() && i!=-1);
+      } while (i < s1.length() && i != -1);
       sb = new StringBuilder();
-      for(int j = 0;j<cnt;j++)
-        sb.append("../");
+      for (int j = 0; j < cnt; j++) sb.append("../");
       sb.append(s2);
       return sb.toString();
     }
     StringBuilder buf = new StringBuilder("./");
     int cnt = 0;
     int i = -2;
-    if(!s1.isEmpty()){
-      do{
-        i = s1.indexOf("/",i+1);
+    if (!s1.isEmpty()) {
+      do {
+        i = s1.indexOf("/", i + 1);
         buf.append("../");
         cnt++;
-      }
-      while(i<s1.length() && i!=-1);
+      } while (i < s1.length() && i != -1);
     }
     buf.append(s2);
     return buf.toString();
   }
+
   public static long getTime() {
     return System.nanoTime();
   }
+
   public static String getCharset(String html) throws IOException {
     return OmnivorousImporter.getCharset(html);
   }
+
   public static String[] getCommandLineArgs() {
     return CommandLineArgsProvider.cLineArgs;
   }
+
   private static char octToChar(StringBuilder s) {
-    int n=0;
-    int m=0;
-    byte st=(byte) s.length();
-    
-    OfInt it =s.chars().iterator();
-    m = (s.length()-1)*8; 
-    while(it.hasNext()) {
+    int n = 0;
+    int m = 0;
+    byte st = (byte) s.length();
+
+    OfInt it = s.chars().iterator();
+    m = (s.length() - 1) * 8;
+    while (it.hasNext()) {
       int i = it.next();
       char c = (char) i;
-	  n=(c-'0')*m+n;
-	  m-=8;
-	  if(m == 0)
-		  m = 1;
+      n = (c - '0') * m + n;
+      m -= 8;
+      if (m == 0) m = 1;
     }
-	return (char)n;
+    return (char) n;
   }
+
   private static char hexToChar(StringBuilder s) {
-    int n=0;
-    int m=0;
-    byte st=(byte) s.length();
-    
-    OfInt it =s.chars().iterator();
-    m = (s.length()-1)*16; 
-    while(it.hasNext()) {
+    int n = 0;
+    int m = 0;
+    byte st = (byte) s.length();
+
+    OfInt it = s.chars().iterator();
+    m = (s.length() - 1) * 16;
+    while (it.hasNext()) {
       int i = it.next();
       char c = (char) i;
-      if(c>='0'&&c<='9')
-    	n=(c-'0')*m+n;
+      if (c >= '0' && c <= '9') n = (c - '0') * m + n;
       else {
-    	n=(Character.toLowerCase(c)-'a'+10)*m+n;
+        n = (Character.toLowerCase(c) - 'a' + 10) * m + n;
       }
-	  m-=16;
-	  if(m == 0)
-		  m = 1;
+      m -= 16;
+      if (m == 0) m = 1;
     }
-	return (char)n;
+    return (char) n;
   }
-  public static String filterOutText(String aval,boolean cropSpaces) {
-	StringBuilder sb = new StringBuilder();
-	StringBuilder cha = new StringBuilder();
-	byte ignore = 0;
-	int lvl = 0;
-	boolean schar = false;
-	for(int i = 0;i<aval.length();i++) {//TODO rewrite
-		char c = aval.charAt(i);
-		if(ignore==0)
-		{
-			if(c == '\\') {
-				ignore = 1;
-			} else
-				if(c == '<') {
-					lvl++;
-				}else
-					if(c == '>') {
-						lvl--;
-					}else
-						if(lvl==0) {
-							if(!cropSpaces || sb.length()==0 || sb.charAt(sb.length()-1)!=' ' || c!=' ')
-								sb.append(c);
-						}
-		}
-		else
-			switch(ignore) {
-				case 1:{
-					if(c == 'x' || c == 'X') {//hex numericals
-						ignore = 4;
-					}else
-					if(Character.isDigit(c)) {
-						//zero or octal
-						if(c == '0')
-							ignore = 3;
-						else
-							ignore = 4;
-						cha.append(c);
-					}else {
-						i--;
-						ignore = 0;
-					}
-				}break;
-//				case 2:{
-//					ignore = 0;
-//					s
-//					i--;
-//				}break;
-				case 3:{
-					if(!Character.isDigit(c)) {
-						ignore = 0;
-						sb.append((char)0);
-						cha.setLength(0);
-						i--;
-					}else {
-						ignore = 4;
-						cha.append(c);
-					}
-				}break;
-				case 4:
-				case 5:
-				case 6:{
-					if(ignore< 6 && (c>='0' && c<='9' || Character.toLowerCase(c)>='a'&&Character.toLowerCase(c)<='f')) {
-						ignore++;
-						cha.append(c);
-					}else {
-						ignore = 0;
-						sb.append(hexToChar(cha));
-						cha.setLength(0);
-						i--;
-					}
-				}break;
-			}
-			if(ignore == 1) {
-			}
-	}
-	if(ignore>0) {
 
-		switch(ignore) {
+  public static String filterOutText(String aval, boolean cropSpaces) {
+    StringBuilder sb = new StringBuilder();
+    StringBuilder cha = new StringBuilder();
+    byte ignore = 0;
+    int lvl = 0;
+    boolean schar = false;
+    for (int i = 0; i < aval.length(); i++) { // TODO rewrite
+      char c = aval.charAt(i);
+      if (ignore == 0) {
+        if (c == '\\') {
+          ignore = 1;
+        } else if (c == '<') {
+          lvl++;
+        } else if (c == '>') {
+          lvl--;
+        } else if (lvl == 0) {
+          if (!cropSpaces || sb.length() == 0 || sb.charAt(sb.length() - 1) != ' ' || c != ' ')
+            sb.append(c);
+        }
+      } else
+        switch (ignore) {
+          case 1:
+            {
+              if (c == 'x' || c == 'X') { // hex numericals
+                ignore = 4;
+              } else if (Character.isDigit(c)) {
+                // zero or octal
+                if (c == '0') ignore = 3;
+                else ignore = 4;
+                cha.append(c);
+              } else {
+                i--;
+                ignore = 0;
+              }
+            }
+            break;
+            //				case 2:{
+            //					ignore = 0;
+            //					s
+            //					i--;
+            //				}break;
+          case 3:
+            {
+              if (!Character.isDigit(c)) {
+                ignore = 0;
+                sb.append((char) 0);
+                cha.setLength(0);
+                i--;
+              } else {
+                ignore = 4;
+                cha.append(c);
+              }
+            }
+            break;
+          case 4:
+          case 5:
+          case 6:
+            {
+              if (ignore < 6
+                  && (c >= '0' && c <= '9'
+                      || Character.toLowerCase(c) >= 'a' && Character.toLowerCase(c) <= 'f')) {
+                ignore++;
+                cha.append(c);
+              } else {
+                ignore = 0;
+                sb.append(hexToChar(cha));
+                cha.setLength(0);
+                i--;
+              }
+            }
+            break;
+        }
+      if (ignore == 1) {}
+    }
+    if (ignore > 0) {
 
-			case 3:
-				sb.append(octToChar(cha));
-				break;
-			case 4:
-			case 5:
-			case 6:{
-					ignore = 0;
-					sb.append(hexToChar(cha));
-					cha.setLength(0);
-				}break;
-		}
-	}
-	return sb.toString();
+      switch (ignore) {
+        case 3:
+          sb.append(octToChar(cha));
+          break;
+        case 4:
+        case 5:
+        case 6:
+          {
+            ignore = 0;
+            sb.append(hexToChar(cha));
+            cha.setLength(0);
+          }
+          break;
+      }
+    }
+    return sb.toString();
   }
+
   public static String spaceOne(String one) {
-	StringBuilder sb = new StringBuilder();
-	for(int i = 0;i<one.length();i++) {
-		char c = one.charAt(i);
-		if(sb.length()==0 || sb.charAt(sb.length()-1)!=' '||c!=' ')
-			sb.append(c);
-	}
-	return sb.toString();
+    StringBuilder sb = new StringBuilder();
+    for (int i = 0; i < one.length(); i++) {
+      char c = one.charAt(i);
+      if (sb.length() == 0 || sb.charAt(sb.length() - 1) != ' ' || c != ' ') sb.append(c);
+    }
+    return sb.toString();
   }
 
   public static boolean forgetName(File pfile) {
-    if(pfile.exists()) {
+    if (pfile.exists()) {
       File iproj = pfile.toPath().resolve(".project").toFile();
-      if(iproj.exists()) {
+      if (iproj.exists()) {
         Long cha = lchange.remove(iproj);
-        return cha!=null && cha!=0;
+        return cha != null && cha != 0;
       }
     }
     return false;
-  }  
-  //TODO rewrite, used to fake project name for manual rename refactoring
+  }
+  // TODO rewrite, used to fake project name for manual rename refactoring
 
   public static String getProjectName(File ch) {
-  	FileInputStream fis = null;
-  	File iproj = null;
-	try {
-	  iproj = ch.toPath().resolve(".project").toFile();
-	  long changeTime = lchange.getOrDefault(iproj,0L);
-	  if(changeTime==iproj.lastModified()&&iproj.lastModified()!=0 || changeTime == -1)
-		return names.get(iproj);
-	  else
-        lchange.put(iproj, iproj.lastModified());
-	  fis = new FileInputStream(iproj);
-	} catch (FileNotFoundException e1) {
-	  return null;
-	}
-	String name = null;
-  	try{
+    FileInputStream fis = null;
+    File iproj = null;
+    try {
+      iproj = ch.toPath().resolve(".project").toFile();
+      long changeTime = lchange.getOrDefault(iproj, 0L);
+      if (changeTime == iproj.lastModified() && iproj.lastModified() != 0 || changeTime == -1)
+        return names.get(iproj);
+      else lchange.put(iproj, iproj.lastModified());
+      fis = new FileInputStream(iproj);
+    } catch (FileNotFoundException e1) {
+      return null;
+    }
+    String name = null;
+    try {
       XMLInputFactory xif = XMLInputFactory.newInstance();
       xif.setProperty(XMLInputFactory.IS_SUPPORTING_EXTERNAL_ENTITIES, false);
       xif.setProperty(XMLInputFactory.IS_REPLACING_ENTITY_REFERENCES, false);
@@ -1420,26 +1434,23 @@ public class CoreUtils {
       while (reader.hasNext()) {
         XMLEvent event = (XMLEvent) reader.next();
         try {
-          if(event.isStartElement()){
-          	deep++;
-          	StartElement se = event.asStartElement();
-          	if(se.getName().getLocalPart().toLowerCase().equals("name")&&deep == 2)
-          	  record = 1;
-          }else if(event.isEndElement()){
-          	deep--;
-          	if(record == 1)
-          	  record = 2;
-          }else if(event.isCharacters()){
-          	if(record == 1)
-          	  sb.append(event.asCharacters().getData());
+          if (event.isStartElement()) {
+            deep++;
+            StartElement se = event.asStartElement();
+            if (se.getName().getLocalPart().toLowerCase().equals("name") && deep == 2) record = 1;
+          } else if (event.isEndElement()) {
+            deep--;
+            if (record == 1) record = 2;
+          } else if (event.isCharacters()) {
+            if (record == 1) sb.append(event.asCharacters().getData());
           }
         } catch (Exception e) {
           e.printStackTrace();
         }
       }
-      if(record == 2) {
-    	name = sb.toString();
-      	return name;
+      if (record == 2) {
+        name = sb.toString();
+        return name;
       }
     } catch (XMLStreamException e) {
       e.printStackTrace();
@@ -1447,24 +1458,23 @@ public class CoreUtils {
       e.printStackTrace();
     } catch (Exception e) {
       e.printStackTrace();
-	}finally{
-	  try {
-	    if(fis!=null)
-		  fis.close();
-	  } catch (IOException e) {
+    } finally {
+      try {
+        if (fis != null) fis.close();
+      } catch (IOException e) {
         e.printStackTrace();
-	  }
-	  if(iproj!=null && name!=null)
-		names.put(iproj, name);
-	}
-	return names.get(iproj);
+      }
+      if (iproj != null && name != null) names.put(iproj, name);
+    }
+    return names.get(iproj);
   }
+
   public static String gatherStoredType(String vtype) {
     int pos = vtype.lastIndexOf(',');
-    if(pos>-1)
-    	return vtype.substring(pos+1).trim();
+    if (pos > -1) return vtype.substring(pos + 1).trim();
     return vtype;
   }
+
   public static Object[] reworkPath(String url) {
     String uid = url.toString().replace(".html", ".xhtml");
     String mark = null;
@@ -1477,7 +1487,7 @@ public class CoreUtils {
     }
     uid = uid.replace("/./", "/");
     int point = uid.indexOf("../");
-    int up = -1;//one for ./resources/.xhtml
+    int up = -1; // one for ./resources/.xhtml
     while (point == 0) {
       uid = uid.substring(3);
       point = uid.indexOf("../", point);
@@ -1490,59 +1500,60 @@ public class CoreUtils {
     }
     return new Object[] {uid, mark, up};
   }
+
   public static String getShortTrace() {
-    StackTraceElement[]el = Thread.currentThread().getStackTrace();
-    if(el.length>3)
-      return el[3].toString();
+    StackTraceElement[] el = Thread.currentThread().getStackTrace();
+    if (el.length > 3) return el[3].toString();
     return el[0].toString();
   }
 
   private static ScriptEngineManager factory = new ScriptEngineManager();
   private static ScriptEngine engine = null;
+
   static {
-	engine = factory.getEngineByName("JavaScript");
-    if(engine == null)
-      engine = factory.getEngineByName("Nashorn");
-    if(engine == null)
-      engine = factory.getEngineByName("GrallVM");
-    if(engine == null)
-      engine = factory.getEngineByName("ECMAScript");
-	if(engine == null)
-      engine = factory.getEngineByName("rhino");
+    engine = factory.getEngineByName("JavaScript");
+    if (engine == null) engine = factory.getEngineByName("Nashorn");
+    if (engine == null) engine = factory.getEngineByName("GrallVM");
+    if (engine == null) engine = factory.getEngineByName("ECMAScript");
+    if (engine == null) engine = factory.getEngineByName("rhino");
   }
+
   public static ScriptEngine getJSEngine() {
-	return engine;
+    return engine;
   }
+
   public static URI getURI(String ret) {
-	File f = new File(ret);
-	return f.toURI();
+    File f = new File(ret);
+    return f.toURI();
   }
-  public static String getFIDOrUUID(ReportGenerationContext context, TreeNode node, boolean external) {
-    if(node == null)
-      return null;
-    //TODO inspect usages
-    String fid = external?node.getNodeIdForReport(context):node.getForeignID();
+
+  public static String getFIDOrUUID(
+      ReportGenerationContext context, TreeNode node, boolean external) {
+    if (node == null) return null;
+    // TODO inspect usages
+    String fid = external ? node.getNodeIdForReport(context) : node.getForeignID();
     return fid == null ? node.getSUUId() : fid;
   }
+
   public static String clearURIChars(String s) {
-    for(Character f:CoreUtils.repl.keySet())
+    for (Character f : CoreUtils.repl.keySet())
       s = s.replace(CoreUtils.repl.get(f), Character.toString(f));
     return s;
   }
+
   public static void stopCacheConnections(File f) {
     File[] files = f.listFiles();
-    if(files!=null)
-      for(File fa:files)
-        stopCacheConnections(fa);
+    if (files != null) for (File fa : files) stopCacheConnections(fa);
     CacheStorage.closeConnection(f.toURI());
   }
+
   public static void stopCacheConnections(TreeDB db) {
     stopCacheConnections(getCacheDir(db).toFile());
   }
+
   public static IProgressMonitor getMonitorOrConsole(TreeDB db) {
-    IProgressMonitor mon = db == null? null: db.getMonitor();
-    if(mon == null)
-      mon = new ConsoleProgressMonitor();
+    IProgressMonitor mon = db == null ? null : db.getMonitor();
+    if (mon == null) mon = new ConsoleProgressMonitor();
     return mon;
   }
 }

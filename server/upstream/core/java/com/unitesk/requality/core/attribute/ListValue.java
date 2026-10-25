@@ -15,7 +15,7 @@ public class ListValue implements Iterable<Object>, Cloneable,IContextStringProv
   }
 
   public AttributeType getType() {
-    return type;
+    return type!=null?type:AttributeType.STRING;//adds default
   }
   public Iterator<Object> iterator(){
     return values.iterator(); 
@@ -97,6 +97,7 @@ public class ListValue implements Iterable<Object>, Cloneable,IContextStringProv
   @Override
   protected Object clone() throws CloneNotSupportedException {
     List<Object> lst = new ArrayList<>();
+    //TODO references?
     for (Object o : values) {
       if (type == AttributeType.ENUM) lst.add(((AppliedEnumValue) o).clone());
       else if (type == AttributeType.LIST) lst.add(((ListValue) o).clone());
@@ -104,7 +105,7 @@ public class ListValue implements Iterable<Object>, Cloneable,IContextStringProv
       else if (type == AttributeType.ENUM_DEFINITION) lst.add(((EnumDefinitionValue) o).clone());
       else lst.add(o);
     }
-    return new ListValue(type, values);
+    return new ListValue(type, lst);
   }
   @Override
   public boolean equals(Object obj) {

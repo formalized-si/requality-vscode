@@ -36,6 +36,7 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedList;
+import java.util.List;
 import java.util.ListIterator;
 import java.util.Map;
 import java.util.Map.Entry;
@@ -55,18 +56,22 @@ import com.unitesk.jsonclone.JSONObject;
 import com.unitesk.requality.core.attribute.Attribute;
 import com.unitesk.requality.core.attribute.AttributeDefinition;
 import com.unitesk.requality.core.attribute.valueprovider.TempFolderFilesProvider;
+import com.unitesk.requality.core.checker.IMark;
+import com.unitesk.requality.core.checker.StorageProblem;
 import com.unitesk.requality.core.events.Moment;
 import com.unitesk.requality.core.lock.LockIsBusy;
 import com.unitesk.requality.core.lock.LockType;
 import com.unitesk.requality.core.log.RLogger;
 import com.unitesk.requality.core.model.NodeDesc;
 import com.unitesk.requality.core.model.NodeDescSet;
+import com.unitesk.requality.core.model.Pair;
 import com.unitesk.requality.core.model.TreeNode;
 import com.unitesk.requality.core.operation.ChangesSet;
 import com.unitesk.requality.core.operation.IProgressMonitor;
 import com.unitesk.requality.core.operation.ProgressRunnable;
 import com.unitesk.requality.nodetype.ErrorNode;
 import com.unitesk.requality.tool.CoreUtils;
+import com.unitesk.requality.tool.UUIDDuplicationHelper;
 
 public class FSStorage extends AbstractTreeStorage implements IUUIDsCachedTreeStorage {
   private UUID root = null;
@@ -74,7 +79,10 @@ public class FSStorage extends AbstractTreeStorage implements IUUIDsCachedTreeSt
   private static final Path ROOT_NODE_PATH = Path.of("root.json");
   private static final IResourceAble[] EMPTY = new IResourceAble[0];
 //  private Map<UUID, File> nodeToFile = new HashMap<>();
+  private Set<UUID> brokenNodes = new HashSet<>();
+  private Map<UUID, Path> storedUUIDPaths = new HashMap<>();
   private Map<UUID, Map<String, AttributeDefinition>> activeAttributes = new HashMap<>();
+  private Map<UUID, Collection <IMark>> nodeProblems = new HashMap<>();
   private final URI projectURI;
   private final Path projectFullPath;
   private ReentrantLock rl = new ReentrantLock();
@@ -146,6 +154,7 @@ public class FSStorage extends AbstractTreeStorage implements IUUIDsCachedTreeSt
     if (Files.exists(filep)) {
       UUID uuid = getUUIdByFullPath(filep);
       root = uuid;
+      storedUUIDPaths.put(uuid, filep);
       getResourceMap().cachePut(filep, ROOT_NODE_PATH, root, false, -1);// TODO test
       return uuid;
     }
@@ -236,12 +245,33 @@ public class FSStorage extends AbstractTreeStorage implements IUUIDsCachedTreeSt
       return Collections.emptySet();
     }
     try (Stream<Path> ds = Files.list(childrenFolder)) {
-      return ds.parallel().map(one -> getFullPathUUID(one)).filter(one -> one != null).collect(Collectors.toList());
+      List<Pair<Path, UUID>> fileRecords =  ds.parallel().map(one -> new Pair<Path, UUID>(one, getFullPathUUID(one))).filter(one -> one.getSecond() != null).collect(Collectors.toList());
+      List<UUID> ret = null;
+      for(Pair<Path, UUID> rec: fileRecords) {
+        UUID uuidToStore = rec.getSecond();
+        Path oldPath = storedUUIDPaths.get(rec.getSecond());
+        if(oldPath!=null && !oldPath.equals(rec.getFirst())) {
+          uuidToStore = UUIDDuplicationHelper.getIncremented(uuidToStore);
+          Path resNew = storedUUIDPaths.get(uuidToStore);
+          while(resNew!=null && !resNew.equals(rec.getFirst())) {
+            uuidToStore =  UUIDDuplicationHelper.getIncremented(uuidToStore);
+            resNew = storedUUIDPaths.get(uuidToStore);
+          }
+          recordUUIDDuplication(uuid, rec.getSecond(), uuidToStore, oldPath, rec.getFirst());
+        }else {
+          storedUUIDPaths.put(rec.getSecond(), rec.getFirst());
+        }
+        if(ret == null)
+          ret = new LinkedList<>();
+        ret.add(uuidToStore);
+      }
+      return ret;
     } catch (IOException e) {
       RLogger.logError(e);
     }
     return Collections.emptySet();
   }
+  
 
   @Override
   public void createStorageNode(NodeDescSet desca, String template, byte flag) {
@@ -257,6 +287,9 @@ public class FSStorage extends AbstractTreeStorage implements IUUIDsCachedTreeSt
       FileOutputStream fos = null;
       UUID parentUUId = desc.getWorkParentUUID();
       UUID uuid = desc.getUUId();
+      
+      Path oldPath = storedUUIDPaths.get(uuid);
+      
       String id = desc.getId();
       Map<String, AttributeDefinition> attributes = desc.getAttributes();
       try {
@@ -283,8 +316,17 @@ public class FSStorage extends AbstractTreeStorage implements IUUIDsCachedTreeSt
         if (!file.exists()) {
           file.createNewFile();
         }
-
-        String jsonString = NodeMapper.toJSON(uuid, attributes, true).toString(4);
+        
+        UUID uuidToStore = uuid;//uuid duplication may cause problems
+        //TODO remove?
+        if(oldPath!=null && !oldPath.equals(file.toPath())) {
+          uuidToStore = UUID.randomUUID();
+          recordUUIDDuplication(desc.getWorkParentUUID(), uuid, uuidToStore, oldPath, file.toPath());
+        }else {
+          storedUUIDPaths.put(uuid, file.toPath());
+        }
+        
+        String jsonString = NodeMapper.toJSON(uuidToStore, attributes, true).toString(4);
         fos = new FileOutputStream(file);
         Writer w = new OutputStreamWriter(fos, "UTF-8");
         w.append(jsonString);
@@ -322,7 +364,6 @@ public class FSStorage extends AbstractTreeStorage implements IUUIDsCachedTreeSt
 
   @Override
   public void remove(NodeDescSet ndb, byte flag) {
-
     ResourceMap rm = getResourceMap();
     Path fullPath = null;
     rm.readLock();
@@ -344,7 +385,9 @@ public class FSStorage extends AbstractTreeStorage implements IUUIDsCachedTreeSt
                                                   // const
     if (temp != null && Files.isDirectory(temp))
       resourcesCont = temp;
-
+    
+    //TODO clear storedPaths
+    
     StorageDeleteOperation<Path, Path> sdo = new StorageDeleteOperation<Path, Path>() {
       @Override
       public Object formSchelduleRule(
@@ -382,7 +425,7 @@ public class FSStorage extends AbstractTreeStorage implements IUUIDsCachedTreeSt
           @Override
           public void refreshRecoursive(IContainerAble cont) {
           }
-        }, activeAttributes, this, flag);
+        }, activeAttributes, storedUUIDPaths, this, flag);
   }
 
   private IContainerAble<Path> toContainerAble(Path childsCont) {
@@ -501,7 +544,7 @@ public class FSStorage extends AbstractTreeStorage implements IUUIDsCachedTreeSt
   @Override
   public void changeNodeId(UUID node, String id, byte flag) {
     // TODO Auto-generated method stub
-
+//TODO clear storedPaths if were implemented
   }
 
   public Path toRelativePath(Path resource) {
@@ -525,6 +568,9 @@ public class FSStorage extends AbstractTreeStorage implements IUUIDsCachedTreeSt
       try {
         Map<String, AttributeDefinition> val = NodeMapper.getAttributes(uuid, is1,
             TempFolderFilesProvider.getOne(getResourceFolder(uuid), true));
+       /* if(brokenNodes.contains(uuid))
+          val.put(TreeNode.ATTR_TYPE, new AttributeDefinition(uuid, TreeNode.ATTR_TYPE,
+             new ConstValueProvider(AttributeType.STRING, ErrorNode.TYPE_NAME)));*/
         activeAttributes.put(uuid, val);
         return val;
       } finally {
@@ -628,7 +674,7 @@ public class FSStorage extends AbstractTreeStorage implements IUUIDsCachedTreeSt
   @Override
   public void moveNodeTo(UUID node, UUID parent, byte flag) {
     // TODO Auto-generated method stub
-
+//TODO update storedPaths if implemented
   }
 
   @Override
@@ -817,6 +863,7 @@ public class FSStorage extends AbstractTreeStorage implements IUUIDsCachedTreeSt
   @Override
   public void clearNodeCache(UUID uid) {
     activeAttributes.remove(uid);
+    storedUUIDPaths.remove(uid);
     super.clearNodeCache(uid);
   }
 
@@ -824,6 +871,7 @@ public class FSStorage extends AbstractTreeStorage implements IUUIDsCachedTreeSt
   public void clearCaches(boolean del) {
     activeAttributes.clear();
     paths.clear();
+    storedUUIDPaths.clear();
     super.clearCaches(del);
   }
 
@@ -931,5 +979,38 @@ public class FSStorage extends AbstractTreeStorage implements IUUIDsCachedTreeSt
       return wl;
     }
   }
+
+  private void addNodeProblem(UUID node, IMark problem) {
+    Collection<IMark> probs = nodeProblems.get(node);
+    if(probs == null) {
+      probs = new LinkedList<>();
+      nodeProblems.put(node, probs);
+    }
+    probs.add(problem);
+  }
+
+  
+  private void recordUUIDDuplication(UUID parent, UUID duplication,UUID temporaryId, Path pathFirst, Path pathSecond){// TODO Auto-generated method stub
+    Path pathFull = pathSecond;
+    Path relPath = projectFullPath.relativize(pathFull);
+    getResourceMap().cachePut(pathFirst, relPath, temporaryId, true, -1);
+    brokenNodes.add(temporaryId);
+    String pathStringFirst = pathFirst.toString();
+    String pathStringSecond = pathSecond.toString();
+    addNodeProblem(parent, new StorageProblem(parent, StorageProblem.ERROR_ID_UUID_FIRST_DUP,
+       StorageProblem.MESSAGE_UUID_FIRST_DUP, duplication.toString(), pathStringSecond,
+       parent.toString(), temporaryId.toString()));
+    addNodeProblem(duplication, new StorageProblem(parent, StorageProblem.ERROR_ID_UUID_PARENT_DUP,
+       StorageProblem.MESSAGE_UUID_PARENT_DUP, duplication.toString(), pathStringFirst, pathStringSecond,
+       parent.toString(), temporaryId.toString()));
+    addNodeProblem(temporaryId, new StorageProblem(temporaryId, StorageProblem.ERROR_ID_UUID_DUP,
+       StorageProblem.MESSAGE_UUID_DUP, duplication.toString(), pathStringFirst, temporaryId.toString()));
+  }
+  
+  @Override 
+  public Collection<IMark> getStorageNodeProblems(UUID uid){
+    return nodeProblems.get(uid);
+  }
+
 
 }

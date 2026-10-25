@@ -37,6 +37,8 @@ public class LocationEventsHandler {
                     }
                   if(targ.getType().equals(Requirement.TYPE_NAME)){
                   	if(attrs.contains(Requirement.ATTR_LOCATIONS)){
+                      if(!(targ instanceof Requirement))
+                        return;
                   	  Requirement r = (Requirement) targ;
                   	  for(TreeNode node:r.getLocations(false)) {
                         TreeNode doc = node.getWorkParent();

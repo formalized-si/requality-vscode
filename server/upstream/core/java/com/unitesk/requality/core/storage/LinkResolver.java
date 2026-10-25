@@ -1195,7 +1195,7 @@ public class LinkResolver extends CacheManipulator<TreeDB> implements IStoppable
         throw e;
       }
       if(CoreUtils.DEBUG_LEVEL>0)
-        RLogger.logDebug("rslv names " + (System.currentTimeMillis()-l) +" "+db.getVisibleName()+ db.getTracker().getTreeStateManager().getRevisionOrHeadString(db));
+        RLogger.logDebug("rslv names " + (System.currentTimeMillis()-l) +" "+db.getVisibleName()+ db.getTracker().getTreeStateManager().getActiveCommitString(db));
       return true;
 //      saveRevLinks(null, true);
     //}else
@@ -1273,7 +1273,7 @@ public class LinkResolver extends CacheManipulator<TreeDB> implements IStoppable
       }
       if(CoreUtils.DEBUG_LEVEL>0) {
     	TreeStateManager tsm = db.getTracker().getTreeStateManager();
-        RLogger.logDebug("rslv " + (System.currentTimeMillis()-l) +" "+root.getTreeDB().getVisibleName()+ ((tsm.getRevisionInfo(db)==null)?" working":(" "+tsm.getRevisionOrHeadString(db)))); 
+        RLogger.logDebug("rslv " + (System.currentTimeMillis()-l) +" "+root.getTreeDB().getVisibleName()+ ((tsm.getRevisionInfo(db)==null)?" working":(" "+tsm.getActiveCommitString(db)))); 
       }
 //      saveRevLinks(null, true);
     }

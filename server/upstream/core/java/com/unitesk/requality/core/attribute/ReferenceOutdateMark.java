@@ -24,8 +24,8 @@ public class ReferenceOutdateMark implements ITreeCheckerProblem, ILocalizedStri
     this.targ = targ;
     this.nodeS = nodeS;
     this.targS = targS;
-    this.oldVers = oldVers;
-    this.newVers = newVers;
+    this.oldVers = oldVers == null ? AttributesVersioningRule.VALUE_NONE: oldVers;
+    this.newVers = newVers == null ?  AttributesVersioningRule.VALUE_NONE: newVers;
     this.key = key;
   }
   

@@ -3,6 +3,8 @@ package com.unitesk.requality.vscode.port.eclipse.ui.cnf;
 import java.text.Collator;
 
 import com.unitesk.requality.vscode.ui.resources.IProject;
+import com.unitesk.requality.vscode.ui.resources.IResource;
+import com.unitesk.requality.vscode.ui.runtime.CoreException;
 import com.unitesk.requality.vscode.ui.jface.viewers.Viewer;
 import com.unitesk.requality.vscode.ui.jface.viewers.ViewerComparator;
 
@@ -16,18 +18,24 @@ public class RequalitySorter extends ViewerComparator {
   public RequalitySorter(Collator collator) {
     super(collator);
   }
-  private static boolean isSomeProject(Object o){
+
+  private static boolean isSomeProject(Object o) {
     return o instanceof IProject;
   }
 
-  private static String getName(Object o){
-    if(o instanceof IProject)
-      return ((IProject)o).getName();//TODO replace by coreutils call?
+  private static String getName(Object o) {
+    if (o instanceof IProject)
+      try {
+        return ((IProject) o).getDescription().getName();
+      } catch (CoreException e) { // TODO Auto-generated catch block
+        return ((IResource)o).getName();
+      } // TODO replace by coreutils call?
     return o.toString();
   }
+
   @Override
   public int compare(Viewer viewer, Object e1, Object e2) {
-    
+
     if (isSomeProject(e1) && isSomeProject(e2)) {
       return getName(e1).compareTo(getName(e2));
     }

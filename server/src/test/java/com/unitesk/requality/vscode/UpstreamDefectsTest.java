@@ -7,6 +7,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
@@ -25,17 +26,18 @@ import com.unitesk.requality.vscode.port.eclipse.core.ResourceStorage;
 import com.unitesk.requality.vscode.port.eclipse.ui.editors.JSEditor;
 import com.unitesk.requality.vscode.port.eclipse.ui.editors.ReviewEditor;
 import com.unitesk.requality.vscode.ui.resources.IProject;
-import com.unitesk.requality.vscode.ui.resources.ProjectLocks;
 import com.unitesk.requality.vscode.ui.resources.ResourcesPlugin;
 import com.unitesk.requality.vscode.ui.swt.widgets.Display;
 import com.unitesk.requality.vscode.ui.workbench.IEditorReference;
 import com.unitesk.requality.vscode.ui.workbench.PlatformUI;
 
 /**
- * The plug-in classes are the upstream ones; three defects of their upstream text are prevented by the server around
- * them: the project lock map of ResourceStorage (unsynchronized), the edit mode of the Review page (set after the
- * socket service was created) and the Change ID dialog of the web editors (the case of the message consumer fell
- * through to the file dialog). A defect of the core is patched (VSCODE-PATCH): TreeLogic.canBeDeleted of the root node.
+ * The plug-in classes are the upstream ones; two defects of their upstream text are prevented by the server around
+ * them: the edit mode of the Review page (set after the socket service was created) and the Change ID dialog of the
+ * web editors (the case of the message consumer fell through to the file dialog). A defect of the core is patched
+ * (VSCODE-PATCH): TreeLogic.canBeDeleted of the root node; a defect that the unstable core shows too:
+ * AttributeStorage.getAD (removed attributes whose origin node is missing). The project lock map of ResourceStorage was unsynchronized
+ * before the unstable branch; the test of its lock stays as a regression test of the upstream fix.
  */
 class UpstreamDefectsTest {
   static ServerHarness h;
@@ -79,7 +81,6 @@ class UpstreamDefectsTest {
 
   @Test
   void oneLockPerProjectForConcurrentThreads() throws Exception {
-    assertTrue(ResourceStorage.markerProjectLocks instanceof ProjectLocks, ResourceStorage.markerProjectLocks.getClass().getName());
     IProject p = ResourcesPlugin.getWorkspace().getRoot().getProject("UpstreamDefectsTest-lock");
     int threads = 16;
     CountDownLatch go = new CountDownLatch(1);
@@ -91,7 +92,7 @@ class UpstreamDefectsTest {
         } catch (InterruptedException e) {
           throw new IllegalStateException(e);
         }
-        return ResourceStorage.getLockObject(p);
+        return ResourceStorage.getLockObject(p, UUID.randomUUID());
       }));
     go.countDown();
     Object first = locks.get(0).get(30, TimeUnit.SECONDS);
@@ -244,5 +245,23 @@ class UpstreamDefectsTest {
     });
     assertEquals(false, root.getTreeDB().getTreeLogic().canBeDeleted(root));
     assertEquals(false, Display.getDefault().syncCall(() -> new com.unitesk.requality.vscode.port.eclipse.handlers.DeleteSelection().isEnabled()));
+  }
+
+  /**
+   * The ETSI catalog has an old storage format: the core converts it when the project opens and tells the result in a
+   * message. 22 requirements of the catalog have a _type whose origin node is not in the catalog. AttributeStorage.getAD
+   * removed such an attribute from the attributes that the storage caches; the unstable core then loads the node
+   * without a type and the conversion stopped on a NullPointerException in ResourceStorage.saveStorageAttributes, which
+   * the message showed. With the VSCODE-PATCH the stored value stays.
+   */
+  @Test
+  void theFormatConversionCompletesWithoutAnError() throws Exception {
+    JsonObject done = h.await2("the message of the format conversion", () -> {
+      for (JsonObject m : h.requests("client/showMessage"))
+        if (m.has("message") && m.get("message").getAsString().contains("to new format was completed"))
+          return m;
+      return null;
+    });
+    assertTrue(!done.get("message").getAsString().contains("Exception"), done.toString());
   }
 }

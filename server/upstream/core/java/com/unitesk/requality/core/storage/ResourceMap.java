@@ -15,6 +15,8 @@ import java.util.Map.Entry;
 import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.Callable;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
@@ -155,7 +157,6 @@ public class ResourceMap extends CacheManipulator<Path> implements IStoppable{
         return null;
       return rs.getFullPath(relPath);
     }
-
     public UUID cacheGet(Path iFile) throws LockIsBusy {
       return cacheGet(iFile, LockType.LOCK_WAIT);
     }
@@ -259,9 +260,9 @@ public class ResourceMap extends CacheManipulator<Path> implements IStoppable{
     }
     private boolean initCaches(Path path, Path p, IUUIDsCachedTreeStorage rs, boolean lock, long session, IProgressMonitor mon) {
       state = 0;
-      Map<Path, Pair<Path, UUID>> uids = new HashMap<>();
-      Map<Path, Path> paths = new HashMap<>();
-      List<Path> jsons = new LinkedList<>();
+      Map<Path, Pair<Path, UUID>> uids = new ConcurrentHashMap<>();
+      Map<Path, Path> paths = new ConcurrentHashMap<>();
+      ConcurrentLinkedQueue<Path> jsons = new ConcurrentLinkedQueue<>();
       p = p.normalize();
       if(mon.isCanceled()) return false;
       if(!listJsons(this, path, p, jsons, paths, mon))
@@ -270,8 +271,8 @@ public class ResourceMap extends CacheManipulator<Path> implements IStoppable{
       collectUUIDs(session, jsons, paths, uids, mon);
       if(stopped || mon.isCanceled())
         return false;
-      Set<Path> vals = new HashSet<>(paths.values());
-      vals.removeAll(uids.keySet());
+      //Set<Path> vals = new HashSet<>(paths.values());
+      //vals.removeAll(uids.keySet());
       if(paths.size()!=uids.size()){
         RLogger.logError("Number of processed uuids is not equal to number of potential paths!");
       }
@@ -311,7 +312,7 @@ public class ResourceMap extends CacheManipulator<Path> implements IStoppable{
           System.out.println("ERROR some not added" ); 
       }
     }
-    private void collectUUIDs(long session, List<Path> jsons, Map<Path, Path> paths, Map<Path, Pair<Path,UUID>> uids, IProgressMonitor mon) {
+    private void collectUUIDs(long session, ConcurrentLinkedQueue<Path> jsons, Map<Path, Path> paths, Map<Path, Pair<Path,UUID>> uids, IProgressMonitor mon) {
       //final long session = rs.getCacheStorage().getTransactionSession(); 
 
       List<Callable<Object>> tasks = jsons.stream().parallel().map(pa->{
@@ -347,7 +348,7 @@ public class ResourceMap extends CacheManipulator<Path> implements IStoppable{
       } 
     }
 
-    private static boolean listJsons(ResourceMap rm, Path rpath, Path d,List<Path> jsonPaths, Map<Path, Path> jsonsMap, IProgressMonitor mon){
+    private static boolean listJsons(ResourceMap rm, Path rpath, Path d, ConcurrentLinkedQueue<Path> jsons, Map<Path, Path> jsonsMap, IProgressMonitor mon){
       LinkedList<Path> toh = new LinkedList<>();
       LinkedList<Path> tohp = new LinkedList<>();
       Set<Path> handled = new  HashSet<>();
@@ -398,7 +399,7 @@ public class ResourceMap extends CacheManipulator<Path> implements IStoppable{
                         tohp.addLast(path == null ? Path.of(fname) : path.resolve(fname));
                       }
                     }
-                    jsonPaths.add(pat);
+                    jsons.add(pat);
                   });
             }
             if(mon.isCanceled()) return false;

@@ -91,6 +91,7 @@ public class ResourcesServlet extends DefaultServlet{
   public static final String REVIEW = "review";
   public static final String TREE = "tree";
   public static final String RESOURCES = "resources";
+  public static final String IMAGES = "upload-images";
   private static final String RETURN_BACK_BUTTON = "<button id=\"go-back\" onclick=\"javascript:history.back();\">Return back</button>";
   private static final String NO_REPORT_HTML = "<html><head><script type='text/javascript' src='varStorage.js'></script><script type='text/javascript' src='jquery/jquery.js'></script><script type='text/javascript'  src='socketsHandlersReport.js'></script><script type='text/javascript' src='sockets.js'></script><script type='text/javascript'  src='report.js'></script></head><body><h1>Content cannot be loaded!</h1>Resource content cannot be found for resource {res} of node {node}. Please generate new report.<p>"+RETURN_BACK_BUTTON+"</p></body></html>";
   private static final String REPORT_UPDATE_HTML = "<html><head><script type='text/javascript' src='varStorage.js'></script><script type='text/javascript' src='jquery/jquery.js'></script><script type='text/javascript' src='socketsHandlersReport.js'></script><script type='text/javascript' src='sockets.js'></script><script type='text/javascript'  src='report.js'></script></head><body><h1>Report content being processed.</h1><p>Please wait, this page will be updated soon.</p><script language='javascript'>"
@@ -261,6 +262,15 @@ public class ResourcesServlet extends DefaultServlet{
        category = ruri.substring(0,ressep);
        ruri = ruri.substring(ressep+1);
        ressep = ruri.indexOf("/");
+    }
+    if(category!=null && category.equals(IMAGES)) {
+      java.nio.file.Path lookFrom = ResourcesProvider.getOne().imagesFolder;
+      File imFile = lookFrom.resolve(CoreUtils.URLDecode(ruri)).toFile();
+      if(!imFile.exists())
+        rresp.sendError(404);
+      else
+        outStaticEditorsFile(null, imFile, rresp, null);
+        return;
     }
     //detect session, resource name and node
     String session = null;

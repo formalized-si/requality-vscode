@@ -342,8 +342,7 @@ public class FIDUpdater {
         ReentrantLock rl = chn.getTreeCheckersLock();
         rl.lock();
         try {
-          //wontwork chn.registerTreeCheckerProblems(en.getValue());
-          chn.getTreeDB().getCheckerContainer().addToCheckQ(chn, false);
+          chn.registerTreeCheckerProblems(en.getValue());
         }finally {
           rl.unlock();
         }

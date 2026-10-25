@@ -12,6 +12,7 @@ import com.unitesk.jsonclone.JSONException;
 import com.unitesk.jsonclone.JSONObject;
 import com.unitesk.requality.core.attribute.AttributeStorage;
 import com.unitesk.requality.core.attribute.AttributeType;
+import com.unitesk.requality.core.attribute.MapValue;
 import com.unitesk.requality.core.attribute.TypedValue;
 import com.unitesk.requality.core.exception.NullParentException;
 import com.unitesk.requality.core.model.TreeNode;
@@ -19,7 +20,6 @@ import com.unitesk.requality.core.model.TreeNode;
 public class ChildPositionsProvider implements IValueProvider {
   public static final String ATTR_KEY = "_childrenPositions";
   public static String TYPE = "ChildPositions";
-  private static TypedValue EMPTY_ANSWER = new TypedValue(AttributeType.MAP, Collections.emptyMap());
   private static ChildPositionsProvider one = new ChildPositionsProvider();
   @Override
   public TypedValue getTypedValue(String key, AttributeStorage as) {
@@ -29,18 +29,18 @@ public class ChildPositionsProvider implements IValueProvider {
 	}catch(NullParentException npe) {
 	}
     if(par==null)
-      return EMPTY_ANSWER;//root node;
+      return MapValue.EMPTY_ANSWERS.get(AttributeType.INT);//root node;
     else {
       List<Object> ln = as.getNode().attrs().getListAttributeValue(ShownChildrenProvider.ATTR_KEY);
       if(ln == null)
         return null;
-      Map<String, String> pos = ln==null||ln.size()==0?Collections.emptyMap():new HashMap<>();
+      Map<String, Object> pos = ln==null||ln.size()==0?Collections.emptyMap():new HashMap<>();
       int i = 0;
       for(Object ob:ln) {
         UUID uid = (UUID) ob;
-        pos.put(uid.toString(), Integer.toString(i++));
+        pos.put(uid.toString(), i++);
       }
-      return pos.isEmpty()?EMPTY_ANSWER: new TypedValue(AttributeType.MAP, pos);//root node
+      return pos.isEmpty()?MapValue.EMPTY_ANSWERS.get(AttributeType.INT): new TypedValue(AttributeType.MAP, new MapValue(AttributeType.INT, pos));//root node
     }
   }
   

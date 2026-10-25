@@ -6,6 +6,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.SortedMap;
 import java.util.TreeMap;
+
 import com.unitesk.requality.vscode.ui.jface.dialogs.Dialog;
 import com.unitesk.requality.vscode.ui.jface.dialogs.MessageDialog;
 import com.unitesk.requality.vscode.ui.jface.viewers.CellEditor;
@@ -41,6 +42,7 @@ import com.unitesk.requality.vscode.ui.swt.widgets.Table;
 import com.unitesk.requality.vscode.ui.swt.widgets.TableItem;
 import com.unitesk.requality.vscode.ui.workbench.ISharedImages;
 import com.unitesk.requality.vscode.ui.workbench.PlatformUI;
+
 import com.unitesk.requality.core.attribute.Attribute;
 import com.unitesk.requality.core.attribute.AttributeType;
 import com.unitesk.requality.core.attribute.ListValue;
@@ -602,6 +604,7 @@ public class ListValueEditor extends DialogCellEditor {
 
     protected CellEditor getEditor(TreeNode node, AttributeType lasttype, Composite t, int style) {
       if (lasttype == AttributeType.STRING) return new TextCellEditor(t, style);
+      if (lasttype == AttributeType.HTML) return new TextCellEditor(t, style);
       if (lasttype == AttributeType.LIST) return new ListValueEditor(node, t, style, false);
       if (lasttype == AttributeType.INT) return new IntValueEditor(t, style);
       if (lasttype == AttributeType.BOOL) return new BoolValueEditor(t, style);

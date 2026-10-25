@@ -2,7 +2,7 @@
   "name": "requality-vscode",
   "displayName": "Requality (Unofficial)",
   "description": "Unofficial port of the Requality Eclipse plug-in (ISP RAS) for requirements management. It runs the original Requality core and plug-in code.",
-  "version": "1.4.0",
+  "version": "1.5.0",
   "publisher": "formalized-si",
   "icon": "media/icon.png",
   "preview": true,
@@ -1729,16 +1729,6 @@
           "when": "!requality.menuHidden.requality.delete"
         },
         {
-          "command": "requality.findNext",
-          "when": "(activeWebviewPanelId == requality.markup) && !requality.menuHidden.requality.findNext",
-          "group": "3_find@1"
-        },
-        {
-          "command": "requality.findPrevious",
-          "when": "(activeWebviewPanelId == requality.markup) && !requality.menuHidden.requality.findPrevious",
-          "group": "3_find@2"
-        },
-        {
           "command": "requality.addBookmark",
           "group": "4_additions@1",
           "when": "!requality.menuHidden.requality.addBookmark"
@@ -3281,7 +3271,7 @@
     "test": "npm run build:server && npm run test:server && npm run test:unit && npm run test:integration",
     "manifest": "python3 scripts/gen-manifest.py",
     "vscode:prepublish": "node scripts/prepublish.js",
-    "package": "vsce package --githubBranch main --out requality-vscode-1.4.0.vsix",
+    "package": "vsce package --githubBranch main --out requality-vscode-1.5.0.vsix",
     "check": "tsc -p . --noEmit",
     "package:platforms": "node scripts/package-platforms.js",
     "media": "npm run compile && node out/test/media/run.js"

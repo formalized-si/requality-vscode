@@ -1,7 +1,10 @@
 package com.unitesk.requality.core.search;
 
+import java.util.List;
 import java.util.Set;
+
 import com.unitesk.requality.core.attribute.TypedValue;
+import com.unitesk.requality.core.model.Pair;
 import com.unitesk.requality.core.model.TreeNode;
 
 public class NotRequest implements ISearchRequest {
@@ -18,13 +21,19 @@ public class NotRequest implements ISearchRequest {
 	}
 
 	@Override
-	public boolean test(TreeNode node) {
-      return !req.test(node);
+	public void test(TreeNode node, List<String> foundAttrs) {
+      Set<String> attrsAll = node.attrs().getAllAttributeKeys();//TODO check;
+      //
+      req.test(node, foundAttrs);//TODO think
+      if(foundAttrs.isEmpty())
+        foundAttrs.addAll(attrsAll);
+      else
+        foundAttrs.clear();
 	}
 
 
 	@Override
-	public boolean actionAndIgore(TreeNode root, Set<TreeNode> matches) {
+	public boolean actionAndIgore(TreeNode root, List<Pair<? extends TreeNode, List<String>>> matches) {
       return req.actionAndIgore(root, matches);
 	}	
 	@Override

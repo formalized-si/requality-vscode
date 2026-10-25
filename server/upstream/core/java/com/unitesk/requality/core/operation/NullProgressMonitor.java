@@ -2,6 +2,8 @@ package com.unitesk.requality.core.operation;
 
 public class NullProgressMonitor implements IProgressMonitor {
 
+  public static final IProgressMonitor ONE = new NullProgressMonitor();
+
   @Override
   public void worked(int val) {
     // TODO Auto-generated method stub

@@ -97,7 +97,7 @@ public class FilesTracker extends AbstractResTracker {
   private TrackerNotifier tn = new TrackerNotifier(){
     @Override
     protected void treeClosed(TreeDB db){
-      treeCloseReaction(db);
+      treeCloseReaction(db, true);
     }
     @Override
     protected void treeOpenned(TreeDB db){
@@ -113,10 +113,12 @@ public class FilesTracker extends AbstractResTracker {
     alwaysOK = true;
       this.dbnm = dbnm;
   }
-  public void treeCloseReaction(TreeDB db)
+  public void treeCloseReaction(TreeDB db, boolean withEvent)
   {
     DBLocalName name = db.getMetaObject(META_LOCAL_NAME);
     if(name!=null) {
+      if(withEvent)
+        notifyListeners(Moment.BEFORE, name.name, db.getProjectName(), db, TreeEvent.TREE_CLOSE);
       RevisionInfo ri = getTreeStateManager().getRevisionInfo(db);
       String revKey = getRevKey(ri);
   //        Map<String, Path> lmap = locationsP.get(name.name);
@@ -129,6 +131,8 @@ public class FilesTracker extends AbstractResTracker {
         if(map.size() == 0)
           dbs.remove(name.name);
       }
+      if(withEvent)
+        notifyListeners(Moment.AFTER, name.name, db.getProjectName(), db, TreeEvent.TREE_CLOSE);//TODO move?
     }
     dbnm.forget(db);
   }
@@ -846,7 +850,7 @@ public class FilesTracker extends AbstractResTracker {
     }
     TreeDB old = map.put(ris, db);
     if(old!=null && db!=old) {
-      treeCloseReaction(db);
+      treeCloseReaction(db, true);
     }
     Map<String, Path> map2 = locationsP.get(lname);
     if(map2 == null) {
@@ -953,7 +957,7 @@ public class FilesTracker extends AbstractResTracker {
 
   @Override
   public TreeDB loadTreeDBDescription(Object project,RevisionInfo ri, String name, IProgressMonitor mon) throws IOException {
-  checkReloadState();
+    checkReloadState();
     if(project instanceof URI)
       return loadTreeDBDescription((URI)project, ri, name, mon);
     if(project instanceof File)
@@ -1051,9 +1055,12 @@ public class FilesTracker extends AbstractResTracker {
       if(s1!=null)
         break;
     }
+    
     if(s1!=null)
       dbs.get(s1).remove(s2);
+    treeCloseReaction(db,false);
     notifyListeners(Moment.AFTER, db.getLocalName(),db.getProjectName(), db, TreeEvent.TREE_CLOSE);//TODO move?
+    
   }
   
   @Override
@@ -1327,5 +1334,16 @@ public class FilesTracker extends AbstractResTracker {
   @Override
   public void handleNewProjects(List<URI> reqProjects) {
     //TODO implement, for now used only by Activator and related loading
+  }
+  @Override
+  public void unbindBaseFromProject(Object project, TreeDB db, boolean delete, File ch) {
+    if(db == null)
+      try {
+        db = getTreeDB(project, null, null);
+      } catch (IOException e) {
+        RLogger.logError(e);
+      }
+    if(db!=null)
+      treeCloseReaction (db, true);
   }
 }

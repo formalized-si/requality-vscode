@@ -42,7 +42,7 @@ public class TempFolderFilesProvider implements IRelatedFilesProvider {
   private TempFolderFilesProvider(File dir, boolean dirInited) {
     this.dir = dir;
     if(dir!=null && !dir.exists())
-      dir = null;
+      this.dir = null;
     this.dirInited = dirInited;
   }
   @Override

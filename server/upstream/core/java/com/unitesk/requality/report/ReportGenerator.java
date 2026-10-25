@@ -108,7 +108,7 @@ public class ReportGenerator {
 
   private static void hideInstancers(TreeNode node, ReportGenerationContext context, List<TreeNode> hidden) {
     // TreeDB root = VirtualNode.getRootTree(node.getTreeDB(),3);
-    if (node == null) return;
+    if (node == null || context.monitor.isCanceled()) return;
     context.monitor.worked(1);
     TreeDB root = node.getTreeDB(); // TODO root?
     if (!root.isVirtual()) {
@@ -120,11 +120,15 @@ public class ReportGenerator {
     node = root.getNode(node.getUUId());
     if (node == null || node.getType() == null) 
       RLogger.logDebug("NF!");
+    if(context.monitor.isCanceled())
+      return;
     if (node!=null && node.getType().equals(VirtualNode.TYPE_NAME) && !(((VirtualNode) node).isCollapsed())) {
       ((VirtualNode) node).collapse();
       hidden.add(node);
       node.commitAttributes();
     }
+    if(context.monitor.isCanceled())
+      return;
     if (node != null)
       for (UUID node2 : node.getWorkChildrenUUIDs())
         hideInstancers(node.getTreeDB().getNode(node2), context, hidden);

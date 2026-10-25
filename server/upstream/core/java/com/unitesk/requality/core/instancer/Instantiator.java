@@ -49,15 +49,10 @@ import com.unitesk.requality.tool.CoreUtils;
 public class Instantiator {
   private static final String PARENT_ROOT = "_%parentRoot";
   private static final String INST_NAME = "_%instName";
+  private static final String NAME_INSTANCES_TREE = "_instTree";
   public static final String ATTR_TEMP = "_temporary";
   public static String DEFAULT_INSTANCE_NAME = "_default";
   private static Map<String, TreeDB> rootToDBMap = new HashMap<>(); // TODO
-  // move
-  // to
-  // treedb
-  // load
-  // mech?
-  private static Map<String, TreeInstancer> rootToTI = new HashMap<>(); // TODO
   // move
   // to
   // treedb
@@ -80,15 +75,13 @@ public class Instantiator {
       rootToInstances.remove(rid);
     }
     initiated.remove(rid);
-    
-    rootToTI.remove(rid);
     //initiated.remove(rid);
     TreeDB db = rootToDBMap.remove(rid);
     if (db != null) iDBToRootDB.remove(db);
-
-    for(String s:new HashSet<>(rootToTI.keySet()))
-      if(s.startsWith(rid.substring(0,rid.indexOf("|"))))
-        recClear(s);//TODO rewrite
+//
+//    for(String s:new HashSet<>(rootToTI.keySet()))
+//      if(s.startsWith(rid.substring(0,rid.indexOf("|"))))
+//        recClear(s);//TODO rewrite
   }
 
   public static void clearCache(TreeDB db) {
@@ -99,6 +92,9 @@ public class Instantiator {
       String root = node.toString();
       String rid = getId(root, db);
       recClear(rid);
+      TreeInstancer ti = db.getMetaObject(NAME_INSTANCES_TREE);
+      if(ti!=null)
+        db.unRegisterMetaObject(NAME_INSTANCES_TREE);
     } catch (Exception e) {
       RLogger.logError(e);
     }
@@ -369,8 +365,10 @@ public class Instantiator {
   private static TreeInstancer loadOrCreateTi(
       String instR, final TreeDB db, final TreeInstancer prevInst, Map<String, Object> initPar) {
     String insti = getId(instR, db);
-    if (rootToTI.containsKey(insti)) return rootToTI.get(insti);
-    TreeInstancer ti = null;
+//    if (rootToTI.containsKey(insti)) return rootToTI.get(insti);
+    TreeInstancer ti = db.getMetaObject(NAME_INSTANCES_TREE);
+    if(ti!=null)
+      return ti;
     // root storage to create raw root
     TreeDB rootT = db;
     if(rootT.isVirtual())
@@ -403,7 +401,8 @@ public class Instantiator {
           };
       ti = new TreeInstancer(db, instR, rt, ms);
     }
-    rootToTI.put(insti, ti);
+    db.registerMetaObject(NAME_INSTANCES_TREE, ti);
+    //rootToTI.put(insti, ti);
     return ti;
   }
 //
@@ -698,21 +697,11 @@ public class Instantiator {
   public static TreeDB getVirtualTreeDB(TreeInstancer treeInstancer) {
     readLock();
     try{
-      for (String s : rootToTI.keySet())
-        if (rootToTI.get(s) != null
-            && rootToTI.get(s).getRootNode().equals(treeInstancer.getRootNode())) // possible
-          // source
-          // of
-          // misstargeting
-          // whene
-          // there
-          // are
-          // clones
-          // of
-          // projects
-          return rootToDBMap.get(s);
-      // getId(treeInstancer.getRootNode(), tree)
-      // TreeDB db = rootToDBMap.get();
+      for(TreeDB db: iDBToRootDB.keySet()) {
+        TreeInstancer ti = db.getMetaObject(NAME_INSTANCES_TREE);
+        if(ti == treeInstancer)
+          return db;
+      }
       return null;
     }finally{
       readUnlock();

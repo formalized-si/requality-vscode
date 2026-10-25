@@ -428,6 +428,12 @@
   <meta http-equiv="content-type" content="text/html; charset=utf-8"/>
   <title></title>
   <style type="text/css">
+<#if fitImages?? >
+  img,object{
+    max-width: 100%;
+    object-fit: contain;
+  }
+</#if>
   .tabind{
     padding-left: 25px;
   }

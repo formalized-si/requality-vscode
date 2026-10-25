@@ -628,7 +628,9 @@ public final class Workspace {
           state = pls == ProjectLoadingState.VERSION_UPDATE || p.loading ? "loading" : "ready";
         else
           state = "loading";
-        o.addProperty("rootId", Nodes.id(db.getRootNode()));
+        // only a ready tree loads its root: the resource map of a loading tree is not initialized yet
+        if (TreeState.readyState(ts) || ts == TreeState.MODIFYING)
+          o.addProperty("rootId", Nodes.id(db.getRootNode()));
         o.addProperty("treeState", String.valueOf(ts));
       }
       o.addProperty("state", state);

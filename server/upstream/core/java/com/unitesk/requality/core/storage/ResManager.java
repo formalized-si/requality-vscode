@@ -7,7 +7,9 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardOpenOption;
 import java.util.Collection;
+import java.util.HashSet;
 import java.util.Map;
+import java.util.Set;
 
 import com.unitesk.requality.core.api.API;
 import com.unitesk.requality.core.api.Global;
@@ -58,9 +60,9 @@ public class ResManager {
       params = lastParams;
     tt = rmp.initTracker(params);
     if(API.GENERAL_SALT == null) {
-      URI gcl = tt.getGlobalCacheLocation();
-      if(gcl!=null) {
-        File f = new File(gcl).toPath().resolve(CoreUtils.CACHE_FOLDER_NAME).resolve(".pepper").toFile();
+      Path cache = CoreUtils.getCacheDir(getGlobalCacheLocation());
+      if(cache!=null) {
+        File f = cache.resolve(".pepper").toFile();
         if(!f.getParentFile().exists())
           f.getParentFile().mkdirs();
         byte[]fc = null;
@@ -379,5 +381,31 @@ public class ResManager {
         ignoreWorkspaceOperationInRename = old;
 	  }
     }
+  }
+  private static Set<Integer> deletingHashes = new HashSet<>();
+  public static boolean isMarkedAsDeleting(TreeDB project) {
+    if(project == null)
+      return false;
+    return deletingHashes.contains(getHash(project));
+  }
+  private static String ID_NAME = "IND_NUMBER";
+  private static int ID = 0;
+  private static int getHash(TreeDB project) {
+    Integer storedId = project.getMetaObject(ID_NAME);
+    if(storedId == null) {
+      synchronized (ID_NAME) {
+        storedId = project.getMetaObject(ID_NAME);
+        if(storedId == null) {
+          storedId = ID++;
+          project.registerMetaObject(ID_NAME, storedId);
+        }
+      }
+    }
+    return storedId;
+  }
+  public static void markTreeAsDeleting(TreeDB db) {
+    if(db == null)
+      return;
+    deletingHashes.add(getHash(db));
   }
 }

@@ -32,7 +32,8 @@ describe('package.json: menus of the Eclipse workbench', () => {
     const labels = new Map<string, string>((contributes.submenus as Array<{ id: string; label: string }>).map(s => [s.id, s.label]));
     assert.deepEqual(main.map(m => labels.get(m as string)), ['File', 'Edit', 'Navigate', 'Project', 'Window', 'Help']);
     const edit = (contributes.menus['requality.mainMenu.edit'] as MenuItem[]).map(i => i.command);
-    assert.ok(edit.includes('requality.addBookmark') && edit.includes('requality.findNext'), edit.join());
+    // Find Next / Find Previous: the plugin.xml menu contribution is commented out upstream (#13947)
+    assert.ok(edit.includes('requality.addBookmark') && !edit.includes('requality.findNext'), edit.join());
     const showView = (contributes.menus['requality.mainMenu.window.showView'] as MenuItem[]).map(i => i.command);
     assert.ok(showView.includes('requality.showView.problems') && showView.at(-1) === 'requality.showView.other', showView.join());
     const window = (contributes.menus['requality.mainMenu.window'] as MenuItem[]).map(i => i.submenu ?? i.command);

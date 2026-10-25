@@ -1,10 +1,11 @@
 package com.unitesk.requality.core.operation.mass;
 
-import java.util.Collection;
-import java.util.HashSet;
+import java.util.LinkedList;
+import java.util.List;
 import java.util.Map;
-import java.util.Set;
+
 import com.unitesk.requality.core.attribute.TypedValue;
+import com.unitesk.requality.core.model.Pair;
 import com.unitesk.requality.core.model.TreeNode;
 import com.unitesk.requality.core.search.ISearchRequest;
 import com.unitesk.requality.core.search.SearchMethod;
@@ -39,12 +40,15 @@ public class NodeSearch extends AbstractMassOperation {
   }
   
 
-  Set<TreeNode> matches = new HashSet<>();
+  List<Pair<? extends TreeNode, List<String>>> matches = new LinkedList<>();
 
   @Override
   public void performSingleAction(TreeNode node) {
-    if(sr.test(node))
-      matches.add(node);
+    List<String> attrs = new LinkedList<>();
+    sr.test(node, attrs);
+    if(attrs.size()>0) {
+      matches.add( new Pair<>(node, attrs));
+    }
   }
 
   @Override
@@ -56,7 +60,7 @@ public class NodeSearch extends AbstractMassOperation {
     if(sr != null)
       this.sr = sr;
   }
-  public Collection<? extends TreeNode> getMatches() {
+  public List<Pair<? extends TreeNode,  List<String>>> getMatches() {
     return matches;
   }
 }

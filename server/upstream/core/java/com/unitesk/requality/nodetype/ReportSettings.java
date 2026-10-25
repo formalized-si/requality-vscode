@@ -110,6 +110,7 @@ public class ReportSettings extends TreeNode {
   public static final String ATTR_WIDTH_ATTR = "selAttrsWidth";
   public static final String ATTR_SEL_FORMULA = "selFormula";
   public static final String ATTR_USER_DEFINED_FILENAME = "reportFileName";
+  public static final String NEXT_REPORT_UUID = "nextReportUuid";
   
 
   public ReportSettings() {

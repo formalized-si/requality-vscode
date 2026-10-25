@@ -3,7 +3,7 @@ plugins {
 }
 
 group = 'com.unitesk.requality.vscode'
-version = '1.4.0'
+version = '1.5.0'
 
 repositories {
     mavenCentral()
@@ -28,7 +28,7 @@ tasks.withType(JavaCompile).configureEach {
 }
 
 dependencies {
-    // Upstream release_1_4 core dependencies (build.gradle "extraLib"), same versions.
+    // Upstream unstable core dependencies (build.gradle "extraLib"), same versions.
     implementation 'org.apache.tika:tika-parsers:2.7.0'
     implementation 'org.apache.tika:tika-core:2.7.0'
     implementation 'org.apache.tika:tika-parser-pdf-module:2.7.0'

@@ -357,14 +357,14 @@ public class TreeStateManager {
 
   
 
-  public String getRevisionOrHeadString(TreeDB db) {
+  public String getActiveCommitString(TreeDB db) {
     RevisionInfo rs = getRevisionInfo(db);
     if(rs!=null) {
       String ri = rs.getRevision();
       if(ri!=null)
         return ri;
     }
-    RevisionInfo ri = Global.getRepoManager(db).getHeadRevision();
+    RevisionInfo ri = Global.getRepoManager(db).getCurrentRevision();
     if(ri!=null)
       return "~"+ri.getRevision();
     return "";

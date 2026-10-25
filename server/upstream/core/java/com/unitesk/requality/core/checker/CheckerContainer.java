@@ -28,6 +28,8 @@ import com.unitesk.requality.core.log.RLogger;
 import com.unitesk.requality.core.model.TreeDB;
 import com.unitesk.requality.core.model.TreeNode;
 import com.unitesk.requality.core.operation.ChangesSet;
+import com.unitesk.requality.core.operation.IProgressMonitor;
+import com.unitesk.requality.core.operation.NullProgressMonitor;
 import com.unitesk.requality.core.storage.IResTracker;
 import com.unitesk.requality.core.storage.ITreeStateListener;
 import com.unitesk.requality.core.storage.OFlag;
@@ -86,7 +88,7 @@ public class CheckerContainer {
     @Override
     public void delete(String lname, String pname, TreeDB db) {
       if(db==curDB) {
-        stopOldThread();
+        stopOldThread(true);
         nodesTo.clear();
         lastNodesMap.clear();
         nodesToIt = nodesTo.iterator();
@@ -162,7 +164,7 @@ public class CheckerContainer {
         curDB.getTracker().getTreeStateManager().removeStateHook(curDBLocalName, tss, hook);
     }
     curDB = db;
-    stopOldThread();
+    stopOldThread(false);
     if(curDB!=null) {
       curDBName = curDB.getVisibleName();
       curDBLocalName = curDB.getSemiLocalName();
@@ -188,22 +190,20 @@ public class CheckerContainer {
     
   }
   private Map<String, IMark[]> old = new HashMap<>();
-  public void checkSingleNode(Map<UUID, TreeNode> map, LinkedHashSet<UUID>q, boolean late) {
+  public void checkSingleNode(Map<UUID, TreeNode> map, LinkedList<UUID>q, boolean late) {
     UUID node = null;
-    boolean rem2 = q!=null&&q!=nodesTo;
-    synchronized (nodesTo) {
-      boolean isEm = nodesTo.isEmpty();
-      node = isEm?null:nodesToIt.next();
-      if(isEm)
-        rem2=false;
-      if(rem2&&q!=null){
-        Iterator<UUID> it = q.iterator();
-        it.next();
-        it.remove();
+    boolean isEm = q==null || q.isEmpty();
+    node = isEm?null:q.getFirst();
+    boolean rem = false;
+    if(q!=null){
+      q.removeFirst();
+      rem = true;
+    }
+    if(rem && node!=null){
+      synchronized(nodesTo){
+        nodesTo.remove(node);
+        nodesToIt = nodesTo.iterator();
       }
-      TreeDB db = curDB;
-      if(rem2)
-        nodesToIt.remove();//remove if we are ready to
     }
     if(node == null)
       return;
@@ -217,9 +217,11 @@ public class CheckerContainer {
         treenode.updateCheckerProblems();
         IMark[] newp = treenode.getCheckerProblems();
         if(newp == null || newp.hashCode()!=hc){
-          if(!Arrays.equals(oldp,treenode.getCheckerProblems())){
+          if(!Arrays.equals(oldp,newp)){
             treenode.getTreeDB().fireNodeGUIChange(treenode, CHANGE_SET, OFlag.NONE, Moment.BEFORE);
-          old.put(treenode.getSUUId(), newp);
+
+            old.put(treenode.getSUUId(), newp);
+            
             treenode.getTreeDB().fireNodeGUIChange(treenode, CHANGE_SET, OFlag.NONE, Moment.AFTER);
           }
         }
@@ -289,14 +291,17 @@ public class CheckerContainer {
 
   
   public void forceCheckQ(boolean runOnlyPart) {
-    stopOldThread();
-    runCheckerThreadActions(runOnlyPart);
+    stopOldThread(false);
+    runCheckerThreadActions(runOnlyPart, NullProgressMonitor.ONE);//TODO implement?
     startNewThread();
   }
 
   public void addToCheckQ(TreeNode node, boolean afterChange) {
     if(checkthread == null && isEnabled())
-      startNewThread();
+      synchronized (CheckerContainer.this) {
+         if(checkthread == null && isEnabled())
+           startNewThread();
+      }
     synchronized (nodesTo) {      
       if(!node.canBeCheckedIn(this))//marked to be checked by another container
         return;
@@ -308,9 +313,9 @@ public class CheckerContainer {
       nodesTo.add(nodeuid);
       nodesToIt = nodesTo.iterator();
       lastNodesMap.put(nodeuid, node);
-      synchronized (CheckerContainer.this) {
-        CheckerContainer.this.notifyAll(); 
-      }
+    }
+    synchronized (CheckerContainer.this) {
+      CheckerContainer.this.notifyAll(); 
     }
   }
 
@@ -327,7 +332,7 @@ public class CheckerContainer {
   private static TreeState[]tss = new TreeState[] {TreeState.HALTED, TreeState.READY,  TreeState.CANCELED};
   private IStateChangeHandler hook = null;
   public void runCheckers() {
-    stopOldThread();
+    stopOldThread(false);
     TreeStateManager tsm = curDB.getTracker().getTreeStateManager();
     String lname = curDB.getLocalName();
     if(tsm.isFullReady(lname, tsm.getRevisionInfo(curDB))) {
@@ -351,26 +356,26 @@ public class CheckerContainer {
           if(instanceChanged) {
             removeIfNeeded(lname);
             if(checkthread!=null)
-              stopOldThread();
+              stopOldThread(true);
             return;
           }
           if(state == TreeState.CANCELED) {
               removeIfNeeded(lname);
               if(checkthread!=null)
-                stopOldThread();
+                stopOldThread(true);
           }else if(state == TreeState.HALTED) {
             ProjectRemovedWait.registerWaitHalted(tsm, db, lname, ri, TreeState.LOADED_NO_CACHE, new Runnable() {
               @Override
               public void run() {
                 removeIfNeeded(lname);
                 if(checkthread!=null)
-                  stopOldThread();
+                  stopOldThread(true);
               }
             });
           }
           if(state == TreeState.READY) {
             if(checkthread!=null)
-              stopOldThread();
+              stopOldThread(false);
             addAllLoadedToQ();
             removeIfNeeded(lname);
             startNewThread();
@@ -381,7 +386,7 @@ public class CheckerContainer {
     }
   }
   private long nextTreeCheck = -1;
-  protected boolean runCheckerThreadActions(boolean late){
+  protected boolean runCheckerThreadActions(boolean late, IProgressMonitor coreMon){
     TreeState ts = null;
     try{
       if(late){
@@ -391,27 +396,35 @@ public class CheckerContainer {
           return false;
         }
       } 
-      LinkedHashSet<UUID> lbq = null;
+      if(coreMon.isCanceled())
+        return false;
+      LinkedList<UUID> lbq = null;
       synchronized (nodesTo) {
-        lbq = new LinkedHashSet<>(nodesTo);
+        lbq = new LinkedList<>(nodesTo);
       }
       int i = Math.max(lbq.size()/10,500);
       boolean checked = false;
       while(!lbq.isEmpty() && (!late||i>0)){
         if(late)
           i--;
+        if(coreMon.isCanceled())
+          return false;
         checkSingleNode(lastNodesMap,lbq,late);
         checked = true;
       }
       if(runTreeCheckers && lbq.isEmpty() && checked) {
         if(nextTreeCheck != -1 && System.currentTimeMillis()<nextTreeCheck) 
           return true;
+        if(coreMon.isCanceled())
+          return false;
         nextTreeCheck = System.currentTimeMillis() + NEXT_TREE_CHECK_TIMEOUT; 
         DeepFirstTreeWalker dftw = new DeepFirstTreeWalker(curDB.getNode(Requirement.getTypeRootQId()));
         Iterator<TreeNode> it = dftw.iterator();
         while(it.hasNext()){
           TreeNode node = it.next();
           ReentrantLock rl = node.getTreeCheckersLock();
+          if(coreMon.isCanceled())
+            return false;
           try {
             rl.lock();
             node.clearTreeCheckerProblems();
@@ -434,14 +447,14 @@ public class CheckerContainer {
   }
   public long checkthreadid = -1;
   public Object checkThreadStarted = null;
-  public Object checkthread = null;
+  public Object checkthread = null;//TODO replace by runnable with monitor?
   public IStoppable checkStopper = null;
   //TODO test it...
   protected void startNewThread() {
     Thread t = null;
     IStoppable st = null;
     if(checkthreadid != -1)
-      stopOldThread();
+      stopOldThread(false);
     if(curDB.isDisposed())
       return;
     synchronized (CheckerContainer.this) {
@@ -475,7 +488,7 @@ public class CheckerContainer {
                 canRun = (!emp && isEnabled());//no nodes or empty
               }
               if(canRun&&checkthreadid == c.getId())
-                runCheckerThreadActions(true);
+                runCheckerThreadActions(true, NullProgressMonitor.ONE);//TODO replace by progress monitor
               synchronized (nodesTo) {
                 emp = nodesTo.isEmpty();
               }
@@ -545,7 +558,10 @@ public class CheckerContainer {
       nextTreeCheck = -1;
     }
   }
-  public void stopOldThread() {
+  public void stopOldThread(boolean halted) {
+/*    тут надо логику посмотреть и возможно переписать, явно путаются понятия потока
+    обработки проверок и контейнера(последний переиспользуется)
+    или нужно пересоздать контейнер иногда*/
     Object ct = null;
     IStoppable s = null;
     long id = -1;

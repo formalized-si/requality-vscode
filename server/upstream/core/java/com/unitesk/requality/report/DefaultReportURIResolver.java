@@ -71,7 +71,13 @@ public class DefaultReportURIResolver implements IReqURIResolver{
             		ReportGenerationContext.getAdoptedReqRoot(context, tdb, trg), rs)+"#"+did, nw, true);
           }
         }else {
-        	//многотомная поддержка тут, возможно просто завернуть в detectName == detectName2
+          TreeNode sourceMpart = context.detectRoot(node);
+          TreeNode trgMpart = context.detectRoot(trg);
+          if(sourceMpart!=trgMpart) {
+            ReportSettings rs = context.reportS;
+            return new ReqURIResolveResult(getTemplateFileName(tdb, 
+              ReportGenerationContext.getAdoptedReqRoot(context, tdb, trg), rs)+"#"+did, nw, true);
+          }
         }
         return new ReqURIResolveResult("#"+did, nw, true);
       }

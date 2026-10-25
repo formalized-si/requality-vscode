@@ -12,6 +12,7 @@ import java.util.concurrent.locks.Lock;
 import com.unitesk.requality.core.attribute.Attribute;
 import com.unitesk.requality.core.attribute.AttributeDefinition;
 import com.unitesk.requality.core.attribute.Version;
+import com.unitesk.requality.core.checker.IMark;
 import com.unitesk.requality.core.lock.LockIsBusy;
 import com.unitesk.requality.core.lock.LockType;
 import com.unitesk.requality.core.model.NodeDescSet;
@@ -265,4 +266,5 @@ public interface ITreeStorage {
   public File getJSONResource(UUID uid, LockType lock) throws LockIsBusy;
   public abstract void initCaches(ITreeStorage storage, CacheInitializationStage stage, IProgressMonitor mon) throws Exception;
   public abstract void renew();
+  public abstract Collection<IMark> getStorageNodeProblems(UUID uid);
 }

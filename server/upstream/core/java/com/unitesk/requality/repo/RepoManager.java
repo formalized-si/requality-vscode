@@ -281,7 +281,7 @@ public class RepoManager extends AbstractResTracker
         }
         if(pc!=null){
           exc = null;
-          mon.beginTask("Start loading revision "+(revisionInfo==null?"NOREV":revisionInfo.commit.toString())+" of tree "+db.getSemiLocalName(), 10000);
+          mon.beginTask("Start loading revision "+((revisionInfo==null||revisionInfo.commit==null)?"NOREV":revisionInfo.commit.toString())+" of tree "+db.getSemiLocalName(), 10000);
           try{
             tree = loadTree(db, revisionInfo, pc.getFirst(), load, true, initCache, waitLoaded, mon);//TODO maybe not check?
             bindTreeToProject(pc, tree, revisionInfo, lname, pc.getFirst());
@@ -312,7 +312,7 @@ public class RepoManager extends AbstractResTracker
 
   public static void forgetCPCaches(String pname) {
     Path cf = CoreUtils.getCacheDir(ResManager.getManager().getTracker().getGlobalCacheLocation());
-    cf = cf.resolve(CoreUtils.CACHE_FOLDER_NAME);//cp folder
+    cf = cf.resolve(CoreUtils.CACHE_FOLDER_NAME);//cp folder, tends to be incorrect? also already removed here 
     String projName = pname;
   try {
       Path cpList = cf.resolve("cpConversion");
@@ -1116,11 +1116,27 @@ public class RepoManager extends AbstractResTracker
     rt.open(obj);
   }
 
-  public RevisionInfo getHeadRevision() {
+  public RevisionInfo getBranchHeadRevision() {
     ICVSClient cli;
     try {
       cli = getCVSClient();
-      RevisionInfo rev = cli.getHeadRevision(db);
+      RevisionInfo rev = cli.getBranchHeadRevision(db);
+      if(rev!=null)
+        return rev;
+      return null; 
+    } catch (CVSException e) {
+      //tends to be not git project
+    } catch(Exception e2){
+      RLogger.logError(e2);
+    }
+    return null;
+    
+  }
+  public RevisionInfo getCurrentRevision() {
+    ICVSClient cli;
+    try {
+      cli = getCVSClient();
+      RevisionInfo rev = cli.getCurrentRevision(db);
       if(rev!=null)
         return rev;
       return null; 
@@ -1308,6 +1324,13 @@ public class RepoManager extends AbstractResTracker
     rt.bindTreeToProject(proj, db, ri, lname, ch);
   }
 
+
+  @Override
+  public void unbindBaseFromProject(Object project, TreeDB db, boolean delete, File ch) {
+    rt.unbindBaseFromProject(project, db, delete, ch);
+  }
+
+
   @Override
   public void registerNames(TreeDB db, String lname, String pname) {
     rt.registerNames(db, lname, pname);
@@ -1336,5 +1359,4 @@ public class RepoManager extends AbstractResTracker
   public void handleNewProjects(List<URI> reqProjects) {  
     rt.handleNewProjects(reqProjects);
   }
-
 }

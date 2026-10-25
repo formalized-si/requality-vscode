@@ -8,7 +8,7 @@
 [![CI](https://github.com/formalized-si/requality-vscode/actions/workflows/ci.yml/badge.svg)](https://github.com/formalized-si/requality-vscode/actions/workflows/ci.yml)
 [![License](https://img.shields.io/badge/license-MIT%20%2F%20Apache--2.0-blue)](#license)
 
-Requality for VS Code is a port of the Requality Eclipse plug-in (release 1.4) to Visual Studio Code.
+Requality for VS Code is a port of the Requality Eclipse plug-in (branch `unstable`) to Visual Studio Code.
 Requality is a tool for requirements management ([requality.org](http://requality.org)).
 The extension uses the original Requality core and the original user interface code of the Eclipse plug-in.
 
@@ -57,6 +57,8 @@ The extension uses the original Requality core and the original user interface c
 ## Install
 
 Install the extension **Requality (Unofficial)** from the Visual Studio Marketplace or from Open VSX.
+Versions with an odd minor number (for example, 1.5) are pre-releases.
+To get them, click **Switch to Pre-Release Version** on the page of the extension in VS Code.
 
 To install a VSIX file (for example, from the GitHub releases):
 
@@ -258,12 +260,13 @@ The status bar shows the current perspective. Click it to open the **Open Perspe
 2. Install a JDK 17 or later.
 3. Run `npm ci`.
 4. Run `npm run build`. This command builds the server into `dist/server` and compiles the extension.
-5. Run `npm run package`. This command makes the file `requality-vscode-1.4.0.vsix` without a Java runtime.
+5. Run `npm run package`. This command makes the file `requality-vscode-1.5.0.vsix` without a Java runtime.
 6. To make the packages of a release, run `npm run package:platforms`.
    This command makes one VSIX file for each platform with a Java runtime, and one without, in `release/`.
 
 The workflow `.github/workflows/release.yml` makes a release for a tag `v<version>`.
 It publishes the packages to the Visual Studio Marketplace (secret `VSCE_PAT`) and to Open VSX (secret `OVSX_PAT`).
+If the minor number of the version is odd, the packages and the GitHub release are pre-releases.
 
 ## Test
 

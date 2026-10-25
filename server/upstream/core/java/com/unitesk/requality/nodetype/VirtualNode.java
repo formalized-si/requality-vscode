@@ -364,18 +364,18 @@ public class VirtualNode extends TreeNode {
     }
   }
   
-  @Override
-  public List<UUID> getWorkChildrenUUIDs(boolean onlyloaded) {
-    if (!isDisposed()&&!isVirtual()) {
-      if (!onlyloaded) {
-      //  updateChildrenIfNeeded();
-
-        //	AttributeStorage.markUp(getTreeDB(), getUUId());
-        return getActiveWorkChildrenUUIDs();
-      }
-    }
-    return super.getWorkChildrenUUIDs(onlyloaded);
-  }
+//  @Override
+//  public List<UUID> getWorkChildrenUUIDs(boolean onlyloaded) {
+//    if (!isDisposed()&&!isVirtual()) {
+//      if (!onlyloaded) {
+//      //  updateChildrenIfNeeded();
+//
+//        //	AttributeStorage.markUp(getTreeDB(), getUUId());
+//        return getActiveWorkChildrenUUIDs();
+//      }
+//    }
+//    return super.getWorkChildrenUUIDs(onlyloaded);
+//  }
   //    @Override
   //    public void setChildrenUUIDs(List<UUID> children2,boolean init) {
   //  //  	if(isVirtual()){
@@ -540,7 +540,6 @@ public class VirtualNode extends TreeNode {
       boolean ciup = childiterator!=null && childiterator.needUpdate(this),
           nup = ciup || childiterator == null;
       if(ciup){
-        getChildIterator().needUpdate(this);
         childiterator = getChildIterator();
         childrenLoaded = true;
       }
@@ -598,28 +597,28 @@ public class VirtualNode extends TreeNode {
   //
   //		return getVirtualTreeDB().getNode(uid);
   //    };
-  @Override
-  public List<UUID> getWorkChildrenUUIDs() {
-    //    	if(!isVirtual()){
-    //    		TreeNode ivn = getVirtMirror();
-    //    		if(ivn!=null)
-    //    			return ivn.getWorkChildrenUUIDs();
-    //    		return new ArrayList<UUID>();
-    //    	}
-    //if(!raw)//&&super.getRawChildrenUUIDs(true).size()>0)
-    //    	if(isVirtual() && getVS().isCloneParentVersionOutdated(Type.STRUCT) ||
-    //    			!isVirtual() && updateChildrenIfNeeded())
-    //    		getTreeDB().updateNodeChildren(this);
-    //List<UUID> clones = getVNChildren(true);
-    //if(clones!=null)
-    //			clones = new ArrayList<UUID>(clones);
-    //	else
-    //	clones = new ArrayList<UUID>();
-    //clones.addAll(super.getRawChildrenUUIDs());
-    return super.getWorkChildrenUUIDs();
-    //return clns;
-    //return getVNChildren(raw);
-  }
+//  @Override
+//  public List<UUID> getWorkChildrenUUIDs() {
+//    //    	if(!isVirtual()){
+//    //    		TreeNode ivn = getVirtMirror();
+//    //    		if(ivn!=null)
+//    //    			return ivn.getWorkChildrenUUIDs();
+//    //    		return new ArrayList<UUID>();
+//    //    	}
+//    //if(!raw)//&&super.getRawChildrenUUIDs(true).size()>0)
+//    //    	if(isVirtual() && getVS().isCloneParentVersionOutdated(Type.STRUCT) ||
+//    //    			!isVirtual() && updateChildrenIfNeeded())
+//    //    		getTreeDB().updateNodeChildren(this);
+//    //List<UUID> clones = getVNChildren(true);
+//    //if(clones!=null)
+//    //			clones = new ArrayList<UUID>(clones);
+//    //	else
+//    //	clones = new ArrayList<UUID>();
+//    //clones.addAll(super.getRawChildrenUUIDs());
+//    return super.getWorkChildrenUUIDs();
+//    //return clns;
+//    //return getVNChildren(raw);
+//  }
 
   public VirtualNode(TreeDB db, UUID uuid) {
     super(db, uuid);

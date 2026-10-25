@@ -21,8 +21,6 @@ public interface IGenerateReportHandler {
 
   String getLastError();
 
-  ReportData getLastReport();
-
   void openError(String string, String string2);
 
   void openInformation(String string, String string2);

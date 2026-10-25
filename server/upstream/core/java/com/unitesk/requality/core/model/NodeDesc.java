@@ -387,11 +387,19 @@ public class NodeDesc {
   }
 
   public static NodeDesc fromNode(
-	      final TreeNode node, Boolean deep) {
+      final TreeNode node, Boolean deep) {
     return fromNode(true, node, deep);
+  }
+  public static NodeDesc fromNode(
+      final TreeNode node,UUID uid, Boolean deep) {
+    return fromNode(true, node, uid, deep);
   }
   static NodeDesc fromNode( boolean firstRoot,
       final TreeNode node, Boolean deep) {
+    return fromNode(firstRoot, node, node.getUUId(), deep);
+  }
+  static NodeDesc fromNode( boolean firstRoot,
+      final TreeNode node, UUID uuid, Boolean deep) {
     List<TreeNode> chi = node.getSortedWorkChildren();//now we can copy hidden vnodes
     List<UUID> uids = new LinkedList<>();
     for(TreeNode nde:chi)
@@ -414,7 +422,7 @@ public class NodeDesc {
           attr = node.attrs().getAttribute(attr.getKey());
         if (attr == null || !attr.getOrigin().equals(node.getUUId())) continue;
        
-        natr.put(key, new AttributeDefinition(node.getUUId(), attr.getKey(), attr.getAvailability(),
+        natr.put(key, new AttributeDefinition(uuid, attr.getKey(), attr.getAvailability(),
               attr.getDefinition().getValueProvider(),
               attr.getDefinition().getFlags()));
       }
@@ -423,7 +431,7 @@ public class NodeDesc {
     NodeDesc result =
         new NodeDesc(
             node.getTreeDB(),
-            node.getUUId(),
+            uuid,
             node.getCloneParentUUId(),
             node.getWorkParentUUID(),
             node.getShownParentUUID(),

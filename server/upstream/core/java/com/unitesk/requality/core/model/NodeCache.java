@@ -162,6 +162,7 @@ public class NodeCache {
     long l = System.currentTimeMillis();
     AttributeStorage as = AttributeStorage.getCachedStorage(db, uuid);
     TreeNode n = null;
+    boolean updateChildren = false;
     try{
       if (CoreUtils.DEBUG_LEVEL > 7) {
         RLogger.logDebug(uuid + " preload " + (System.currentTimeMillis() - l));
@@ -177,6 +178,7 @@ public class NodeCache {
           l = System.currentTimeMillis();
         }
         n = db.createFromStorage(uuid, type, attrs);
+        updateChildren = true;
         if (CoreUtils.DEBUG_LEVEL > 7) {
           RLogger.logDebug(uuid + " item created " + (System.currentTimeMillis() - l));
           l = System.currentTimeMillis();
@@ -229,6 +231,9 @@ public class NodeCache {
       // RLogger.logInfo("anomaly!");
       // RLogger.logInfo("Load node time: "+(t));
       n.fireLoaded();
+      if(updateChildren) {
+        db.updateNodeChildren(n, db.getStorage().getChildren(uuid), true);
+      }
       CheckerContainer cc = db.getCheckerContainer();
       if(!notcheck && cc.isEnabled())
         cc.addToCheckQ(n, false);

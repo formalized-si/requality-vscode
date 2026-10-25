@@ -1,5 +1,6 @@
 package com.unitesk.requality.core.service;
 
+import java.io.File;
 import java.io.IOException;
 import java.net.URI;
 import java.util.ArrayList;
@@ -56,6 +57,7 @@ import com.unitesk.requality.core.operation.delete.DeleteNodeOperation;
 import com.unitesk.requality.core.operation.undoredo.UndoRedoMech;
 import com.unitesk.requality.core.selection.FSId;
 import com.unitesk.requality.core.sorting.SortingSettings;
+import com.unitesk.requality.core.storage.ResManager;
 import com.unitesk.requality.core.tree.ITreeLogic.IdContainsWrongChars;
 import com.unitesk.requality.core.tree.ITreeLogic.IdEmpty;
 import com.unitesk.requality.core.tree.ITreeLogic.PastingIntoLeafException;
@@ -648,6 +650,11 @@ public class EditorsSocketService extends GenericSocketService {
 //            }, false);
 
             return true;
+          case "uploadImage":
+            String path = (String) message.get("path");
+            Pair<String,String> loadingRes = ResourcesProvider.loadImageToTempFolder(db, path);
+            sendUploadedImagePath(ws, loadingRes.getFirst(), loadingRes.getSecond(), session);
+            return true;
           case "addTest":// node
             node = (String) message.get("node");
 
@@ -887,11 +894,15 @@ public class EditorsSocketService extends GenericSocketService {
                     }
                     Attribute attr = null;
                     if (!value.equals("")) {
+                      value = value.replace(ResourcesProvider.getOne().getResourcesURI(db, n.getUUId()).toString(), 
+                        ResManager.RES_VAR);
+                      value = value.replace(ResManager.RES_VAR+"/"+CoreUtils.URLEncode(key), ResManager.ATTR_RES_VAR);
+                      File resFolder = new File(n.getNodeResourcesPath(key));
                       n.attrs()
                           .setAttribute(new AttributeDefinition(n.getUUId(), key,
                               AttributeDefinition.detectValueProvider(key,
                                 atype, value, 
-                                TempFolderFilesProvider.getOne(n.getNodeResourcesFile(), true)),
+                                TempFolderFilesProvider.getOne(resFolder, false)),
                                 AttributeDefinition.detectFlags(key)));
                       attr = n.attrs().getAttribute(key);
                     } else {
@@ -1322,6 +1333,14 @@ public class EditorsSocketService extends GenericSocketService {
         }
       };
     return hl;
+  }
+  protected void sendUploadedImagePath(WSSocket ws, String newPath, String error, Session session) {
+    JSONObject ret = new JSONObject();
+    if(newPath!=null)
+      ret.put("path", newPath);
+    if(error!=null)
+      ret.put("error", error);
+    ws.send("sendImageLoaded", ret, session);
   }
 
   protected void setSelectionOnManager(TreeNode nd2) {

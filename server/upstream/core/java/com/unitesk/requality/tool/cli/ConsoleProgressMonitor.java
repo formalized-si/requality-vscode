@@ -119,7 +119,7 @@ public class ConsoleProgressMonitor implements IProgressMonitor {
   }
 
   public String getTask() {
-    return tasks!=null?tasks.lastElement():toString();
+    return (tasks!=null&&!tasks.isEmpty())?tasks.lastElement():null;
   }
 
   @Override

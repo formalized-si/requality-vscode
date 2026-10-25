@@ -1,7 +1,7 @@
 package com.unitesk.requality.core.search;
 
+import java.util.List;
 import java.util.Map;
-import java.util.Set;
 
 import com.unitesk.requality.core.attribute.TypedValue;
 import com.unitesk.requality.core.model.Pair;
@@ -22,7 +22,7 @@ public class SearchByRequest implements ISearchRequest {
   }
 
   @Override
-  public boolean test(TreeNode node) {
+  public void test(TreeNode node, List<String> attrsFound) {
     if(fh == null)
       throw new RuntimeException("JS holder not inited in search!");
     String f = params.get("formula").getGValue();
@@ -30,11 +30,12 @@ public class SearchByRequest implements ISearchRequest {
     if(jf == null)
       jf = fh.addRule("Search rule", f);
     Pair<Object, Boolean> res = jf.runOnNode(node);
-    return !JSFormulaHolder.resultNotTrue(res.getFirst());
+    if(!JSFormulaHolder.resultNotTrue(res.getFirst()))
+     attrsFound.add("formula: "+jf);
   }
 
   @Override
-  public boolean actionAndIgore(TreeNode root, Set<TreeNode> matches) {
+  public boolean actionAndIgore(TreeNode root, List<Pair<? extends TreeNode, List<String>>> matches) {
     // TODO Auto-generated method stub
     return false;
   }
