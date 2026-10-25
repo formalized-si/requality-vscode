@@ -1,5 +1,7 @@
 package com.unitesk.requality.vscode.mcp;
 
+import java.io.File;
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -149,27 +151,115 @@ final class Core {
   /** The time each project was used last (by its local name). */
   private final Map<String, Long> lastUse = new java.util.concurrent.ConcurrentHashMap<>();
 
+  /** A project was used now (its catalog is not idle). */
+  void used(TreeDB db) {
+    Workspace.Project p = workspace().project(db.getLocalName());
+    if (p != null)
+      lastUse.put(p.localName, System.currentTimeMillis());
+  }
+
   /**
-   * Releases the catalogs of the ready projects that no tool used for {@code idleMs} (another session or VS Code can
-   * open them); a later call loads such a project again.
+   * The ready projects to release: the ones no tool used for {@code idleMs} (0: none), and the ones another process
+   * waits for that no tool used for {@code wantedMs}.
    */
-  void releaseIdle(long idleMs) {
+  List<Workspace.Project> idle(long idleMs, long wantedMs) {
     long now = System.currentTimeMillis();
+    List<Workspace.Project> out = new ArrayList<>();
     for (Workspace.Project p : workspace().projects()) {
       if (!p.requality || p.closed || p.released || p.loading || p.error != null)
         continue;
-      TreeDB db = Nodes.findDB(p.localName);
-      if (db == null || !Nodes.isReady(db))
+      long unused = now - lastUse.getOrDefault(p.localName, 0L);
+      if (!(idleMs > 0 && unused >= idleMs) && !(unused >= wantedMs && workspace().lockWanted(p)))
         continue;
-      if (now - lastUse.getOrDefault(p.localName, 0L) >= idleMs) {
-        System.err.println("[mcp] releases the idle catalog " + p.dir);
-        workspace().releaseProject(p.dir);
-        // the release runs on the loader thread: it ends before a tool can start
-        long end = System.currentTimeMillis() + LOAD_WAIT_MS;
-        while (!p.released && System.currentTimeMillis() < end)
-          sleep(50);
-      }
+      TreeDB db = Nodes.findDB(p.localName);
+      if (db != null && Nodes.isReady(db))
+        out.add(p);
     }
+    return out;
+  }
+
+  /**
+   * Releases the catalogs of {@link #idle} (another session or VS Code can open them); a later call loads such a project
+   * again. Called when no tool runs.
+   */
+  void releaseIdle(long idleMs, long wantedMs) {
+    for (Workspace.Project p : idle(idleMs, wantedMs)) {
+      System.err.println("[mcp] releases the idle catalog " + p.dir);
+      workspace().releaseProject(p.dir);
+      // the release runs on the loader thread: it ends before a tool can start
+      long end = System.currentTimeMillis() + LOAD_WAIT_MS;
+      while (!p.released && System.currentTimeMillis() < end)
+        sleep(50);
+    }
+  }
+
+  private final DiskWatch disk = new DiskWatch();
+
+  /**
+   * Before a call on a project: when its catalog changed on disk (git pull, another editor), the project is loaded
+   * again (when no tool runs); the notice of the result tells it. Null when nothing changed.
+   */
+  String checkDisk(McpServer mcp, JsonObject args) {
+    if (!args.has("project") || !args.get("project").isJsonPrimitive())
+      return null;
+    Workspace.Project p;
+    try {
+      p = project(args.get("project").getAsString());
+    } catch (ToolError e) {
+      return null; // the tool tells it
+    }
+    // no change runs while the files are compared with the tree
+    boolean outdated = mcp.shared(() -> {
+      TreeDB db = Nodes.findDB(p.localName);
+      return db != null && !p.loading && !p.closed && p.error == null && Nodes.isReady(db) && disk.outdated(p.dir, db);
+    });
+    if (!outdated)
+      return null;
+    System.err.println("[mcp] the catalog " + p.dir + " changed on disk: the project loads again");
+    mcp.exclusive(() -> {
+      workspace().reloadProject(p.dir);
+      disk.forget(p.dir);
+    });
+    return "The catalog changed on disk (git pull or another editor): the server loaded the project again before this "
+        + "call. Undo and redo of the earlier changes end here; revert_change still works.";
+  }
+
+  /** The projects whose files of an interrupted import were looked for. */
+  final java.util.Set<String> recovered = java.util.concurrent.ConcurrentHashMap.newKeySet();
+
+  /**
+   * Removes the files an import left when the server stopped during it (see {@link RequalityTools#markImport}): the
+   * files of the document folder that were not there before it and belong to no node.
+   */
+  void recoverImport(Workspace.Project p, TreeDB db) {
+    if (!recovered.add(p.localName))
+      return;
+    File history = History.of(headless.server().options().storage, p.dir).dir();
+    File m = history == null ? null : new File(history, RequalityTools.IMPORT_MARKER);
+    if (m == null || !m.isFile())
+      return;
+    try {
+      JsonObject o = com.google.gson.JsonParser.parseString(java.nio.file.Files.readString(m.toPath())).getAsJsonObject();
+      File dir = new File(o.get("dir").getAsString());
+      TreeNode folder = db.getNode(UUID.fromString(o.get("folder").getAsString()));
+      java.util.Set<String> before = new java.util.HashSet<>();
+      o.getAsJsonArray("before").forEach(x -> before.add(x.getAsString()));
+      String[] now = dir.list();
+      if (folder != null && !folder.isDisposed() && now != null)
+        for (String n : now) {
+          if (before.contains(n))
+            continue;
+          String id = n.endsWith(".json") ? n.substring(0, n.length() - 5)
+              : n.endsWith("_resources") ? n.substring(0, n.length() - 10) : n;
+          if (folder.findWorkChild(id) == null) {
+            System.err.println("[mcp] removes " + new File(dir, n) + ", which an interrupted import left");
+            RequalityTools.deleteTree(new File(dir, n));
+          }
+        }
+    } catch (IOException | RuntimeException e) {
+      System.err.println("[mcp] cannot read the record of an interrupted import " + m + ": " + e);
+    }
+    m.delete();
   }
 
   /** The tree of a project, after its loading ended (waits for it). */
@@ -182,6 +272,7 @@ final class Core {
       workspace().loadProject(p.dir);
     long end = System.currentTimeMillis() + LOAD_WAIT_MS;
     long closedSince = 0;
+    boolean asked = false;
     while (true) {
       if (needsConversion(p))
         throw new ToolError("Project " + projectName + " has the catalog format of an older Requality. Convert it with "
@@ -196,12 +287,30 @@ final class Core {
       } else {
         closedSince = 0;
       }
-      if (p.error != null)
-        throw new ToolError("Project " + projectName + " cannot be loaded: " + p.error
-            + (p.error.startsWith(Workspace.LOCKED) ? ". Close it there, then load it again with open_project" : ""));
+      String error = p.error;
+      if (error != null && error.startsWith(Workspace.LOCKED)) {
+        // Another process holds the catalog: the wait asks it to give the catalog up (an idle requality-mcp does). The
+        // project loads when the lock comes.
+        if (!asked) {
+          asked = true;
+          workspace().requestLock(p);
+          end = Math.max(end, System.currentTimeMillis() + LOAD_WAIT_MS);
+        }
+        if (workspace().waitsForLock(p)) {
+          sleep(200);
+          continue;
+        }
+        throw new ToolError("Project " + projectName + " is open in another Requality process (VS Code or another "
+            + "requality-mcp session that is in use): " + p.dir + ". Close it there (an idle requality-mcp session gives it "
+            + "up when asked), then call again");
+      }
+      if (error != null)
+        throw new ToolError("Project " + projectName + " cannot be loaded: " + error);
       TreeDB db = Nodes.findDB(p.localName);
-      if (!p.closed && db != null && !p.loading && Nodes.isReady(db))
+      if (!p.closed && db != null && !p.loading && Nodes.isReady(db)) {
+        recoverImport(p, db);
         return db;
+      }
       if (System.currentTimeMillis() > end)
         throw new ToolError("Project " + projectName + " is still loading");
       sleep(200);
@@ -217,9 +326,25 @@ final class Core {
     }
   }
 
+  /**
+   * Refuses a change of a catalog this server loaded without its lock (no folder for the lock files): another process
+   * could write it at the same time.
+   */
+  void writable(TreeDB db) {
+    Workspace.Project p = workspace().project(db.getLocalName());
+    String why = p != null ? p.unlocked : null;
+    if (why != null)
+      throw new ToolError("The server does not change project " + db.getSemiProjectName() + ": its catalog is not locked ("
+          + why + "), so VS Code or another session could write it at the same time. Start requality-mcp with --locks "
+          + "<a folder it can write> to lock the catalogs");
+  }
+
   // ---- nodes
 
-  /** A node by its UUID or by its path ("/Requirements/A/B", a qualified id or a user-visible id). */
+  /**
+   * A node by its UUID, its path ("/Requirements/A/B"), its user-visible id (with the id prefix of the project), or its
+   * id alone when one node of the project has it.
+   */
   static TreeNode node(TreeDB db, String ref) {
     TreeNode n = null;
     try {
@@ -228,8 +353,29 @@ final class Core {
       String path = ref.isEmpty() || ref.equals("/") ? "/" : ref;
       n = db.getNode(path, Path.QID | Path.UV | Path.UUID);
     }
+    if ((n == null || n.isDisposed()) && !ref.isEmpty() && !ref.contains("/")) {
+      // an id alone (LIM_04): the node when the id is unique
+      com.unitesk.requality.core.operation.mass.NodeSearch s = new com.unitesk.requality.core.operation.mass.NodeSearch(
+          new com.unitesk.requality.core.search.AttributeRequest(TreeNode.ATTR_ID,
+              com.unitesk.requality.core.search.AttributeOperator.EQUALS, ref, false));
+      s.execute(db.getRootNode());
+      List<TreeNode> found = new ArrayList<>();
+      for (com.unitesk.requality.core.model.Pair<? extends TreeNode, List<String>> m : s.getMatches())
+        if (m.getFirst() != null && !m.getFirst().isDisposed() && !m.getFirst().isVirtual())
+          found.add(m.getFirst());
+      if (found.size() == 1)
+        return db.getNode(found.get(0).getUUId());
+      if (found.size() > 1) {
+        List<String> paths = new ArrayList<>();
+        for (TreeNode f : found.subList(0, Math.min(10, found.size())))
+          paths.add(f.getQualifiedId());
+        throw new ToolError("Several nodes have the id " + ref + ": " + paths + (found.size() > 10 ? " and more" : "")
+            + "; give the path");
+      }
+    }
     if (n == null || n.isDisposed())
-      throw new ToolError("No node " + ref + " in project " + db.getSemiProjectName());
+      throw new ToolError("No node " + ref + " in project " + db.getSemiProjectName()
+          + " (give a path such as /Requirements/A/B, a UUID, or an id that one node has)");
     return n;
   }
 

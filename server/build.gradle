@@ -28,8 +28,11 @@ tasks.withType(JavaCompile).configureEach {
 }
 
 dependencies {
-    // Upstream unstable core dependencies (build.gradle "extraLib"), same versions, except Tika 3.3.3 with POI 5.5.1:
-    // Tika 2.7.0 parsed the XFA forms of a PDF with external entities (CVE-2025-54988, CVE-2025-66516).
+    // Upstream unstable core dependencies (build.gradle "extraLib"), same versions, except:
+    // - Tika 3.3.3 with POI 5.5.1: Tika 2.7.0 parsed the XFA forms of a PDF with external entities (CVE-2025-54988,
+    //   CVE-2025-66516);
+    // - FreeMarker 2.3.34 and Jetty 9.4.58 (the last 9.4 versions: fixes of CVE-2023-26048, CVE-2023-26049 and others);
+    // - no Jersey and no Jackson: no code uses them.
     implementation 'org.apache.tika:tika-parsers:3.3.3'
     implementation 'org.apache.tika:tika-core:3.3.3'
     implementation 'org.apache.tika:tika-parser-pdf-module:3.3.3'
@@ -42,7 +45,7 @@ dependencies {
     implementation 'org.apache.xmlbeans:xmlbeans:5.1.1'
     implementation 'xerces:xercesImpl:2.12.2'
     implementation 'org.odftoolkit:odfdom-java:0.11.0'
-    implementation 'org.freemarker:freemarker:2.3.28'
+    implementation 'org.freemarker:freemarker:2.3.34'
     implementation 'net.sourceforge.htmlcleaner:htmlcleaner:2.29'
     implementation 'net.sf.cssbox:webvector:3.5'
     implementation 'net.arnx:wmf2svg:0.9.0'
@@ -55,15 +58,11 @@ dependencies {
     implementation 'com.sun.xml.bind:jaxb-core:2.3.0'
     implementation 'javax.xml.bind:jaxb-api:2.3.1'
     implementation 'com.googlecode.json-simple:json-simple:1.1.1'
-    implementation 'org.glassfish.jersey.media:jersey-media-multipart:2.38'
-    implementation 'org.glassfish.jersey.core:jersey-server:2.38'
-    implementation 'org.glassfish.jersey.connectors:jersey-jetty-connector:2.38'
-    implementation 'com.fasterxml.jackson.core:jackson-databind:2.10.3'
-    implementation 'org.eclipse.jetty.websocket:websocket-api:9.4.50.v20221201'
-    implementation 'org.eclipse.jetty.websocket:websocket-server:9.4.50.v20221201'
-    implementation 'org.eclipse.jetty:jetty-server:9.4.50.v20221201'
-    implementation 'org.eclipse.jetty:jetty-servlet:9.4.50.v20221201'
-    implementation 'org.eclipse.jetty:jetty-xml:9.4.50.v20221201'
+    implementation 'org.eclipse.jetty.websocket:websocket-api:9.4.58.v20250814'
+    implementation 'org.eclipse.jetty.websocket:websocket-server:9.4.58.v20250814'
+    implementation 'org.eclipse.jetty:jetty-server:9.4.58.v20250814'
+    implementation 'org.eclipse.jetty:jetty-servlet:9.4.58.v20250814'
+    implementation 'org.eclipse.jetty:jetty-xml:9.4.58.v20250814'
 
     // VS Code bridge.
     implementation 'com.google.code.gson:gson:2.11.0'

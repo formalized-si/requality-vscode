@@ -49,6 +49,10 @@ import com.unitesk.requality.vscode.rpc.JsonRpcConnection;
  * <p>A revert makes the nodes of a change as they were before it, with their UUIDs (links and locations to them stay
  * valid). It is refused when a node of the change is not as the change left it (a later change, by the agent or in
  * VS Code), unless forced.
+ *
+ * <p>Several servers can share a storage folder (sessions of the agent on other catalogs, or on this one one after the
+ * other): the folder of a history is locked ({@code journal.lock}) while it is written or read, and the journal is read
+ * again when another process added to it.
  */
 final class History {
   /** The histories by the canonical path of their catalog folder. */
@@ -57,8 +61,10 @@ final class History {
   private final File dir;
   private final List<JsonObject> entries = new ArrayList<>();
   private int next = 1;
-  /** The journal ends with a line the last server did not finish: the next entry starts a new line. */
-  private boolean newLine;
+  /** The length of the journal when it was read last: another process changed it when it differs. */
+  private long read = -1;
+  /** The changes this server added (the others are of earlier sessions). */
+  private final Set<Integer> mine = new java.util.HashSet<>();
 
   /** The history of the catalog in the folder; in memory only without a storage folder. */
   static History of(File storage, File catalog) {
@@ -94,8 +100,57 @@ final class History {
       } catch (IOException e) {
         System.err.println("[mcp] cannot write the history of " + catalog + ": " + e);
       }
-      load();
-      prune();
+      locked(dir, () -> {
+        refresh();
+        prune();
+        return null;
+      });
+    }
+  }
+
+  // ---- the lock of a history folder
+
+  /** The channels of the lock files (one per file in this JVM: closing another channel of a file releases its lock). */
+  private static final Map<String, java.nio.channels.FileChannel> LOCKS = new HashMap<>();
+  private static final Map<String, Object> MONITORS = new HashMap<>();
+  /** The folders whose lock this thread holds (the lock is taken once). */
+  private static final ThreadLocal<Set<String>> HOLDS = ThreadLocal.withInitial(java.util.HashSet::new);
+
+  /** Runs the body with the lock of the history folder (of this JVM and of the other processes). */
+  static <T> T locked(File dir, java.util.concurrent.Callable<T> body) {
+    try {
+      if (dir == null)
+        return body.call();
+      String path = dir.getAbsolutePath();
+      if (HOLDS.get().contains(path))
+        return body.call();
+      Object monitor;
+      synchronized (LOCKS) {
+        monitor = MONITORS.computeIfAbsent(path, k -> new Object());
+      }
+      synchronized (monitor) {
+        java.nio.channels.FileChannel ch;
+        synchronized (LOCKS) {
+          ch = LOCKS.get(path);
+          if (ch == null || !ch.isOpen()) {
+            ch = java.nio.channels.FileChannel.open(new File(dir, "journal.lock").toPath(),
+                java.nio.file.StandardOpenOption.CREATE, java.nio.file.StandardOpenOption.WRITE);
+            LOCKS.put(path, ch);
+          }
+        }
+        java.nio.channels.FileLock l = ch.lock();
+        HOLDS.get().add(path);
+        try {
+          return body.call();
+        } finally {
+          HOLDS.get().remove(path);
+          l.release();
+        }
+      }
+    } catch (RuntimeException e) {
+      throw e;
+    } catch (Exception e) {
+      throw new ToolError("The history in " + dir + " cannot be used: " + e);
     }
   }
 
@@ -111,7 +166,10 @@ final class History {
     f.setExecutable(true, true);
   }
 
-  /** Removes the node states of the changes older than KEEP_DAYS, and the contents no state refers to any more. */
+  /**
+   * Removes the node states of the changes older than KEEP_DAYS, and the contents no state refers to any more (and that
+   * no capture wrote or used in the last day: a change in progress refers to them soon). With the lock of the folder.
+   */
   private void prune() {
     Instant limit = Instant.now().minus(java.time.Duration.ofDays(KEEP_DAYS));
     boolean pruned = false;
@@ -140,9 +198,10 @@ final class History {
           return; // a file that cannot be read: no content is removed
         }
     File[] blobs = new File(dir, "blobs").listFiles();
+    long recent = System.currentTimeMillis() - 24L * 3600_000;
     if (blobs != null)
       for (File b : blobs)
-        if (!used.contains(b.getName()))
+        if (!used.contains(b.getName()) && b.lastModified() < recent)
           b.delete();
   }
 
@@ -155,40 +214,62 @@ final class History {
     return dir;
   }
 
-  private void load() {
-    File f = new File(dir, "journal.jsonl");
-    if (!f.isFile())
+  /** Reads the journal again when another process changed it (with the lock of the folder). */
+  private void refresh() {
+    if (dir == null)
       return;
-    Map<Integer, JsonObject> byId = new HashMap<>();
+    File f = new File(dir, "journal.jsonl");
+    long length = f.length();
+    if (length == read)
+      return;
+    // a number twice (a journal of an older version that two processes shared): the later entry
+    Map<Integer, JsonObject> byId = new java.util.LinkedHashMap<>();
+    int n = 1;
     try {
-      byte[] all = Files.readAllBytes(f.toPath());
-      newLine = all.length > 0 && all[all.length - 1] != '\n';
+      byte[] all = f.isFile() ? Files.readAllBytes(f.toPath()) : new byte[0];
       for (String line : new String(all, StandardCharsets.UTF_8).split("\n")) {
         JsonObject o;
         try {
           o = JsonParser.parseString(line).getAsJsonObject();
         } catch (RuntimeException e) {
-          continue; // a line the last server did not finish
+          continue; // a line a server did not finish
         }
         if (o.has("change")) {
-          o.addProperty("session", "earlier");
-          entries.add(o);
-          byId.put(o.get("change").getAsInt(), o);
-          next = Math.max(next, o.get("change").getAsInt() + 1);
+          int c = o.get("change").getAsInt();
+          if (!mine.contains(c))
+            o.addProperty("session", "earlier");
+          byId.remove(c);
+          byId.put(c, o);
+          n = Math.max(n, c + 1);
         } else if (o.has("state_of") && byId.containsKey(o.get("state_of").getAsInt())) {
           byId.get(o.get("state_of").getAsInt()).addProperty("state", o.get("state").getAsString());
         }
       }
+      read = all.length;
     } catch (IOException e) {
       System.err.println("[mcp] cannot read the history " + f + ": " + e);
+      return;
     }
+    // entries kept in memory only (no storage) do not exist here: the journal is the whole history
+    entries.clear();
+    entries.addAll(byId.values());
+    next = Math.max(next, n);
   }
 
   /** Adds an entry for a committed change ({@code reverts}: the change it reverts, or 0); its node states go to their own file. */
   synchronized JsonObject add(String project, String tool, String label, String summary, JsonArray operations, Capture c,
       int reverts) {
+    return locked(dir, () -> {
+      refresh();
+      return addEntry(project, tool, label, summary, operations, c, reverts);
+    });
+  }
+
+  private JsonObject addEntry(String project, String tool, String label, String summary, JsonArray operations, Capture c,
+      int reverts) {
     JsonObject e = new JsonObject();
     int n = next++;
+    mine.add(n);
     e.addProperty("change", n);
     e.addProperty("time", Instant.now().toString());
     e.addProperty("project", project);
@@ -216,14 +297,20 @@ final class History {
   }
 
   synchronized List<JsonObject> entries() {
-    return new ArrayList<>(entries);
+    return locked(dir, () -> {
+      refresh();
+      return new ArrayList<>(entries);
+    });
   }
 
   synchronized JsonObject entry(int change) {
-    for (JsonObject e : entries)
-      if (e.get("change").getAsInt() == change)
-        return e;
-    return null;
+    return locked(dir, () -> {
+      refresh();
+      for (JsonObject e : entries)
+        if (e.get("change").getAsInt() == change)
+          return e;
+      return null;
+    });
   }
 
   /** The node states of a change: {"before": {uuid: state}, "after": {uuid: state}} (null: the node does not exist). */
@@ -245,17 +332,21 @@ final class History {
 
   /** Sets the state of an entry (done, undone, reverted) and records it. */
   synchronized void setState(int change, String state) {
-    JsonObject e = entry(change);
-    if (e == null)
-      return;
-    e.addProperty("state", state);
-    JsonObject m = new JsonObject();
-    m.addProperty("time", Instant.now().toString());
-    m.addProperty("state_of", change);
-    m.addProperty("state", state);
-    append(m);
+    locked(dir, () -> {
+      JsonObject e = entry(change);
+      if (e == null)
+        return null;
+      e.addProperty("state", state);
+      JsonObject m = new JsonObject();
+      m.addProperty("time", Instant.now().toString());
+      m.addProperty("state_of", change);
+      m.addProperty("state", state);
+      append(m);
+      return null;
+    });
   }
 
+  /** Appends a line to the journal (with the lock of the folder, the journal read). */
   private void append(JsonObject e) {
     if (dir == null)
       return;
@@ -263,8 +354,19 @@ final class History {
       e = e.deepCopy();
       e.remove("session");
     }
-    write(new File(dir, "journal.jsonl"), (newLine ? "\n" : "") + JsonRpcConnection.GSON.toJson(e) + "\n", true);
-    newLine = false;
+    File f = new File(dir, "journal.jsonl");
+    // a journal that ends with a line a server did not finish: the entry starts a new line
+    boolean newLine = false;
+    try (java.io.RandomAccessFile r = new java.io.RandomAccessFile(f, "r")) {
+      if (r.length() > 0) {
+        r.seek(r.length() - 1);
+        newLine = r.read() != '\n';
+      }
+    } catch (IOException x) {
+      // no journal yet
+    }
+    write(f, (newLine ? "\n" : "") + JsonRpcConnection.GSON.toJson(e) + "\n", true);
+    read = f.length();
   }
 
   private static void write(File f, String text, boolean append) {
@@ -375,14 +477,17 @@ final class History {
             continue;
           byte[] bytes = in.readAllBytes();
           String h = sha256(bytes);
-          if (blobs != null) {
-            File f = new File(blobs, h);
-            if (!f.isFile()) {
-              File tmp = new File(blobs, h + ".tmp");
-              Files.write(tmp.toPath(), bytes);
-              Files.move(tmp.toPath(), f.toPath(), StandardCopyOption.REPLACE_EXISTING);
-            }
-          }
+          if (blobs != null)
+            locked(blobs.getParentFile(), () -> {
+              File f = new File(blobs, h);
+              // a content in use is recent: the pruning of another process keeps it
+              if (!f.isFile() || !f.setLastModified(System.currentTimeMillis())) {
+                File tmp = new File(blobs, h + "." + ProcessHandle.current().pid() + ".tmp");
+                Files.write(tmp.toPath(), bytes);
+                Files.move(tmp.toPath(), f.toPath(), StandardCopyOption.REPLACE_EXISTING);
+              }
+              return null;
+            });
           res.addProperty(name, h);
         } catch (IOException e) {
           // a state before a change must be complete (the change is not made); a state after it is only compared
@@ -450,6 +555,10 @@ final class History {
   /** What a revert would do or did: the nodes it restores, recreates and deletes, and the conflicts. */
   static final class Plan {
     final List<String> conflicts = new ArrayList<>();
+    /** The nodes of the conflicts (a later change of them must be reverted first). */
+    final Set<UUID> conflictNodes = new java.util.LinkedHashSet<>();
+    /** The links from other nodes to the nodes the revert deletes: they do not resolve after it. */
+    final JsonArray brokenLinks = new JsonArray();
     final List<UUID> recreate = new ArrayList<>();
     final List<UUID> restore = new ArrayList<>();
     final List<UUID> delete = new ArrayList<>();
@@ -469,16 +578,20 @@ final class History {
       JsonElement be = before.get(e.getKey());
       JsonObject b = be == null || be.isJsonNull() ? null : be.getAsJsonObject();
       JsonObject now = state(db.getStorage(), u, null);
-      if (!same(a, now))
+      if (!same(a, now)) {
         p.conflicts.add(conflict(db, u, a, now));
+        p.conflictNodes.add(u);
+      }
       if (b == null) {
         if (now != null) {
           p.delete.add(u);
           TreeNode n = db.getNode(u);
           if (n != null)
             for (TreeNode c : n.getWorkChildren())
-              if (c != null && !after.has(c.getSUUId()))
+              if (c != null && !after.has(c.getSUUId())) {
                 p.conflicts.add(path(db, u) + " has a node that the change did not make: " + c.getQualifiedId());
+                p.conflictNodes.add(c.getUUId());
+              }
         }
       } else if (now == null) {
         p.recreate.add(u);
@@ -488,6 +601,28 @@ final class History {
     }
     // parents first: a recreated node may be the parent of another one
     p.recreate.sort((x, y) -> depth(before, x) - depth(before, y));
+    // the links that later changes (or VS Code) made to the nodes the revert deletes
+    java.util.Set<UUID> deleted = new java.util.HashSet<>(p.delete);
+    for (UUID u : p.delete) {
+      TreeNode n = db.getNode(u);
+      if (n == null || n.isDisposed())
+        continue;
+      for (TreeNode x : Changes.subtree(n))
+        for (Map.Entry<String, Map<TreeNode, String>> l : Changes.linksTo(x, true).entrySet())
+          for (TreeNode from : l.getValue().keySet()) {
+            // a virtual node (a copy of its target) is no node of its own
+            if (from == null || from.isDisposed() || from.isVirtual() || after.has(from.getSUUId()) || inside(from, deleted))
+              continue;
+            p.conflicts.add(from.getQualifiedId() + " links to " + x.getQualifiedId() + " (" + l.getKey() + "), which the "
+                + "revert deletes");
+            p.conflictNodes.add(from.getUUId());
+            JsonObject b = new JsonObject();
+            b.addProperty("from", from.getQualifiedId());
+            b.addProperty("attribute", l.getKey());
+            b.addProperty("to", x.getQualifiedId());
+            p.brokenLinks.add(b);
+          }
+    }
     return p;
   }
 

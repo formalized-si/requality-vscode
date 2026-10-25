@@ -75,6 +75,12 @@ class HistoryTest {
     h.add("P", "apply_changes", "Agent: old", null, new JsonArray(), c, 0);
     Files.writeString(new File(h.blobs(), "abc").toPath(), "content");
     Files.writeString(new File(h.blobs(), "unused").toPath(), "content");
+    File recent = new File(h.blobs(), "recent");
+    Files.writeString(recent.toPath(), "content");
+    // a content no change refers to goes when it is older than a day (a change in progress refers to a new one soon)
+    long twoDays = System.currentTimeMillis() - 48L * 3600_000;
+    new File(h.blobs(), "abc").setLastModified(twoDays);
+    new File(h.blobs(), "unused").setLastModified(twoDays);
     // the change is two years old
     File journal = new File(dir, "journal.jsonl");
     String old = java.time.Instant.now().minus(java.time.Duration.ofDays(730)).toString();
@@ -84,6 +90,29 @@ class HistoryTest {
     assertNull(later.states(1));
     assertFalse(new File(h.blobs(), "abc").exists());
     assertFalse(new File(h.blobs(), "unused").exists());
+    assertTrue(recent.exists());
+  }
+
+  @Test
+  void twoServersShareAHistory() throws Exception {
+    File dir = Files.createTempDirectory("requality-history-shared").toFile();
+    History first = new History(dir, "/catalog");
+    History second = new History(dir, "/catalog");
+    History.Capture c = new History.Capture(first.blobs());
+    c.after.add("u1", state("A", "Alpha"));
+    c.before.add("u1", JsonNull.INSTANCE);
+    JsonObject e1 = first.add("P", "apply_changes", "Agent: one", null, new JsonArray(), c, 0);
+    // the other server reads the journal again before it adds: no number twice, no states written over
+    JsonObject e2 = second.add("P", "apply_changes", "Agent: two", null, new JsonArray(), c, 0);
+    assertEquals(1, e1.get("change").getAsInt());
+    assertEquals(2, e2.get("change").getAsInt());
+    assertEquals(2, first.entries().size());
+    second.setState(1, "reverted");
+    assertEquals("reverted", first.entry(1).get("state").getAsString());
+    assertTrue(new File(dir, "changes/1.json").isFile() && new File(dir, "changes/2.json").isFile());
+    // the entries of the other server are of an earlier session for this one
+    assertTrue(first.entry(2).has("session"));
+    assertFalse(first.entry(1).has("session"));
   }
 
   @Test

@@ -370,13 +370,24 @@ public class OmnivorousImporter {
       throw e;
     } catch (NullPointerException ne) {
     }
-    CharsetDetector cd = new CharsetDetector();
+    // VSCODE-PATCH: the encoding of the XML declaration, else UTF-8 when the bytes are UTF-8, before a guess (the
+    // detector took the UTF-8 of a file with few letters outside ASCII for ISO-8859-1, and the import changed them)
+    byte[] bytes;
     try(InputStream sourceFile = isprov.getStream()){
-      try(TikaInputStream tis = TikaInputStream.get(sourceFile)){
-        cd.setText(tis);
-      }
+      bytes = sourceFile.readAllBytes();
     }
-    String charset = cd.detect().getName();
+    String charset = declaredEncoding(bytes);
+    if (charset == null && isUtf8(bytes))
+      charset = "UTF-8";
+    if (charset == null) {
+      CharsetDetector cd = new CharsetDetector();
+      try(InputStream sourceFile = isprov.getStream()){
+        try(TikaInputStream tis = TikaInputStream.get(sourceFile)){
+          cd.setText(tis);
+        }
+      }
+      charset = cd.detect().getName();
+    }
     InputStream fr2 = null;
     try(InputStream sourceFile = isprov.getStream()){
       fr2 = getStream(sourceFile, charset);
@@ -387,6 +398,35 @@ public class OmnivorousImporter {
       fr2.close();
     }
   }
+  /** VSCODE-PATCH: the encoding of the XML declaration at the start of the bytes (also after a UTF-8 BOM), or null. */
+  static String declaredEncoding(byte[] b) {
+    int start = b.length >= 3 && (b[0] & 0xff) == 0xef && (b[1] & 0xff) == 0xbb && (b[2] & 0xff) == 0xbf ? 3 : 0;
+    String head = new String(b, start, Math.min(b.length - start, 200), StandardCharsets.ISO_8859_1);
+    if (!head.startsWith("<?xml"))
+      return null;
+    int end = head.indexOf("?>");
+    java.util.regex.Matcher m = java.util.regex.Pattern.compile("encoding\\s*=\\s*[\"']([A-Za-z0-9._-]+)[\"']")
+        .matcher(end > 0 ? head.substring(0, end) : head);
+    if (!m.find())
+      return null;
+    try {
+      return java.nio.charset.Charset.forName(m.group(1)).name();
+    } catch (IllegalArgumentException e) {
+      return null;
+    }
+  }
+
+  /** VSCODE-PATCH: true when the bytes are UTF-8 (all of them decode). */
+  static boolean isUtf8(byte[] b) {
+    try {
+      StandardCharsets.UTF_8.newDecoder().onMalformedInput(java.nio.charset.CodingErrorAction.REPORT)
+          .onUnmappableCharacter(java.nio.charset.CodingErrorAction.REPORT).decode(java.nio.ByteBuffer.wrap(b));
+      return true;
+    } catch (java.nio.charset.CharacterCodingException e) {
+      return false;
+    }
+  }
+
   private static HtmlCleaner ccleaner = null;
   private static HtmlCleaner getCharsetCleaner(){
     if(ccleaner == null){

@@ -95,6 +95,8 @@ public final class McpServer {
     final boolean readOnly;
     final boolean destructive;
     final Handler handler;
+    /** A read-only tool that changes state of the server with these arguments: it runs alone (null: never). */
+    java.util.function.Predicate<JsonObject> alone;
 
     public Tool(String name, String title, String description, JsonObject inputSchema, boolean readOnly, boolean destructive,
         Handler handler) {
@@ -105,6 +107,12 @@ public final class McpServer {
       this.readOnly = readOnly;
       this.destructive = destructive;
       this.handler = handler;
+    }
+
+    /** The tool runs alone (as a tool that changes something) when the arguments match. */
+    public Tool alone(java.util.function.Predicate<JsonObject> when) {
+      alone = when;
+      return this;
     }
 
     JsonObject describe() {
@@ -157,6 +165,81 @@ public final class McpServer {
   private final java.util.concurrent.locks.ReadWriteLock toolsLock = new java.util.concurrent.locks.ReentrantReadWriteLock(true);
   /** The client sent initialize: before it, the server answers only initialize and ping. */
   private volatile boolean initialized;
+  /** The server stops: no tool call starts. */
+  private volatile boolean stopping;
+  /** The protocol version and the capabilities of the client (initialize). */
+  private volatile String protocol;
+  private volatile JsonObject clientCapabilities = new JsonObject();
+  /** The requests this server sent to the client, by id, waiting for their responses. */
+  private final Map<String, java.util.concurrent.CompletableFuture<JsonObject>> pending = new java.util.concurrent.ConcurrentHashMap<>();
+  private final java.util.concurrent.atomic.AtomicInteger requestIds = new java.util.concurrent.atomic.AtomicInteger();
+
+  /** True when the client can ask its user (elicitation, protocol 2025-06-18 and later). */
+  public boolean canAskUser() {
+    String p = protocol;
+    return p != null && p.compareTo("2025-06-18") >= 0 && clientCapabilities.has("elicitation");
+  }
+
+  /**
+   * Asks the user of the client a yes-or-no question (elicitation/create); true when the user accepted and said yes.
+   * False when the client cannot ask, the user declined or cancelled, or no answer came in {@code timeoutMs}.
+   */
+  public boolean askUser(String message, String yes, long timeoutMs) {
+    if (!canAskUser())
+      return false;
+    JsonObject params = new JsonObject();
+    params.addProperty("message", message);
+    JsonObject schema = new JsonObject();
+    schema.addProperty("type", "object");
+    JsonObject props = new JsonObject();
+    JsonObject allow = new JsonObject();
+    allow.addProperty("type", "boolean");
+    allow.addProperty("title", yes);
+    allow.addProperty("default", false);
+    props.add("allow", allow);
+    schema.add("properties", props);
+    JsonArray req = new JsonArray();
+    req.add("allow");
+    schema.add("required", req);
+    params.add("requestedSchema", schema);
+    JsonObject r = request("elicitation/create", params, timeoutMs);
+    if (r == null || !r.has("result") || !r.get("result").isJsonObject())
+      return false;
+    JsonObject res = r.getAsJsonObject("result");
+    if (!res.has("action") || !"accept".equals(res.get("action").getAsString()))
+      return false;
+    JsonObject content = res.has("content") && res.get("content").isJsonObject() ? res.getAsJsonObject("content") : null;
+    return content != null && content.has("allow") && content.get("allow").isJsonPrimitive()
+        && content.get("allow").getAsJsonPrimitive().isBoolean() && content.get("allow").getAsBoolean();
+  }
+
+  /** Sends a request to the client and waits for its response (null: none in time). */
+  private JsonObject request(String method, JsonObject params, long timeoutMs) {
+    String id = "requality-" + requestIds.incrementAndGet();
+    java.util.concurrent.CompletableFuture<JsonObject> f = new java.util.concurrent.CompletableFuture<>();
+    pending.put(id, f);
+    JsonObject m = new JsonObject();
+    m.addProperty("jsonrpc", "2.0");
+    m.addProperty("id", id);
+    m.addProperty("method", method);
+    m.add("params", params);
+    send(m);
+    try {
+      return f.get(timeoutMs, java.util.concurrent.TimeUnit.MILLISECONDS);
+    } catch (InterruptedException e) {
+      Thread.currentThread().interrupt();
+      return null;
+    } catch (java.util.concurrent.ExecutionException | java.util.concurrent.TimeoutException e) {
+      return null;
+    } finally {
+      pending.remove(id);
+    }
+  }
+
+  /** No tool call starts from now on (the running ones end). */
+  public void stop() {
+    stopping = true;
+  }
 
   /** Reads messages until the input ends. A malformed message gets an error and the server continues. */
   public void listen() throws IOException {
@@ -183,23 +266,31 @@ public final class McpServer {
       return;
     }
     if (msg.isJsonArray() && msg.getAsJsonArray().size() > 0) {
-      // a batch (protocol 2025-03-26): one array with the responses, after all requests of the batch ran
-      List<java.util.concurrent.CompletableFuture<JsonObject>> results = new java.util.ArrayList<>();
-      for (JsonElement m : msg.getAsJsonArray())
-        results.add(m.isJsonObject() ? dispatch(m.getAsJsonObject())
-            : java.util.concurrent.CompletableFuture.completedFuture(error(null, -32600, "Invalid request: not an object")));
-      java.util.concurrent.CompletableFuture.allOf(results.toArray(new java.util.concurrent.CompletableFuture[0])).thenRun(() -> {
-        JsonArray out = new JsonArray();
-        for (java.util.concurrent.CompletableFuture<JsonObject> f : results) {
-          JsonObject r = f.join();
-          if (r != null)
-            out.add(r);
-        }
-        if (out.size() > 0)
-          send(out);
-      });
+      // a batch (protocol 2025-03-26): one array with the responses, after all requests of the batch ran (the request
+      // that ends last sends it)
+      JsonArray batch = msg.getAsJsonArray();
+      JsonObject[] responses = new JsonObject[batch.size()];
+      java.util.concurrent.atomic.AtomicInteger left = new java.util.concurrent.atomic.AtomicInteger(batch.size());
+      for (int i = 0; i < batch.size(); i++) {
+        int k = i;
+        java.util.function.Consumer<JsonObject> reply = r -> {
+          responses[k] = r;
+          if (left.decrementAndGet() > 0)
+            return;
+          JsonArray out = new JsonArray();
+          for (JsonObject x : responses)
+            if (x != null)
+              out.add(x);
+          if (out.size() > 0)
+            send(out);
+        };
+        if (batch.get(i).isJsonObject())
+          dispatch(batch.get(i).getAsJsonObject(), reply);
+        else
+          reply.accept(error(null, -32600, "Invalid request: not an object"));
+      }
     } else if (msg.isJsonObject()) {
-      dispatch(msg.getAsJsonObject()).thenAccept(r -> {
+      dispatch(msg.getAsJsonObject(), r -> {
         if (r != null)
           send(r);
       });
@@ -212,63 +303,94 @@ public final class McpServer {
     return e != null && e.isJsonPrimitive() && e.getAsJsonPrimitive().isString();
   }
 
-  /** Runs a message; the future gives its response (null: none, for a notification or a cancelled request). */
-  private java.util.concurrent.CompletableFuture<JsonObject> dispatch(JsonObject msg) {
-    java.util.concurrent.CompletableFuture<JsonObject> done = new java.util.concurrent.CompletableFuture<>();
+  /**
+   * Runs a message; {@code done} takes its response (null: none, for a notification or a cancelled request), before the
+   * request counts as ended.
+   */
+  private void dispatch(JsonObject msg, java.util.function.Consumer<JsonObject> done) {
     JsonElement idE = msg.get("id");
     JsonElement id = idE == null || idE.isJsonNull() ? null : idE;
     if (id != null && !(id.isJsonPrimitive() && (id.getAsJsonPrimitive().isString() || id.getAsJsonPrimitive().isNumber()))) {
-      done.complete(error(null, -32600, "Invalid request: the id must be a string or a number"));
-      return done;
+      done.accept(error(null, -32600, "Invalid request: the id must be a string or a number"));
+      return;
     }
     JsonElement m = msg.get("method");
     if (m == null) {
-      done.complete(null); // a response: this server sends no requests
-      return done;
+      // a response to a request of this server (elicitation)
+      java.util.concurrent.CompletableFuture<JsonObject> f = id == null ? null : pending.get(id.getAsString());
+      if (f != null)
+        f.complete(msg);
+      done.accept(null);
+      return;
     }
     if (!isString(m)) {
-      done.complete(id != null ? error(id, -32600, "Invalid request: the method must be a string") : null);
-      return done;
+      done.accept(id != null ? error(id, -32600, "Invalid request: the method must be a string") : null);
+      return;
     }
     String method = m.getAsString();
     JsonElement p = msg.get("params");
     if (p != null && !p.isJsonNull() && !p.isJsonObject()) {
-      done.complete(id != null ? error(id, -32602, "Invalid params: params must be an object") : null);
-      return done;
+      done.accept(id != null ? error(id, -32602, "Invalid params: params must be an object") : null);
+      return;
     }
     JsonObject params = p != null && p.isJsonObject() ? p.getAsJsonObject() : new JsonObject();
     if (id == null) {
       // notifications: initialized, cancelled (a running core operation is not stopped; its result is not sent)
       if (method.equals("notifications/cancelled") && params.has("requestId"))
         runningIds.computeIfPresent(params.get("requestId").toString(), (k, v) -> true);
-      done.complete(null);
-      return done;
+      done.accept(null);
+      return;
     }
     if (!initialized && !method.equals("initialize") && !method.equals("ping")) {
-      done.complete(error(id, -32002, "Server not initialized: send initialize first"));
-      return done;
+      done.accept(error(id, -32002, "Server not initialized: send initialize first"));
+      return;
+    }
+    if (stopping && method.equals("tools/call")) {
+      done.accept(error(id, -32000, "The server is stopping"));
+      return;
     }
     running.incrementAndGet();
     runningIds.put(id.toString(), false);
     workers.execute(() -> {
-      JsonObject out;
       try {
-        out = result(id, handle(method, params));
-      } catch (InvalidParams e) {
-        out = error(id, -32602, e.getMessage());
-      } catch (UnsupportedOperationException e) {
-        out = error(id, -32601, "Method not found: " + method);
-      } catch (Throwable t) {
-        t.printStackTrace(System.err);
-        out = error(id, -32603, t.getClass().getSimpleName() + (t.getMessage() != null ? ": " + t.getMessage() : ""));
+        JsonObject out;
+        try {
+          out = result(id, handle(method, params));
+        } catch (InvalidParams e) {
+          out = error(id, -32602, e.getMessage());
+        } catch (UnsupportedOperationException e) {
+          out = error(id, -32601, "Method not found: " + method);
+        } catch (Throwable t) {
+          t.printStackTrace(System.err);
+          out = error(id, -32603, t.getClass().getSimpleName() + (t.getMessage() != null ? ": " + t.getMessage() : ""));
+        }
+        // the cancellation and the end of the request do not race: the entry is removed once
+        Boolean cancelled = runningIds.remove(id.toString());
+        // the response is sent here
+        done.accept(Boolean.TRUE.equals(cancelled) ? null : out);
       } finally {
+        // a request ends when its response was sent: a server that stops after it sends the response first
         running.decrementAndGet();
       }
-      // the cancellation and the end of the request do not race: the entry is removed once
-      Boolean cancelled = runningIds.remove(id.toString());
-      done.complete(Boolean.TRUE.equals(cancelled) ? null : out);
     });
-    return done;
+  }
+
+  /** Called before a tool call (not under the lock of the tools): a notice for its result, or null. */
+  private volatile java.util.function.BiFunction<String, JsonObject, String> beforeCall;
+
+  /** Sets what runs before each tool call: it returns a notice the result gets ("notice"), or null. */
+  public void beforeCall(java.util.function.BiFunction<String, JsonObject, String> f) {
+    beforeCall = f;
+  }
+
+  /** Runs the task while no tool that changes something runs (read-only tools may run at the same time). */
+  public <T> T shared(java.util.function.Supplier<T> task) {
+    toolsLock.readLock().lock();
+    try {
+      return task.get();
+    } finally {
+      toolsLock.readLock().unlock();
+    }
   }
 
   /** Runs the task when no tool runs, and lets no tool start until it ends. */
@@ -300,7 +422,10 @@ public final class McpServer {
         String requested = params.has("protocolVersion") ? params.get("protocolVersion").getAsString() : null;
         initialized = true;
         JsonObject r = new JsonObject();
-        r.addProperty("protocolVersion", PROTOCOL_VERSIONS.contains(requested) ? requested : DEFAULT_PROTOCOL_VERSION);
+        protocol = PROTOCOL_VERSIONS.contains(requested) ? requested : DEFAULT_PROTOCOL_VERSION;
+        clientCapabilities = params.has("capabilities") && params.get("capabilities").isJsonObject()
+            ? params.getAsJsonObject("capabilities") : new JsonObject();
+        r.addProperty("protocolVersion", protocol);
         JsonObject caps = new JsonObject();
         JsonObject t = new JsonObject();
         t.addProperty("listChanged", false);
@@ -382,9 +507,12 @@ public final class McpServer {
     JsonArray content = new JsonArray();
     JsonObject text = new JsonObject();
     text.addProperty("type", "text");
-    java.util.concurrent.locks.Lock lock = tool.readOnly ? toolsLock.readLock() : toolsLock.writeLock();
+    java.util.concurrent.locks.Lock lock = tool.readOnly && (tool.alone == null || !tool.alone.test(args)) ? toolsLock.readLock()
+        : toolsLock.writeLock();
     try {
       checkArguments(tool, args);
+      java.util.function.BiFunction<String, JsonObject, String> before = beforeCall;
+      String notice = before == null ? null : before.apply(tool.name, args);
       Object value;
       lock.lock();
       try {
@@ -393,6 +521,8 @@ public final class McpServer {
         lock.unlock();
       }
       JsonElement json = JsonRpcConnection.toJson(value);
+      if (notice != null && json.isJsonObject())
+        json.getAsJsonObject().addProperty("notice", notice);
       // compact JSON text (no structuredContent: the tools declare no output schema, a client would pass both)
       text.addProperty("text", json.isJsonPrimitive() ? json.getAsString() : JsonRpcConnection.GSON.toJson(json));
       r.addProperty("isError", false);

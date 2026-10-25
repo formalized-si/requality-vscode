@@ -14,7 +14,7 @@ rem relative arguments start, goes in REQUALITY_CWD.
 for %%I in ("%~dp0..") do set "RQ_HOME=%%~fsI"
 set "REQUALITY_CWD=%CD%"
 set "RQ_JAVA=%REQUALITY_JAVA%"
-if not "%RQ_JAVA%"=="" goto run
+if not "%RQ_JAVA%"=="" goto given
 set "RQ_JAVA=%RQ_HOME%\jre\bin\java.exe"
 if exist "%RQ_JAVA%" goto run
 rem dist\server of the VS Code extension: the runtime is jre\ of the extension
@@ -23,6 +23,15 @@ if exist "%RQ_JAVA%" goto run
 set "RQ_JAVA=java"
 if "%JAVA_HOME%"=="" goto run
 if exist "%JAVA_HOME%\bin\java.exe" set "RQ_JAVA=%JAVA_HOME%\bin\java.exe"
+:given
+rem a relative path of Java starts in the current folder: Java runs in the folder of the package (pushd below)
+set "RQ_REL=%RQ_JAVA:\=%"
+set "RQ_REL=%RQ_REL:/=%"
+if "%RQ_REL%"=="%RQ_JAVA%" goto run
+if "%RQ_JAVA:~1,1%"==":" goto run
+if "%RQ_JAVA:~0,1%"=="\" goto run
+if "%RQ_JAVA:~0,1%"=="/" goto run
+set "RQ_JAVA=%CD%\%RQ_JAVA%"
 :run
 set "RQ_OPTS=%REQUALITY_JAVA_OPTS%"
 if "%RQ_OPTS%"=="" set "RQ_OPTS=-Xmx2g"

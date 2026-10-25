@@ -247,16 +247,49 @@ final class SpecUpdate {
     final Set<String> removed = new java.util.LinkedHashSet<>();
     JsonArray suggestions = new JsonArray();
     Location created;
+    /** The location has no ranges (an old catalog): its text is the description of the location. */
+    boolean fromDescription;
+    String descriptionText;
 
     Move(Location old) {
       this.old = old;
     }
 
+    /**
+     * unchanged: the same text in the same paragraph; context_changed: the same text, sentences came into or went out of
+     * its paragraph; changed: moved to a similar sentence; lost: no similar sentence.
+     */
     String status() {
+      // a location of an old catalog with no text at all (no ranges, no description): nothing to move
+      if (oldTexts.isEmpty())
+        return "empty";
       if (newRanges.isEmpty())
         return "lost";
-      return lost == 0 && exact == oldTexts.size() && added.isEmpty() && removed.isEmpty() ? "unchanged" : "changed";
+      if (lost == 0 && exact == oldTexts.size())
+        return added.isEmpty() && removed.isEmpty() ? "unchanged" : "context_changed";
+      return "changed";
     }
+  }
+
+  /** The content words of a text in their order (not the common ones), once each. */
+  private static List<String> wordList(String s) {
+    List<String> out = new ArrayList<>();
+    for (String t : s.split("[^\\p{L}\\p{N}]+")) {
+      String w = t.toLowerCase(Locale.ROOT);
+      if (!w.isEmpty() && !COMMON.contains(w) && !out.contains(w))
+        out.add(w);
+    }
+    return out;
+  }
+
+  /** The words of {@code a} that {@code b} does not have. */
+  private static JsonArray missing(String a, String b) {
+    List<String> other = wordList(b);
+    JsonArray out = new JsonArray();
+    for (String w : wordList(a))
+      if (!other.contains(w))
+        out.add(w);
+    return out;
   }
 
   /**
@@ -286,16 +319,33 @@ final class SpecUpdate {
       if (mv.requirements.isEmpty())
         continue; // a location of no requirement does not move
       owned = true;
-      for (int[] f : DocumentText.fragments(l)) {
-        if (f[0] < 0 || f[1] > oldT.text.length())
-          continue;
-        String text = oldT.text.substring(f[0], f[1]).replaceAll("[\\s\\u00a0]+", " ").trim();
+      List<int[]> frags = DocumentText.fragments(l);
+      if (frags.isEmpty()) {
+        // a location of an old catalog without ranges: its description has its text (no position in the document)
+        String d = l.getDescription();
+        String text = d == null ? "" : Core.text(d).replaceAll("[\\s\\u00a0]+", " ").trim();
+        if (!text.isEmpty()) {
+          mv.fromDescription = true;
+          frags = new ArrayList<>();
+          frags.add(new int[] { -1, -1 });
+          mv.descriptionText = text;
+        }
+      }
+      for (int[] f : frags) {
+        String text;
+        if (f[0] == -1) {
+          text = mv.descriptionText;
+        } else {
+          if (f[0] < 0 || f[1] > oldT.text.length())
+            continue;
+          text = oldT.text.substring(f[0], f[1]).replaceAll("[\\s\\u00a0]+", " ").trim();
+        }
         if (text.isEmpty())
           continue;
         mv.oldTexts.add(text);
-        DocumentText.Paragraph oldP = oldT.paragraphAt(f[0]);
+        DocumentText.Paragraph oldP = f[0] < 0 ? null : oldT.paragraphAt(f[0]);
         String oldPara = oldP == null ? text : plain(oldP.text);
-        int[] ex = exact(newT, text, oldPara, (double) f[0] / Math.max(1, oldT.text.length()));
+        int[] ex = exact(newT, text, oldPara, f[0] < 0 ? 0.5 : (double) f[0] / Math.max(1, oldT.text.length()));
         if (ex != null) {
           mv.exact++;
           mv.newRanges.add(ex);
@@ -387,69 +437,75 @@ final class SpecUpdate {
       for (Requirement r : mv.requirements)
         byReq.computeIfAbsent(r, k -> new ArrayList<>()).add(mv);
     JsonArray reqs = new JsonArray();
-    int unchanged = 0;
-    int changed = 0;
-    int lost = 0;
+    Map<String, Integer> counts = new LinkedHashMap<>();
+    for (String k : new String[] { "unchanged", "context_changed", "changed", "lost" })
+      counts.put(k, 0);
     for (Map.Entry<Requirement, List<Move>> e : byReq.entrySet()) {
       Requirement r = e.getKey();
       Set<String> st = new HashSet<>();
       for (Move mv : e.getValue())
         st.add(mv.status());
-      String status = st.size() == 1 ? st.iterator().next() : st.contains("unchanged") || st.contains("changed") ? "changed" : "lost";
-      switch (status) {
-        case "unchanged":
-          unchanged++;
-          break;
-        case "changed":
-          changed++;
-          break;
-        default:
-          lost++;
-      }
+      // a location without text tells nothing about the requirement
+      st.remove("empty");
+      if (st.isEmpty())
+        st.add("unchanged");
+      // the status of the requirement: the one of its locations, or the worst one that is not lost when some moved
+      String status = st.size() == 1 ? st.iterator().next()
+          : st.contains("changed") || st.contains("lost") && (st.contains("unchanged") || st.contains("context_changed"))
+              ? "changed" : "context_changed";
+      counts.merge(status, 1, Integer::sum);
       JsonObject o = new JsonObject();
       o.addProperty("requirement", r.getQualifiedId());
       o.addProperty("uuid", r.getSUUId());
-      if (r.getName() != null)
+      if (r.getName() != null && !r.getName().isEmpty())
         o.addProperty("name", r.getName());
       o.addProperty("status", status);
       if (!"unchanged".equals(status)) {
         // its own description, which may need the change too (no description: the text is the one of the location)
         com.unitesk.requality.core.attribute.Attribute da = r.attrs().getAttribute(com.unitesk.requality.core.model.TreeNode.ATTR_DESCRIPTION);
         String d = da == null || da.getValue() == null || !da.isLocal(r.getUUId()) ? null : Core.text(da.getValue().toString());
-        o.addProperty("description", d == null || d.isEmpty() ? "" : d.length() > 300 ? d.substring(0, 300) + " …" : d);
+        if (d != null && !d.isEmpty())
+          o.addProperty("description", d.length() > 300 ? d.substring(0, 300) + " …" : d);
       }
       JsonArray locs = new JsonArray();
       for (Move mv : e.getValue()) {
         JsonObject lo = new JsonObject();
         lo.addProperty("status", mv.status());
         lo.addProperty("old_location", mv.old.getSUUId());
-        if (!"unchanged".equals(mv.status())) {
+        if (mv.fromDescription)
+          lo.addProperty("from_description", true);
+        if (mv.oldTexts.isEmpty())
+          lo.addProperty("note", "The old location has no text: nothing moved");
+        if (!"unchanged".equals(mv.status()) && !mv.oldTexts.isEmpty()) {
           JsonArray ot = new JsonArray();
           mv.oldTexts.forEach(ot::add);
           lo.add("old_text", ot);
         }
         if (mv.created != null) {
           lo.addProperty("new_location", mv.created.getSUUId());
-          lo.addProperty("new_text", String.join(" … ", new java.util.LinkedHashSet<>(mv.newTexts)));
+          String newText = String.join(" … ", new java.util.LinkedHashSet<>(mv.newTexts));
+          if (!"unchanged".equals(mv.status()))
+            lo.addProperty("new_text", newText);
           if ("changed".equals(mv.status())) {
-            if (mv.exact == mv.oldTexts.size() && mv.lost == 0)
-              lo.addProperty("text_same", true);
-            else
-              lo.addProperty("similarity", Math.round(mv.similarity * 100) / 100.0);
+            lo.addProperty("similarity", Math.round(mv.similarity * 100) / 100.0);
+            // the words that went and came: a changed word can change the meaning at a high similarity
+            String oldText = String.join(" ", mv.oldTexts);
+            lo.add("words_removed", missing(oldText, newText));
+            lo.add("words_added", missing(newText, oldText));
             if (mv.modalityChanged)
               lo.addProperty("modality_changed", true);
             if (mv.numbersChanged)
               lo.addProperty("numbers_changed", true);
-            if (!mv.added.isEmpty()) {
-              JsonArray x = new JsonArray();
-              mv.added.forEach(x::add);
-              lo.add("paragraph_added", x);
-            }
-            if (!mv.removed.isEmpty()) {
-              JsonArray x = new JsonArray();
-              mv.removed.forEach(x::add);
-              lo.add("paragraph_removed", x);
-            }
+          }
+          if (!mv.added.isEmpty()) {
+            JsonArray x = new JsonArray();
+            mv.added.forEach(x::add);
+            lo.add("paragraph_added", x);
+          }
+          if (!mv.removed.isEmpty()) {
+            JsonArray x = new JsonArray();
+            mv.removed.forEach(x::add);
+            lo.add("paragraph_removed", x);
           }
         }
         if (mv.suggestions.size() > 0)
@@ -464,17 +520,15 @@ final class SpecUpdate {
     o.addProperty("new_document", newDoc.getQualifiedId());
     JsonObject stats = new JsonObject();
     stats.addProperty("requirements", byReq.size());
-    stats.addProperty("unchanged", unchanged);
-    stats.addProperty("changed", changed);
-    stats.addProperty("lost", lost);
+    for (Map.Entry<String, Integer> c : counts.entrySet())
+      stats.addProperty(c.getKey(), c.getValue());
     o.add("summary", stats);
-    // the changed and lost ones first: they need a review
+    // the lost and changed ones first: they need a review
     JsonArray sorted = new JsonArray();
-    for (String s : new String[] { "lost", "changed", "unchanged" })
+    for (String st : new String[] { "lost", "changed", "context_changed", "unchanged" })
       for (int i = 0; i < reqs.size(); i++)
-        if (s.equals(reqs.get(i).getAsJsonObject().get("status").getAsString()))
+        if (st.equals(reqs.get(i).getAsJsonObject().get("status").getAsString()))
           sorted.add(reqs.get(i));
-    o.add("requirements", sorted);
     // the sentences of the new version that the old one does not have and no requirement marks now: candidates for
     // new requirements (statement: with a word of a requirement, such as shall or must)
     Set<String> old = new HashSet<>();
@@ -497,11 +551,52 @@ final class SpecUpdate {
         fresh.add(n);
       }
     }
+    stats.addProperty("new_sentences", fresh.size());
     o.add("new_sentences", fresh);
-    o.addProperty("note", (detachOld ? "The requirements have no locations in the old document now; the document stays. "
-        : "The requirements keep their locations in the old document too (detach_old false). ")
-        + "Check the changed requirements (modality_changed, numbers_changed and the paragraph changes first), fix the lost "
-        + "ones, and add requirements for the new sentences that are requirements, with apply_changes.");
+    o.add("requirements", sorted);
+    o.addProperty("note", (detachOld ? "The requirements have no locations in the old document now; the document stays as "
+        + "the history (superseded_by names the new version). " : "The requirements keep their locations in the old document "
+        + "too (detach_old false). ") + "Check the changed requirements (words_removed and words_added, modality_changed, "
+        + "numbers_changed) and the ones whose paragraph changed (context_changed), fix the lost ones, and add requirements "
+        + "for the new sentences that are statements, with apply_changes.");
     return o;
+  }
+
+  /**
+   * The result of an update for the agent: the summary, the new sentences and the requirements to check (not the
+   * unchanged ones, unless {@code unchanged}), at most {@code limit} of each list. The history keeps all.
+   */
+  static JsonObject brief(JsonObject full, boolean unchanged, int limit, int change) {
+    JsonObject o = new JsonObject();
+    for (String k : new String[] { "old_document", "new_document", "summary" })
+      o.add(k, full.get(k));
+    JsonArray fresh = full.getAsJsonArray("new_sentences");
+    o.add("new_sentences", first(fresh, limit));
+    JsonArray check = new JsonArray();
+    for (com.google.gson.JsonElement r : full.getAsJsonArray("requirements"))
+      if (unchanged || !"unchanged".equals(r.getAsJsonObject().get("status").getAsString()))
+        check.add(r);
+    o.add("requirements", first(check, limit));
+    List<String> more = new ArrayList<>();
+    if (fresh.size() > limit)
+      more.add((fresh.size() - limit) + " more new sentences");
+    if (check.size() > limit)
+      more.add((check.size() - limit) + " more requirements");
+    if (!more.isEmpty())
+      o.addProperty("more", String.join(", ", more) + ": review_changes with change " + change + " and offset " + limit
+          + " lists the next ones");
+    if (!unchanged && full.getAsJsonObject("summary").get("unchanged").getAsInt() > 0)
+      o.addProperty("unchanged", "The unchanged requirements are not listed (include_unchanged true lists them)");
+    o.add("note", full.get("note"));
+    return o;
+  }
+
+  static JsonArray first(JsonArray a, int n) {
+    if (a.size() <= n)
+      return a;
+    JsonArray out = new JsonArray();
+    for (int i = 0; i < n; i++)
+      out.add(a.get(i));
+    return out;
   }
 }

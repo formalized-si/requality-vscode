@@ -69,6 +69,10 @@ class McpServerTest {
 
   @BeforeAll
   static void start() throws Exception {
+    // the catalog files are compared with the tree before each call: the server writes nothing a call takes for an
+    // outside change
+    System.setProperty("requality.diskWatch", "0");
+    ScriptSandbox.install();
     root = Files.createTempDirectory("requality-mcp-test").toFile();
     workspace = new File(root, "workspace");
     storage = new File(root, "storage");
@@ -252,22 +256,24 @@ class McpServerTest {
       names.add(name);
       assertEquals("object", o.getAsJsonObject("inputSchema").get("type").getAsString(), o.toString());
       JsonObject an = o.getAsJsonObject("annotations");
-      if (List.of("undo", "redo", "revert_change", "apply_changes", "convert_project", "update_document_version").contains(name))
+      if (List.of("undo", "redo", "revert_change", "apply_changes", "convert_project", "update_document_version",
+          "change_project_settings").contains(name))
         assertTrue(an.get("destructiveHint").getAsBoolean(), o.toString());
       if (name.equals("apply_changes")) {
         JsonArray variants = o.getAsJsonObject("inputSchema").getAsJsonObject("properties").getAsJsonObject("operations")
             .getAsJsonObject("items").getAsJsonArray("oneOf");
-        assertEquals(9, variants.size(), "one schema for each operation");
+        assertEquals(12, variants.size(), "one schema for each operation");
         // the keys each operation needs, and a description of each key
-        JsonObject locate = variants.get(6).getAsJsonObject();
+        JsonObject locate = variants.get(9).getAsJsonObject();
         assertEquals("locate", locate.getAsJsonObject("properties").getAsJsonObject("op").get("const").getAsString());
         assertEquals("[\"op\",\"requirement\",\"document\"]", locate.getAsJsonArray("required").toString());
         assertTrue(locate.getAsJsonObject("properties").getAsJsonObject("quote").has("description"), locate.toString());
       }
     }
     assertEquals(List.of("list_projects", "get_tree", "get_node", "search_nodes", "read_document", "apply_changes", "import_document",
-        "update_document_version", "trace_coverage", "test_coverage", "review_changes", "revert_change", "undo", "redo", "list_report_templates",
-        "generate_report", "open_project", "close_project", "convert_project", "create_project", "server_messages"), names);
+        "import_reqif", "update_document_version", "trace_coverage", "test_coverage", "review_changes", "compare_with_revision", "revert_change", "undo",
+        "redo", "get_project_settings", "change_project_settings", "list_report_templates", "generate_report", "open_project",
+        "close_project", "convert_project", "create_project", "server_messages"), names);
     // the prompts: the jobs of the person as ready-made requests
     List<String> prompts = new ArrayList<>();
     for (JsonElement e : rpc("prompts/list", null).getAsJsonObject("result").getAsJsonArray("prompts"))
@@ -435,7 +441,7 @@ class McpServerTest {
     File withPic = new File(pics, "pic.html");
     Files.writeString(withPic.toPath(), "<html><body><p>The system shall show a picture.</p><img src=\"a.png\" alt=\"a\"/></body></html>");
     JsonObject pic = call("import_document", "project", P, "file", withPic.getAbsolutePath());
-    call("apply_changes", "project", P, "operations", ops("[{\"op\":\"delete\",\"node\":\"" + pic.get("path").getAsString() + "\"}]"));
+    call("apply_changes", "project", P, "operations", ops("[{\"op\":\"delete\",\"recursive\":true,\"node\":\"" + pic.get("path").getAsString() + "\"}]"));
     // the XFA form of a PDF with an external entity does not read the secret (Tika 3)
     File pdf = new File(root, "form.pdf");
     Files.write(pdf.toPath(), xfaPdf(secret));
@@ -443,7 +449,7 @@ class McpServerTest {
     JsonObject formText = call("read_document", "project", P, "document", form.get("path").getAsString());
     assertContains(formText.toString(), "The system shall work.");
     assertFalse(formText.toString().contains("TOP-SECRET"), formText.toString());
-    call("apply_changes", "project", P, "operations", ops("[{\"op\":\"delete\",\"node\":\"" + form.get("path").getAsString() + "\"}]"));
+    call("apply_changes", "project", P, "operations", ops("[{\"op\":\"delete\",\"recursive\":true,\"node\":\"" + form.get("path").getAsString() + "\"}]"));
     // a coverage file with a DOCTYPE is not read (no external entity)
     File xxe = new File(root, "xxe-coverage.xml");
     Files.writeString(xxe.toPath(), "<?xml version=\"1.0\"?><!DOCTYPE c [<!ENTITY s SYSTEM \"" + secret.toURI() + "\">]>"
@@ -483,7 +489,7 @@ class McpServerTest {
     callError("get_node", "project", P, "node", "/Requirements/DRY");
     // all operations or none: the last one fails, the first one is not made
     assertTrue(callError("apply_changes", "project", P, "operations",
-        ops("[{\"op\":\"create\",\"parent\":\"/Requirements\",\"id\":\"HALF\"},{\"op\":\"delete\",\"node\":\"/Requirements\"}]"))
+        ops("[{\"op\":\"create\",\"parent\":\"/Requirements\",\"id\":\"HALF\"},{\"op\":\"delete\",\"recursive\":true,\"node\":\"/Requirements\"}]"))
         .startsWith("Operation 1 (delete)"));
     callError("get_node", "project", P, "node", "/Requirements/HALF");
     // the keys and the values of the operations are checked before anything is made
@@ -529,9 +535,9 @@ class McpServerTest {
         .getAsJsonArray("elaborates").get(0).getAsString());
     assertEquals(0, call("trace_coverage", "project", P, "under", "/Requirements/LX").getAsJsonObject("requirements")
         .getAsJsonObject("broken_links").get("total").getAsInt());
-    call("apply_changes", "project", P, "operations", ops("[{\"op\":\"delete\",\"node\":\"/Requirements/LX\"},{\"op\":\"delete\",\"node\":\"/Requirements/LZ\"}]"));
+    call("apply_changes", "project", P, "operations", ops("[{\"op\":\"delete\",\"recursive\":true,\"node\":\"/Requirements/LX\"},{\"op\":\"delete\",\"recursive\":true,\"node\":\"/Requirements/LZ\"}]"));
     // a requirement of the legacy catalog whose location reference has the old path form can be deleted
-    assertTrue(call("apply_changes", "project", P, "dry_run", true, "operations", ops("[{\"op\":\"delete\",\"node\":"
+    assertTrue(call("apply_changes", "project", P, "dry_run", true, "operations", ops("[{\"op\":\"delete\",\"recursive\":true,\"node\":"
         + "\"/Requirements/SEC_ITSS/SEC_ITSS_SND/SEC_ITSS_SND_GENMSG/SEC_ITSS_SND_GENMSG_01\"}]")).get("dry_run").getAsBoolean());
     // the text no requirement covers yet (the filter in any case): also a paragraph whose sentence is covered in part
     JsonObject uncovered = call("read_document", "project", P, "document", "/Documents/spec.xhtml", "filter", "UNCOVERED");
@@ -553,7 +559,7 @@ class McpServerTest {
     assertEquals(1, call("get_node", "project", P, "node", "/Requirements/SPEC/LOG").getAsJsonArray("locations").size());
     // a node only where the tree takes its type; the keys an operation needs
     assertContains(callError("apply_changes", "project", P, "operations", ops("[{\"op\":\"create\",\"parent\":\"/Documents\",\"id\":\"X\"}]")),
-        "a Requirement cannot be a child of /Documents (it takes: [DocFolder])");
+        "a Requirement cannot be a child of /Documents (a DocFolder; it takes: [DocFolder])");
     assertContains(callError("apply_changes", "project", P, "operations", ops("[{\"op\":\"locate\",\"requirement\":\"/Requirements/SPEC/LOG\"}]")),
         "missing key 'document'");
     // the nodes of a type; the attributes that matched by their names
@@ -684,7 +690,7 @@ class McpServerTest {
     assertEquals("Access logging", call("get_node", "project", P, "node", "/Requirements/SPEC/LOG").get("name").getAsString());
     // a move and a delete, undone
     call("apply_changes", "project", P, "operations",
-        ops("[{\"op\":\"move\",\"node\":\"/Requirements/SPEC/ENC\",\"parent\":\"/Requirements/SEC_ITSS\"},{\"op\":\"delete\",\"node\":\"/Requirements/SEC_ITSS/ENC\"}]"));
+        ops("[{\"op\":\"move\",\"node\":\"/Requirements/SPEC/ENC\",\"parent\":\"/Requirements/SEC_ITSS\"},{\"op\":\"delete\",\"recursive\":true,\"node\":\"/Requirements/SEC_ITSS/ENC\"}]"));
     callError("get_node", "project", P, "node", "/Requirements/SPEC/ENC");
     call("undo");
     call("get_node", "project", P, "node", "/Requirements/SPEC/ENC");
@@ -719,9 +725,9 @@ class McpServerTest {
     for (CompletableFuture<JsonObject> f : parallel)
       numbers.add(f.get(120, TimeUnit.SECONDS).get("change").getAsInt());
     assertEquals(4, numbers.stream().distinct().count(), numbers.toString());
-    call("apply_changes", "project", P, "operations", ops("[{\"op\":\"delete\",\"node\":\"/Requirements/PAR0\"},"
-        + "{\"op\":\"delete\",\"node\":\"/Requirements/PAR1\"},{\"op\":\"delete\",\"node\":\"/Requirements/PAR2\"},"
-        + "{\"op\":\"delete\",\"node\":\"/Requirements/PAR3\"}]"));
+    call("apply_changes", "project", P, "operations", ops("[{\"op\":\"delete\",\"recursive\":true,\"node\":\"/Requirements/PAR0\"},"
+        + "{\"op\":\"delete\",\"recursive\":true,\"node\":\"/Requirements/PAR1\"},{\"op\":\"delete\",\"recursive\":true,\"node\":\"/Requirements/PAR2\"},"
+        + "{\"op\":\"delete\",\"recursive\":true,\"node\":\"/Requirements/PAR3\"}]"));
 
     // undo does not undo a change that is not one of the agent
     TreeDB db = Nodes.findDB("TS103096");
@@ -747,12 +753,16 @@ class McpServerTest {
         + "{\"op\":\"create\",\"parent\":\"$c\",\"type\":\"TestPurpose\",\"id\":\"C_T1\",\"name\":\"Check gamma\"},"
         + "{\"op\":\"link\",\"from\":\"$a\",\"to\":\"$c\",\"attribute\":\"depends\"}]"));
     // a dry run of a delete names the links that would break, and changes nothing (the link index too)
-    JsonObject dryDel = call("apply_changes", "project", P, "dry_run", true, "operations", ops("[{\"op\":\"delete\",\"node\":\"/Requirements/REV/C\"}]"));
+    JsonObject dryDel = call("apply_changes", "project", P, "dry_run", true, "operations", ops("[{\"op\":\"delete\",\"recursive\":true,\"node\":\"/Requirements/REV/C\"}]"));
     assertContains(dryDel.getAsJsonArray("results").get(0).getAsJsonObject().getAsJsonArray("broken_links").toString(), "/Requirements/REV/A");
+    // the result tells what goes with the node; without recursive a node with nodes under it stays
+    assertEquals(1, dryDel.getAsJsonArray("results").get(0).getAsJsonObject().get("nodes_under").getAsInt(), dryDel.toString());
+    assertContains(callError("apply_changes", "project", P, "dry_run", true, "operations",
+        ops("[{\"op\":\"delete\",\"node\":\"/Requirements/REV/C\"}]")), "has 1 node under it (1 TestPurpose): give recursive true");
     assertEquals("/Requirements/REV/C", call("get_node", "project", P, "node", "/Requirements/REV/A").getAsJsonObject("links")
         .getAsJsonArray("depends").get(0).getAsString());
     // the undo of a delete brings the node back with the links to it
-    call("apply_changes", "project", P, "operations", ops("[{\"op\":\"delete\",\"node\":\"/Requirements/REV/C\"}]"));
+    call("apply_changes", "project", P, "operations", ops("[{\"op\":\"delete\",\"recursive\":true,\"node\":\"/Requirements/REV/C\"}]"));
     JsonObject aBroken = call("get_node", "project", P, "node", "/Requirements/REV/A");
     assertFalse(aBroken.getAsJsonObject("links").has("depends"), aBroken.toString());
     assertEquals("depends", aBroken.getAsJsonArray("broken_links").get(0).getAsJsonObject().get("attribute").getAsString(), aBroken.toString());
@@ -769,7 +779,7 @@ class McpServerTest {
         + "{\"op\":\"move\",\"node\":\"/Requirements/REV/B\",\"parent\":\"/Requirements/SEC_ITSS\"},"
         + "{\"op\":\"link\",\"from\":\"/Requirements/REV/A\",\"to\":\"" + R12 + "\"},"
         + "{\"op\":\"locate\",\"requirement\":\"/Requirements/REV/A\",\"document\":\"/Documents/spec.xhtml\",\"quote\":\"keep logs for one year\"},"
-        + "{\"op\":\"delete\",\"node\":\"/Requirements/REV/C\"},"
+        + "{\"op\":\"delete\",\"recursive\":true,\"node\":\"/Requirements/REV/C\"},"
         + "{\"op\":\"create\",\"parent\":\"/Requirements/REV\",\"id\":\"D\"}]"));
     int n = change.get("change").getAsInt();
     JsonObject brief = call("review_changes", "project", P, "last", 1).getAsJsonArray("changes").get(0).getAsJsonObject();
@@ -844,7 +854,7 @@ class McpServerTest {
     String bUuid = call("get_node", "project", P, "node", "/Requirements/REV/B").get("uuid").getAsString();
     int swap = call("apply_changes", "project", P, "operations", ops("[{\"op\":\"update\",\"node\":\"/Requirements/REV/B\",\"id\":\"B2\"},"
         + "{\"op\":\"create\",\"parent\":\"/Requirements/REV\",\"id\":\"B\",\"name\":\"New B\"},"
-        + "{\"op\":\"delete\",\"node\":\"/Requirements/REV/C\"},{\"op\":\"create\",\"parent\":\"/Requirements/REV\",\"id\":\"C\"}]"))
+        + "{\"op\":\"delete\",\"recursive\":true,\"node\":\"/Requirements/REV/C\"},{\"op\":\"create\",\"parent\":\"/Requirements/REV\",\"id\":\"C\"}]"))
         .get("change").getAsInt();
     call("revert_change", "project", P, "change", swap);
     assertEquals(bUuid, call("get_node", "project", P, "node", "/Requirements/REV/B").get("uuid").getAsString());
@@ -859,7 +869,7 @@ class McpServerTest {
         .get("change").getAsInt();
     call("undo");
     assertContains(callError("revert_change", "project", P, "change", e), "is undone");
-    call("apply_changes", "project", P, "operations", ops("[{\"op\":\"delete\",\"node\":\"/Requirements/REV\"}]"));
+    call("apply_changes", "project", P, "operations", ops("[{\"op\":\"delete\",\"recursive\":true,\"node\":\"/Requirements/REV\"}]"));
     // the history of the catalog is in the storage of the server
     File journals = new File(storage, "journals");
     File[] dirs = journals.listFiles();
@@ -919,8 +929,11 @@ class McpServerTest {
         + "<p>The system shall encrypt all stored data with AES.</p><p>The system shall keep logs for two years.</p>"
         + "<p>The system may lock the account after 5 failed attempts.</p>"
         + "<p>The system must alert the operator.</p><p>Система должна хранить журнал.</p></body></html>", StandardCharsets.UTF_8);
-    JsonObject up = call("update_document_version", "project", P, "document", "/Documents/spec.xhtml", "file", v2.getAbsolutePath());
+    JsonObject up = call("update_document_version", "project", P, "document", "/Documents/spec.xhtml", "file", v2.getAbsolutePath(),
+        "include_unchanged", true);
     assertEquals("/Documents/spec_v2.xhtml", up.get("new_document").getAsString(), up.toString());
+    assertEquals(1, up.getAsJsonObject("summary").get("unchanged").getAsInt(), up.toString());
+    assertEquals(3, up.getAsJsonObject("summary").get("new_sentences").getAsInt(), up.toString());
     Map<String, JsonObject> byReq = new java.util.HashMap<>();
     for (JsonElement e : up.getAsJsonArray("requirements"))
       byReq.put(e.getAsJsonObject().get("requirement").getAsString(), e.getAsJsonObject());
@@ -930,8 +943,11 @@ class McpServerTest {
     assertEquals("changed", enc.get("status").getAsString(), up.toString());
     JsonObject loc = enc.getAsJsonArray("locations").get(0).getAsJsonObject();
     assertEquals("The system shall encrypt stored data.", loc.getAsJsonArray("old_text").get(0).getAsString(), up.toString());
-    assertEquals("", enc.get("description").getAsString(), "ENC has no own description: " + up);
+    assertFalse(enc.has("description"), "ENC has no own description: " + up);
     assertEquals("The system shall encrypt all stored data with AES.", loc.get("new_text").getAsString(), up.toString());
+    // the words that came and went: a changed word shows even at a high similarity
+    assertEquals("[\"all\",\"aes\"]", loc.getAsJsonArray("words_added").toString(), up.toString());
+    assertEquals("[]", loc.getAsJsonArray("words_removed").toString(), up.toString());
     assertTrue(loc.get("similarity").getAsDouble() >= 0.6, up.toString());
     assertFalse(loc.has("modality_changed"), up.toString());
     // shall became may and 3 became 5: the flags tell it
@@ -960,11 +976,18 @@ class McpServerTest {
     assertEquals(1, logLocs.size(), logLocs.toString());
     assertEquals("/Documents/spec_v2.xhtml", logLocs.get(0).getAsJsonObject().get("document").getAsString());
     call("get_node", "project", P, "node", "/Documents/spec.xhtml");
-    // the same update again is refused
+    // the versions know each other: the old one is named, not measured, by the coverage
+    assertEquals("/Documents/spec_v2.xhtml", call("read_document", "project", P, "document", "/Documents/spec.xhtml")
+        .get("superseded_by").getAsString());
+    assertEquals("/Documents/spec.xhtml", call("read_document", "project", P, "document", "/Documents/spec_v2.xhtml")
+        .get("previous_version").getAsString());
+    JsonObject cov = call("trace_coverage", "project", P);
+    assertContains(cov.getAsJsonArray("documents").toString(), "\"superseded_by\":\"/Documents/spec_v2.xhtml\"");
+    // the same update again is refused: the old version names the new one
     assertContains(callError("update_document_version", "project", P, "document", "/Documents/spec.xhtml", "file", v2.getAbsolutePath()),
-        "exists already");
+        "was updated to /Documents/spec_v2.xhtml already");
     assertContains(callError("update_document_version", "project", P, "document", "/Documents/spec.xhtml", "new_document",
-        "/Documents/spec_v2.xhtml"), "has locations already");
+        "/Documents/spec_v2.xhtml"), "was updated to /Documents/spec_v2.xhtml already");
     // the import and the update are one change: one undo step
     JsonObject undone = call("undo");
     assertEquals(up.get("change").getAsInt(), undone.get("undone").getAsInt(), undone.toString());
@@ -999,9 +1022,9 @@ class McpServerTest {
     for (JsonElement e : pu.getAsJsonArray("requirements"))
       pr.put(e.getAsJsonObject().get("requirement").getAsString(), e.getAsJsonObject());
     JsonObject stop = pr.get("/Requirements/PUMP/STOP");
-    assertEquals("changed", stop.get("status").getAsString(), pu.toString());
+    assertEquals("context_changed", stop.get("status").getAsString(), pu.toString());
     JsonObject stopLoc = stop.getAsJsonArray("locations").get(0).getAsJsonObject();
-    assertTrue(stopLoc.get("text_same").getAsBoolean(), pu.toString());
+    assertFalse(stopLoc.has("similarity"), pu.toString());
     assertEquals("[\"In service mode the limit is 7 bar.\"]", stopLoc.getAsJsonArray("paragraph_added").toString(), pu.toString());
     assertEquals("lost", pr.get("/Requirements/PUMP/LIM").get("status").getAsString(), pu.toString());
     // the new sentence with no word of a requirement is listed too
@@ -1063,7 +1086,9 @@ class McpServerTest {
         html.append(Files.readString(new File(f.getAsString()).toPath()));
     assertContains(html.toString(), "test_log");
 
-    // a file changed on disk (git pull, another editor) is not written over: the change is refused until a load
+    // a file changed on disk (git pull, another editor) between two looks at the catalog is not written over: the change
+    // is refused until a load
+    System.setProperty("requality.diskWatch", "3600000");
     File logFile = new File(workspace, "TS103096/root/Requirements/SPEC/LOG.json");
     String json = Files.readString(logFile.toPath());
     String current = call("get_node", "project", P, "node", "/Requirements/SPEC/LOG").get("name").getAsString();
@@ -1077,6 +1102,19 @@ class McpServerTest {
     assertEquals("Renamed on disk", call("get_node", "project", P, "node", "/Requirements/SPEC/LOG").get("name").getAsString());
     call("apply_changes", "project", P, "operations",
         ops("[{\"op\":\"update\",\"node\":\"/Requirements/SPEC/LOG\",\"attributes\":{\"status\":\"checked\"}}]"));
+    // with a look before each call, a read after an outside change loads the project again and tells it
+    System.setProperty("requality.diskWatch", "0");
+    call("get_node", "project", P, "node", "/Requirements/SPEC/LOG");
+    String again = Files.readString(logFile.toPath());
+    Files.writeString(logFile.toPath(), again.replace("Renamed on disk", "Renamed again"));
+    JsonObject seen = call("get_node", "project", P, "node", "/Requirements/SPEC/LOG");
+    assertEquals("Renamed again", seen.get("name").getAsString(), seen.toString());
+    assertContains(seen.get("notice").getAsString(), "changed on disk");
+    // the files the server writes are no outside change
+    JsonObject own = call("apply_changes", "project", P, "operations",
+        ops("[{\"op\":\"update\",\"node\":\"/Requirements/SPEC/LOG\",\"attributes\":{\"status\":\"rechecked\"}}]"));
+    assertFalse(own.has("notice"), own.toString());
+    assertFalse(call("get_node", "project", P, "node", "/Requirements/SPEC/LOG").has("notice"));
     assertEquals("AgentProject", call("create_project", "name", "AgentProject").get("project").getAsString());
     assertContains(callError("create_project", "name", "AgentProject"), "exists already");
     call("apply_changes", "project", "AgentProject", "operations",
@@ -1089,9 +1127,472 @@ class McpServerTest {
     call("open_project", "project", "AgentProject");
     assertEquals("First", call("get_node", "project", "AgentProject", "node", "/Requirements/R1").get("name").getAsString());
     // an idle catalog is released (--release-after) and loads again when a tool needs it
-    mcp.exclusive(() -> core.releaseIdle(0));
+    Thread.sleep(5);
+    mcp.exclusive(() -> core.releaseIdle(1, Long.MAX_VALUE));
     assertEquals("released", state("AgentProject"));
     assertEquals("First", call("get_node", "project", "AgentProject", "node", "/Requirements/R1").get("name").getAsString());
     assertEquals("ready", state("AgentProject"));
+  }
+
+  /** The project of the scenarios below (made in reportsAndProjects). */
+  static final String A = "AgentProject";
+
+  @Test
+  @Order(13)
+  void theAgentEditsTheProjectSettings() throws Exception {
+    JsonObject before = call("get_project_settings", "project", A);
+    for (String k : new String[] { "attributes", "enums", "required_attributes", "checker_rules", "checkers", "id_prefix",
+        "default_link_attribute", "templates" })
+      assertTrue(before.has(k), before.toString());
+    JsonObject changed = call("change_project_settings", "project", A,
+        "enums", JsonParser.parseString("{\"Status\":{\"type\":\"string\",\"values\":[\"draft\",{\"value\":\"approved\",\"comment\":\"by the board\"}]}}"),
+        "attributes", JsonParser.parseString("{\"owner\":{\"type\":\"string\",\"value\":\"team\"},\"level\":{\"type\":\"enum:Status\",\"value\":\"draft\"}}"),
+        "required_attributes", JsonParser.parseString("{\"Requirement\":[{\"attribute\":\"reviewed\",\"default\":false}]}"),
+        "checker_rules", JsonParser.parseString("[{\"name\":\"has a name\",\"formula\":\"getNodeName() != ''\"}]"),
+        "id_prefix", "AG", "default_link_attribute", "refines", "summary", "Settings of the team");
+    int settingsChange = changed.get("change").getAsInt();
+    JsonObject after = call("get_project_settings", "project", A);
+    assertEquals("[{\"value\":\"draft\"},{\"value\":\"approved\",\"comment\":\"by the board\"}]",
+        after.getAsJsonObject("enums").getAsJsonObject("Status").getAsJsonArray("values").toString(), after.toString());
+    assertEquals("enum:Status", after.getAsJsonObject("attributes").getAsJsonObject("level").get("type").getAsString());
+    assertEquals("AG", after.get("id_prefix").getAsString());
+    assertEquals("refines", after.get("default_link_attribute").getAsString());
+    assertEquals("has a name", after.getAsJsonArray("checker_rules").get(0).getAsJsonObject().get("name").getAsString());
+    // the requirements get the mandatory attribute with its default
+    JsonObject r1 = call("get_node", "project", A, "node", "/Requirements/R1");
+    assertTrue(r1.getAsJsonObject("attributes").has("reviewed"), r1.toString());
+    // an attribute of an enumeration takes only its values
+    call("apply_changes", "project", A, "operations",
+        ops("[{\"op\":\"update\",\"node\":\"/Requirements/R1\",\"attributes\":{\"level\":\"approved\"}}]"));
+    assertContains(callError("apply_changes", "project", A, "operations",
+        ops("[{\"op\":\"update\",\"node\":\"/Requirements/R1\",\"attributes\":{\"level\":\"bogus\"}}]")),
+        "is not a value of the enumeration Status");
+    // an enumeration in use stays
+    assertContains(callError("change_project_settings", "project", A, "enums", JsonParser.parseString("{\"Status\":null}")),
+        "is used by");
+    assertContains(callError("change_project_settings", "project", A, "checker_rules",
+        JsonParser.parseString("[{\"name\":\"broken\",\"formula\":\"getNodeName( ==\"}]")), "no JavaScript expression");
+    // a settings change is one change: revert_change takes it back
+    int prefixChange = call("change_project_settings", "project", A, "id_prefix", "XY").get("change").getAsInt();
+    assertEquals("XY", call("get_project_settings", "project", A).get("id_prefix").getAsString());
+    call("revert_change", "project", A, "change", prefixChange);
+    assertEquals("AG", call("get_project_settings", "project", A).get("id_prefix").getAsString());
+    assertTrue(settingsChange < prefixChange);
+    // the JavaScript of a catalog (here a checker rule) reaches no file or program
+    File marker = new File(root, "sandbox-marker");
+    call("change_project_settings", "project", A, "checker_rules", JsonParser.parseString(
+        "[{\"name\":\"escape\",\"formula\":\"new java.io.File('" + marker.getAbsolutePath() + "').createNewFile() || true\"}]"));
+    call("trace_coverage", "project", A, "refresh", true);
+    assertFalse(marker.exists(), "a checker rule created a file");
+    javax.script.ScriptEngine js = com.unitesk.requality.tool.CoreUtils.getJSEngine();
+    assertEquals(3.0, ((Number) js.eval("'abc'.length")).doubleValue());
+    try {
+      js.eval("java.lang.Runtime.getRuntime().exec('true')");
+      throw new AssertionError("a script ran a program");
+    } catch (javax.script.ScriptException | RuntimeException e) {
+      // refused
+    }
+    assertTrue(ScriptSandbox.visible("java.util.ArrayList"));
+    assertFalse(ScriptSandbox.visible("java.lang.Runtime"));
+    assertFalse(ScriptSandbox.visible("java.io.File"));
+    assertFalse(ScriptSandbox.visible("java.lang.Class"));
+    assertFalse(ScriptSandbox.visible("java.util.logging.FileHandler"));
+    assertFalse(ScriptSandbox.visible("com.unitesk.requality.tool.CoreUtils"));
+    assertFalse(ScriptSandbox.visible("com.unitesk.requality.nodetype.Document"));
+    call("change_project_settings", "project", A, "checker_rules", new JsonArray());
+  }
+
+  @Test
+  @Order(14)
+  void applyChangesMakesEveryNodeTypeAndManyNodes() throws Exception {
+    call("apply_changes", "project", A, "operations", ops("[{\"op\":\"create\",\"parent\":\"/Requirements\",\"id\":\"R2\",\"name\":\"Second\"},"
+        + "{\"op\":\"create\",\"parent\":\"/Requirements/R1\",\"type\":\"VirtualNode\",\"id\":\"V1\",\"target\":\"/Requirements/R2\"},"
+        + "{\"op\":\"create\",\"parent\":\"/Requirements\",\"id\":\"BARE\",\"template\":\"none\"}]"));
+    assertEquals("VirtualNode", call("get_node", "project", A, "node", "/Requirements/R1/V1").get("type").getAsString());
+    assertContains(callError("apply_changes", "project", A, "operations",
+        ops("[{\"op\":\"create\",\"parent\":\"/Requirements\",\"type\":\"VirtualNode\",\"id\":\"V2\"}]")), "needs 'target'");
+    assertContains(callError("apply_changes", "project", A, "operations",
+        ops("[{\"op\":\"create\",\"parent\":\"/Requirements\",\"type\":\"Glossary\"}]")), "VirtualNode");
+    // a dry run reports every operation that fails, and the ones that use the node of a failed one
+    String dry = callError("apply_changes", "project", A, "dry_run", true, "operations", ops("["
+        + "{\"op\":\"create\",\"parent\":\"/Nowhere\",\"id\":\"X\",\"as\":\"x\"},"
+        + "{\"op\":\"update\",\"node\":\"$x\",\"name\":\"X\"},"
+        + "{\"op\":\"update\",\"node\":\"/Requirements/R2\",\"name\":\"fine\"},"
+        + "{\"op\":\"delete\",\"node\":\"/Requirements/Missing\"}]"));
+    assertContains(dry, "3 of 4 operations fail");
+    assertContains(dry, "Operation 0 (create)");
+    assertContains(dry, "$x is the node of operation 0, which failed");
+    assertContains(dry, "Operation 3 (delete)");
+    assertEquals("Second", call("get_node", "project", A, "node", "/Requirements/R2").get("name").getAsString());
+    // one operation for many nodes, and the rename of an attribute
+    JsonObject all = call("apply_changes", "project", A, "operations", ops("[{\"op\":\"update_all\",\"under\":\"/Requirements\","
+        + "\"type\":\"Requirement\",\"attributes\":{\"checked\":\"yes\"}}]"));
+    assertTrue(all.getAsJsonArray("results").get(0).getAsJsonObject().get("nodes").getAsInt() >= 3, all.toString());
+    call("apply_changes", "project", A, "operations", ops("[{\"op\":\"rename_attribute\",\"under\":\"/Requirements\","
+        + "\"attribute\":\"checked\",\"new_name\":\"verified\"}]"));
+    JsonObject r2 = call("get_node", "project", A, "node", "/Requirements/R2");
+    assertEquals("yes", r2.getAsJsonObject("attributes").getAsJsonObject("verified").get("value").getAsString(), r2.toString());
+    assertFalse(r2.getAsJsonObject("attributes").has("checked"), r2.toString());
+    // a copy of a subtree: new nodes with the next free ids
+    JsonObject copied = call("apply_changes", "project", A, "operations",
+        ops("[{\"op\":\"copy\",\"node\":\"/Requirements/R1\",\"parent\":\"/Requirements/R2\",\"as\":\"c\"},"
+            + "{\"op\":\"update\",\"node\":\"$c\",\"name\":\"Copy of first\"}]"));
+    JsonObject copy = copied.getAsJsonArray("results").get(0).getAsJsonObject();
+    assertEquals("/Requirements/R1", copy.get("from").getAsString(), copied.toString());
+    String copyPath = copy.get("path").getAsString();
+    assertTrue(copyPath.startsWith("/Requirements/R2/"), copied.toString());
+    JsonObject cn = call("get_node", "project", A, "node", copyPath);
+    assertEquals("Copy of first", cn.get("name").getAsString());
+    assertFalse(cn.get("uuid").getAsString().equals(call("get_node", "project", A, "node", "/Requirements/R1").get("uuid").getAsString()));
+    assertContains(callError("apply_changes", "project", A, "operations",
+        ops("[{\"op\":\"copy\",\"node\":\"/Requirements/R2\",\"parent\":\"" + copyPath + "\"}]")), "into itself");
+    call("apply_changes", "project", A, "operations", ops("[{\"op\":\"delete\",\"recursive\":true,\"node\":\"" + copyPath + "\"}]"));
+    // a node made twice is named
+    JsonObject twice = call("apply_changes", "project", A, "operations",
+        ops("[{\"op\":\"create\",\"parent\":\"/Requirements\",\"id\":\"R3\",\"name\":\"Second\"}]"));
+    assertContains(twice.getAsJsonArray("results").get(0).getAsJsonObject().get("warning").getAsString(), "/Requirements/R2");
+    // a node by its id alone, when one node has it
+    assertEquals("/Requirements/R2", call("get_node", "project", A, "node", "R2").get("path").getAsString());
+    // search by the name of an attribute as the editor shows it; an unknown attribute is an error
+    JsonObject byName = call("search_nodes", "project", A, "attribute", "name", "value", "Second", "operator", "EQUALS");
+    assertEquals(2, byName.getAsJsonArray("matches").size(), byName.toString());
+    assertContains(callError("search_nodes", "project", A, "attribute", "nosuch", "value", "x"), "has the attribute nosuch");
+  }
+
+  @Test
+  @Order(15)
+  void aRevertNamesWhatItBreaks() throws Exception {
+    int made = call("apply_changes", "project", A, "operations",
+        ops("[{\"op\":\"create\",\"parent\":\"/Requirements\",\"id\":\"TARGET\",\"name\":\"Target\"}]")).get("change").getAsInt();
+    int linked = call("apply_changes", "project", A, "operations",
+        ops("[{\"op\":\"link\",\"from\":\"/Requirements/R2\",\"to\":\"/Requirements/TARGET\",\"attribute\":\"depends\"}]"))
+        .get("change").getAsInt();
+    String refused = callError("revert_change", "project", A, "change", made);
+    assertContains(refused, "/Requirements/R2 links to /Requirements/TARGET (depends), which the revert deletes");
+    assertContains(refused, "Later changes of these nodes: [" + linked + "]");
+    JsonObject forced = call("revert_change", "project", A, "change", made, "force", true);
+    assertEquals(1, forced.getAsJsonObject("counts").get("deleted").getAsInt(), forced.toString());
+    assertEquals(1, forced.get("broken_link_count").getAsInt(), forced.toString());
+    assertEquals("/Requirements/R2", forced.getAsJsonArray("broken_links").get(0).getAsJsonObject().get("from").getAsString());
+  }
+
+  @Test
+  @Order(16)
+  void importsAndReportsStayInTheirFolders() throws Exception {
+    // a reference that is not next to the document, but a file of the folder the server runs in, is refused
+    File spec = new File(root, "cwd-ref.html");
+    Files.writeString(spec.toPath(), "<html><body><p>The system shall work.</p><img src=\"build.gradle\"/></body></html>");
+    assertTrue(new File("build.gradle").isFile(), "the tests run in the folder of the server project");
+    assertContains(callError("import_document", "project", A, "file", spec.getAbsolutePath()), "build.gradle");
+    // the decodings of the importer: + is a plus or a space
+    List<File> c = Policy.candidates(root, "a+b.png");
+    assertTrue(c.contains(new File(root, "a+b.png")) && c.contains(new File(root, "a b.png")), c.toString());
+    // a document without text is no import: nothing stays
+    File empty = new File(root, "empty.pdf");
+    Files.write(empty.toPath(), pdf());
+    int changes = call("review_changes", "project", A).get("total").getAsInt();
+    assertContains(callError("import_document", "project", A, "file", empty.getAbsolutePath()), "has no text");
+    assertEquals(changes, call("review_changes", "project", A).get("total").getAsInt());
+    assertFalse(call("get_tree", "project", A, "node", "/Documents").toString().contains("empty"));
+    // a report folder in a catalog is refused
+    assertContains(callError("generate_report", "project", A, "template", "com.unitesk.requality.reports.tableview", "output",
+        new File(workspace, "AgentProject/report").getAbsolutePath()), "inside the catalog");
+    // saved settings: a change of the agent, and a report from them
+    JsonObject saved = call("generate_report", "project", A, "template", "com.unitesk.requality.reports.tableview", "output",
+        new File(root, "report-saveas").getAbsolutePath(), "save_as", "Overview");
+    assertEquals("/Reports/Overview", saved.get("settings").getAsString(), saved.toString());
+    assertTrue(saved.has("change"), saved.toString());
+    call("generate_report", "project", A, "settings", "/Reports/Overview", "output", new File(root, "report-saved2").getAbsolutePath());
+    // the coverage source of report settings is set by generate_report only, and only from a file of the folders
+    assertContains(callError("apply_changes", "project", A, "operations", ops("[{\"op\":\"update\",\"node\":\"/Reports/Overview\","
+        + "\"attributes\":{\"coverageFilePath\":\"http://127.0.0.1:9/x\"}}]")), "coverage_file");
+    TreeDB db = Nodes.findDB("AgentProject");
+    Core.write(db, "Coverage URL", false, () -> {
+      TreeNode n = Core.node(db, "/Reports/Overview");
+      n.attrs().setConstAttribute("coverageFilePath", "http://127.0.0.1:9/exfil", 0);
+      n.commitAttributes();
+      return null;
+    });
+    assertContains(callError("generate_report", "project", A, "settings", "/Reports/Overview", "output",
+        new File(root, "report-url").getAbsolutePath()), "which is no file");
+    // a template of the catalog cannot run a program
+    File marker = new File(root, "template-marker");
+    File tpl = new File(workspace, "AgentProject/.templates/escape");
+    tpl.mkdirs();
+    Files.writeString(new File(tpl, "template.xml").toPath(), "<?xml version=\"1.0\" ?>\n<report start=\"escape.ftl\" id=\"test.escape\" "
+        + "name=\"Escape\" read-only=\"true\" group=\"extraction\"><description>test</description><template source=\"escape.ftl\" "
+        + "location=\"escape.html\"/></report>");
+    Files.writeString(new File(tpl, "escape.ftl").toPath(), "<#assign ex = \"freemarker.template.utility.Execute\"?new()>"
+        + "${ex(\"touch " + marker.getAbsolutePath() + "\")}");
+    call("open_project", "project", A);
+    boolean listed = call("list_report_templates", "project", A).toString().contains("test.escape");
+    assertTrue(listed, "the template of the catalog is listed");
+    // the report fails or is made without the program: the template cannot make an Execute object
+    JsonObject args = new JsonObject();
+    args.addProperty("project", A);
+    args.addProperty("template", "test.escape");
+    args.addProperty("output", new File(root, "report-escape").getAbsolutePath());
+    JsonObject params = new JsonObject();
+    params.addProperty("name", "generate_report");
+    params.add("arguments", args);
+    rpc("tools/call", params);
+    assertFalse(marker.exists(), "a template ran a program");
+  }
+
+  /** A PDF with the lines (text and the y position of each). */
+  static byte[] pdf(Object... lines) {
+    StringBuilder content = new StringBuilder();
+    for (int i = 0; i < lines.length; i += 2)
+      content.append("BT /F1 11 Tf 72 ").append(lines[i + 1]).append(" Td (").append(lines[i]).append(") Tj ET\n");
+    String[] objects = { "<< /Type /Catalog /Pages 2 0 R >>", "<< /Type /Pages /Kids [3 0 R] /Count 1 >>",
+        "<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Contents 4 0 R /Resources << /Font << /F1 5 0 R >> >> >>",
+        "<< /Length " + content.length() + " >>\nstream\n" + content + "endstream",
+        "<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>" };
+    StringBuilder b = new StringBuilder("%PDF-1.7\n");
+    List<Integer> offsets = new ArrayList<>();
+    for (int i = 0; i < objects.length; i++) {
+      offsets.add(b.toString().getBytes(StandardCharsets.UTF_8).length);
+      b.append(i + 1).append(" 0 obj\n").append(objects[i]).append("\nendobj\n");
+    }
+    int xref = b.toString().getBytes(StandardCharsets.UTF_8).length;
+    b.append("xref\n0 ").append(objects.length + 1).append("\n0000000000 65535 f \n");
+    for (int o : offsets)
+      b.append(String.format("%010d 00000 n \n", o));
+    b.append("trailer\n<< /Size ").append(objects.length + 1).append(" /Root 1 0 R >>\nstartxref\n").append(xref).append("\n%%EOF\n");
+    return b.toString().getBytes(StandardCharsets.UTF_8);
+  }
+
+  @Test
+  @Order(17)
+  void aPdfKeepsItsHeadings() throws Exception {
+    File f = new File(root, "brakes.pdf");
+    Files.write(f.toPath(), pdf("1 Scope", 712, "The brake shall stop the car.", 698, "2 Limits", 640, "2.1 Pressure", 626,
+        "The pressure shall stay below 180 bar.", 612));
+    JsonObject doc = call("import_document", "project", A, "file", f.getAbsolutePath());
+    JsonObject read = call("read_document", "project", A, "document", doc.get("path").getAsString());
+    JsonObject scope = paragraph(read, "Scope");
+    assertNotNull(scope, read.toString());
+    assertEquals(1, scope.get("heading").getAsInt(), read.toString());
+    assertEquals(2, paragraph(read, "2.1 Pressure").get("heading").getAsInt(), read.toString());
+    assertFalse(paragraph(read, "stay below").has("heading"), read.toString());
+    assertEquals(0, PdfHeadings.level("5 bar.", Map.of()));
+    assertEquals(0, PdfHeadings.level("3 the pump shall stop", Map.of()));
+    assertEquals(3, PdfHeadings.level("4.2.1 Wet road", Map.of()));
+    assertEquals(2, PdfHeadings.level("Annex text", Map.of("annex text", 2)));
+  }
+
+  @Test
+  @Order(18)
+  void aReqIfFileBecomesRequirements() throws Exception {
+    File reqif = new File(root, "brakes.reqif");
+    try (java.io.InputStream in = McpServerTest.class.getResourceAsStream("/mcp/brakes.reqif")) {
+      Files.copy(in, reqif.toPath());
+    }
+    call("create_project", "name", "ReqifProject");
+    JsonObject imported = call("import_reqif", "project", "ReqifProject", "file", reqif.getAbsolutePath());
+    assertEquals(3, imported.get("requirements").getAsInt(), imported.toString());
+    assertEquals(1, imported.get("objects_left_out").getAsInt(), imported.toString());
+    JsonObject tree = call("get_tree", "project", "ReqifProject", "node", "/Requirements", "depth", 3);
+    assertContains(tree.toString(), "Wet road");
+    JsonObject braking = call("search_nodes", "project", "ReqifProject", "attribute", "name", "value", "Braking", "operator", "EQUALS");
+    String path = braking.getAsJsonArray("matches").get(0).getAsJsonObject().get("path").getAsString();
+    JsonObject n = call("get_node", "project", "ReqifProject", "node", path);
+    assertContains(n.get("description").getAsString(), "The brake shall stop the car within 40 m");
+    assertEquals("high", n.getAsJsonObject("attributes").getAsJsonObject("Priority").get("value").getAsString(), n.toString());
+    // a value the file does not give is no value (not the first value of the enumeration)
+    JsonObject parking = call("search_nodes", "project", "ReqifProject", "attribute", "name", "value", "Parking brake", "operator", "EQUALS");
+    JsonObject p = call("get_node", "project", "ReqifProject", "node",
+        parking.getAsJsonArray("matches").get(0).getAsJsonObject().get("path").getAsString());
+    assertFalse(p.getAsJsonObject("attributes").has("Priority"), p.toString());
+    assertTrue(call("get_project_settings", "project", "ReqifProject").getAsJsonObject("enums").has("Priority"));
+    // the import makes /Requirements the specification: a project with requirements needs replace
+    assertContains(callError("import_reqif", "project", "ReqifProject", "file", reqif.getAbsolutePath()), "replace true");
+    call("revert_change", "project", "ReqifProject", "change", imported.get("change").getAsInt());
+    assertEquals(0, call("get_tree", "project", "ReqifProject", "node", "/Requirements").get("children").getAsInt());
+    // a file that is no ReqIF, and an external entity, are refused
+    File bad = new File(root, "bad.reqif");
+    Files.writeString(bad.toPath(), "<?xml version=\"1.0\"?><!DOCTYPE r [<!ENTITY e SYSTEM \"file:///etc/passwd\">]><REQ-IF>&e;</REQ-IF>");
+    assertContains(callError("import_reqif", "project", "ReqifProject", "file", bad.getAbsolutePath()), "no XML file");
+  }
+
+  static String git(File dir, String... args) throws Exception {
+    List<String> cmd = new ArrayList<>(List.of("git", "-C", dir.getAbsolutePath(), "-c", "user.name=test", "-c",
+        "user.email=test@example.com", "-c", "commit.gpgsign=false"));
+    cmd.addAll(List.of(args));
+    Process pr = new ProcessBuilder(cmd).redirectErrorStream(true).start();
+    String out = new String(pr.getInputStream().readAllBytes(), StandardCharsets.UTF_8);
+    assertEquals(0, pr.waitFor(), out);
+    return out;
+  }
+
+  @Test
+  @Order(19)
+  void aChangeIsComparedWithAGitRevision() throws Exception {
+    File catalog = new File(workspace, "AgentProject");
+    assertContains(callError("compare_with_revision", "project", A), "not in a Git repository");
+    git(catalog, "init", "-q");
+    git(catalog, "add", "-A");
+    git(catalog, "commit", "-q", "-m", "base");
+    JsonObject none = call("compare_with_revision", "project", A);
+    assertEquals(0, none.getAsJsonObject("counts").get("changed").getAsInt() + none.getAsJsonObject("counts").get("added").getAsInt(),
+        none.toString());
+    call("apply_changes", "project", A, "operations", ops("[{\"op\":\"update\",\"node\":\"/Requirements/R2\",\"name\":\"Second, renamed\"},"
+        + "{\"op\":\"create\",\"parent\":\"/Requirements\",\"id\":\"NEW\",\"name\":\"New one\"},"
+        + "{\"op\":\"move\",\"node\":\"/Requirements/R3\",\"parent\":\"/Requirements/R2\"},"
+        + "{\"op\":\"delete\",\"node\":\"/Requirements/BARE\"}]"));
+    JsonObject d = call("compare_with_revision", "project", A, "revision", "HEAD");
+    assertContains(d.getAsJsonArray("added").toString(), "/Requirements/NEW");
+    assertContains(d.getAsJsonArray("deleted").toString(), "/Requirements/BARE");
+    String changed = d.getAsJsonArray("changed").toString();
+    assertContains(changed, "\"before\":\"Second\",\"after\":\"Second, renamed\"");
+    assertContains(changed, "\"path\":\"/Requirements/R2/R3\",");
+    assertContains(changed, "\"was\":\"/Requirements/R3\"");
+    assertContains(callError("compare_with_revision", "project", A, "revision", "--output=/tmp/x"), "Invalid revision");
+    assertContains(callError("compare_with_revision", "project", A, "revision", "nosuchbranch"), "No revision nosuchbranch");
+  }
+
+  @Test
+  @Order(20)
+  void aCatalogWithoutALockIsNotChangedAndAnInterruptedImportIsCleaned() throws Exception {
+    com.unitesk.requality.vscode.core.Workspace.Project p = core.project(A);
+    p.unlocked = "test: no folder for the lock files";
+    try {
+      assertContains(callError("apply_changes", "project", A, "operations",
+          ops("[{\"op\":\"update\",\"node\":\"/Requirements/R2\",\"name\":\"x\"}]")), "is not locked");
+      assertContains(call("list_projects").toString(), "not locked");
+    } finally {
+      p.unlocked = null;
+    }
+    // the files an import left when the server stopped during it go when the project is used next
+    TreeDB db = core.db(A);
+    File docs = RequalityTools.childrenFolder(db, Core.node(db, "/Documents"));
+    java.util.Set<String> before = RequalityTools.list(docs);
+    File marker = RequalityTools.markImport(History.of(storage, p.dir), Core.node(db, "/Documents"), docs, before);
+    File orphan = new File(docs, "orphan.xhtml.json");
+    Files.writeString(orphan.toPath(), "{}");
+    File orphanRes = new File(docs, "orphan.xhtml_resources");
+    orphanRes.mkdirs();
+    core.recovered.remove(p.localName);
+    call("get_tree", "project", A);
+    assertFalse(orphan.exists());
+    assertFalse(orphanRes.exists());
+    assertFalse(marker.exists());
+  }
+
+  /** Answers the next question of the server (elicitation/create); returns it. */
+  static JsonObject answerQuestion(String action, Boolean allow) throws Exception {
+    long end = System.currentTimeMillis() + 60_000;
+    while (System.currentTimeMillis() < end) {
+      JsonObject m = others.poll(200, TimeUnit.MILLISECONDS);
+      if (m == null || !m.has("method") || !m.get("method").getAsString().equals("elicitation/create"))
+        continue;
+      JsonObject r = new JsonObject();
+      r.addProperty("jsonrpc", "2.0");
+      r.add("id", m.get("id"));
+      JsonObject res = new JsonObject();
+      res.addProperty("action", action);
+      if (allow != null) {
+        JsonObject content = new JsonObject();
+        content.addProperty("allow", allow);
+        res.add("content", content);
+      }
+      r.add("result", res);
+      send(r.toString());
+      return m;
+    }
+    throw new AssertionError("the server asked nothing");
+  }
+
+  @Test
+  @Order(21)
+  void theUserAllowsAFolderOutsideTheServer() throws Exception {
+    File outside = Files.createTempDirectory("requality-outside").toFile();
+    File doc = new File(outside, "outside.html");
+    Files.writeString(doc.toPath(), "<html><body><p>The system shall be allowed.</p></body></html>");
+    // a client that cannot ask: the folder is refused, with the option that allows it
+    assertContains(callError("import_document", "project", A, "file", doc.getAbsolutePath()), "--allow");
+    JsonObject init = new JsonObject();
+    init.addProperty("protocolVersion", "2025-06-18");
+    JsonObject caps = new JsonObject();
+    caps.add("elicitation", new JsonObject());
+    init.add("capabilities", caps);
+    rpc("initialize", init);
+    others.clear();
+    try {
+      CompletableFuture<JsonObject> allowed = CompletableFuture.supplyAsync(() -> {
+        try {
+          return call("import_document", "project", A, "file", doc.getAbsolutePath());
+        } catch (Exception e) {
+          throw new RuntimeException(e);
+        }
+      });
+      JsonObject q = answerQuestion("accept", true);
+      assertContains(q.getAsJsonObject("params").get("message").getAsString(), outside.getCanonicalPath());
+      assertTrue(allowed.get(120, TimeUnit.SECONDS).has("path"));
+      // the folder stays allowed for the session: no second question
+      File doc2 = new File(outside, "second.html");
+      Files.writeString(doc2.toPath(), "<html><body><p>The system shall be allowed again.</p></body></html>");
+      assertTrue(call("import_document", "project", A, "file", doc2.getAbsolutePath()).has("path"));
+      // a declined question refuses
+      File other = Files.createTempDirectory("requality-outside2").toFile();
+      File doc3 = new File(other, "declined.html");
+      Files.writeString(doc3.toPath(), "<html><body><p>No.</p></body></html>");
+      CompletableFuture<String> declined = CompletableFuture.supplyAsync(() -> {
+        try {
+          return callError("import_document", "project", A, "file", doc3.getAbsolutePath());
+        } catch (Exception e) {
+          throw new RuntimeException(e);
+        }
+      });
+      answerQuestion("decline", null);
+      assertContains(declined.get(120, TimeUnit.SECONDS), "--allow");
+      // the home folder, a top folder and the hidden folders of the user are never offered
+      assertFalse(Policy.askable(new File(System.getProperty("user.home"))));
+      assertFalse(Policy.askable(new File(System.getProperty("user.home")).getParentFile()));
+      assertFalse(Policy.askable(new File(System.getProperty("user.home"), ".ssh")));
+      assertFalse(Policy.askable(new File(System.getProperty("user.home"), ".config/app")));
+      assertTrue(Policy.askable(outside));
+    } finally {
+      JsonObject plain = new JsonObject();
+      plain.addProperty("protocolVersion", "2025-06-18");
+      plain.add("capabilities", new JsonObject());
+      rpc("initialize", plain);
+    }
+  }
+
+  @Test
+  @Order(22)
+  void theSameDocumentAgainChangesNothingAndKeepsItsLetters() throws Exception {
+    // a UTF-8 XHTML file without a meta charset and with few letters outside ASCII keeps its letters
+    File cafe = new File(root, "cafe.xhtml");
+    StringBuilder text = new StringBuilder("<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<html xmlns=\"http://www.w3.org/1999/xhtml\"><body>");
+    for (int i = 0; i < 40; i++)
+      text.append("<p>The system shall log event ").append(i).append(" in the journal of the operator.</p>");
+    text.append("<p>The café shall open at 7 °C.</p></body></html>");
+    Files.writeString(cafe.toPath(), text.toString(), StandardCharsets.UTF_8);
+    JsonObject imported = call("import_document", "project", A, "file", cafe.getAbsolutePath());
+    JsonObject read = call("read_document", "project", A, "document", imported.get("path").getAsString(), "from", 40);
+    assertContains(read.toString(), "The café shall open at 7 °C.");
+    // the ETSI document of the catalog, as a new version of itself, with the same file name: nothing changed, also for
+    // the locations of the converted catalog without character ranges
+    // (the idle release of reportsAndProjects released the catalog: it loads again)
+    TreeDB db = core.db(P);
+    String docPath = "/Documents/ts_103097v010201p.xhtml";
+    Document etsi = (Document) Core.node(db, docPath);
+    File source = new File(RequalityTools.childrenFolder(db, Core.node(db, "/Documents")), "ts_103097v010201p.xhtml_resources/ts_103097v010201p.xhtml");
+    assertTrue(source.isFile(), source.toString());
+    File copyDir = new File(root, "etsi-v2");
+    copyDir.mkdirs();
+    File copy = new File(copyDir, "ts_103097v010201p.xhtml");
+    Files.copy(source.toPath(), copy.toPath());
+    JsonObject up = call("update_document_version", "project", P, "document", docPath, "file", copy.getAbsolutePath());
+    JsonObject sum = up.getAsJsonObject("summary");
+    assertEquals(0, sum.get("lost").getAsInt(), up.toString());
+    assertEquals(0, sum.get("changed").getAsInt(), up.toString());
+    assertEquals(0, sum.get("context_changed").getAsInt(), up.toString());
+    assertEquals(0, sum.get("new_sentences").getAsInt(), up.toString());
+    assertEquals(sum.get("requirements").getAsInt(), sum.get("unchanged").getAsInt(), up.toString());
+    assertTrue(up.toString().length() < 4000, "a short result: " + up.toString().length());
+    assertTrue(etsi.getUUId() != null);
   }
 }

@@ -3,7 +3,9 @@ name: Release
 # them, and publishes them to the Visual Studio Marketplace (secret VSCE_PAT) and to Open VSX (secret OVSX_PAT).
 # An odd minor version (v1.5.x) is a pre-release: the packages are marked by scripts/package-platforms.js.
 # The release also has the archives of the Requality MCP server (requality-mcp-*, scripts/package-mcp.js), with build
-# provenance attestations (gh attestation verify <archive> -R formalized-si/requality-vscode).
+# provenance attestations of this workflow for the tag (only a tag makes them):
+#   gh attestation verify <archive> -R formalized-si/requality-vscode --source-ref refs/tags/v<version> \
+#     --signer-workflow formalized-si/requality-vscode/.github/workflows/release.yml
 #
 # The build job runs the build tools (npm install scripts, Gradle) with read access only and no stored credentials. The
 # publish job, which can write, sign and publish, runs no build tool: it takes the files of the build job.
@@ -60,7 +62,9 @@ jobs:
         with:
           name: requality-vscode-packages
           path: release
+      # a manual run (workflow_dispatch) can build any branch: only a tag gets an attestation
       - uses: actions/attest-build-provenance@e8998f949152b193b063cb0ec769d69d929409be # v2
+        if: startsWith(github.ref, 'refs/tags/')
         with:
           subject-path: release/requality-mcp-*
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4

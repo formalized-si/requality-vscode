@@ -14,14 +14,28 @@ import com.unitesk.requality.vscode.mcp.McpServer.ToolError;
 
 /**
  * What the agent may reach outside the catalogs: the folders whose files it may import and where it may write reports
- * (the folders of the catalogs and the folders given with --allow), and the file types it may import.
+ * (the folders of the catalogs and the folders given with --allow, and the folders the user allows when the agent needs
+ * them and the client can ask), and the file types it may import.
  */
 final class Policy {
+  /**
+   * Asks the user whether the server may use a folder (for the rest of the session); null when the client cannot ask.
+   * The argument is the folder and the reason.
+   */
+  interface Asker {
+    boolean allow(File folder, String reason);
+  }
+
+  private volatile Asker asker;
+
+  void asker(Asker a) {
+    asker = a;
+  }
   /** The document types the core imports (HTML through its own importer, the others through Apache Tika). */
   static final Set<String> DOCUMENT_TYPES = new HashSet<>(Arrays.asList("html", "htm", "xhtml", "xml", "doc", "docx", "odt",
       "rtf", "pdf", "txt"));
 
-  private final List<Path> roots = new ArrayList<>();
+  private final List<Path> roots = new java.util.concurrent.CopyOnWriteArrayList<>();
 
   Policy(List<File> folders) {
     for (File f : folders)
@@ -38,6 +52,11 @@ final class Policy {
 
   /** The canonical path of a file or folder in an allowed folder; an error that tells how to allow it otherwise. */
   File allowed(String path, String what) {
+    return allowed(path, what, true);
+  }
+
+  /** {@link #allowed(String, String)}; {@code ask}: the user may allow the folder (else it is refused). */
+  File allowed(String path, String what, boolean ask) {
     File f = new File(path);
     if (!f.isAbsolute())
       throw new ToolError(what + " " + path + ": give an absolute path");
@@ -64,8 +83,54 @@ final class Policy {
     for (Path root : roots)
       if (p.startsWith(root))
         return p.toFile();
+    // the folder of the file (or the folder itself), when the user allows it; never the home or a top folder
+    File folder = p.toFile().isDirectory() ? p.toFile() : p.toFile().getParentFile();
+    Asker a = ask ? asker : null;
+    if (a != null && folder != null && askable(folder)
+        && a.allow(folder, what.toLowerCase(Locale.ROOT) + " " + p)) {
+      try {
+        roots.add(folder.getCanonicalFile().toPath());
+      } catch (IOException e) {
+        roots.add(folder.getAbsoluteFile().toPath().normalize());
+      }
+      return p.toFile();
+    }
     throw new ToolError(what + " " + path + " is outside the folders this server may use: " + roots
         + ". Start requality-mcp with --allow <folder> to add a folder.");
+  }
+
+  /** A folder the user may be asked to allow: not the home folder, not one of its parents, not a top folder. */
+  static boolean askable(File folder) {
+    try {
+      Path f = folder.getCanonicalFile().toPath();
+      Path home = new File(System.getProperty("user.home")).getCanonicalFile().toPath();
+      if (f.getParent() == null || f.getNameCount() < 2 || home.startsWith(f))
+        return false;
+      // the folders of the system and of the settings of the user (keys, credentials)
+      String name = f.getFileName().toString();
+      if (name.startsWith("."))
+        return false;
+      for (Path x = f; x != null; x = x.getParent())
+        if (x.getFileName() != null && x.getFileName().toString().startsWith("."))
+          return false;
+      return true;
+    } catch (IOException e) {
+      return false;
+    }
+  }
+
+  /** True when the file (an allowed, canonical path) is the folder or in it. */
+  static boolean inside(File file, File folder) {
+    Path f;
+    Path d;
+    try {
+      f = file.getCanonicalFile().toPath();
+      d = folder.getCanonicalFile().toPath();
+    } catch (IOException e) {
+      f = file.getAbsoluteFile().toPath().normalize();
+      d = folder.getAbsoluteFile().toPath().normalize();
+    }
+    return f.startsWith(d);
   }
 
   /** A document file the agent may import: in an allowed folder, of a document type. */
@@ -74,7 +139,7 @@ final class Policy {
   }
 
   /** The HTML documents: the importer copies the files their references name (and downloads the CSS of a URL). */
-  private static final Set<String> HTML_TYPES = new HashSet<>(Arrays.asList("html", "htm", "xhtml"));
+  private static final Set<String> HTML_TYPES = new HashSet<>(Arrays.asList("html", "htm", "xhtml", "xml"));
 
   /**
    * The references of an HTML document that the importer would copy into the catalog or download: a URL (other than
@@ -107,33 +172,77 @@ final class Policy {
         bad.add(r); // a URL: the importer downloads it (CSS) or the reference is copied as text
         continue;
       } else {
-        String path = r;
-        int cut = path.indexOf('#');
-        if (cut >= 0)
-          path = path.substring(0, cut);
-        cut = path.indexOf('?');
-        if (cut >= 0)
-          path = path.substring(0, cut);
-        if (path.isEmpty())
-          continue;
-        try {
-          path = java.net.URLDecoder.decode(path.replace("+", "%2B"), "UTF-8");
-        } catch (IllegalArgumentException e) {
-          // not encoded
-        }
-        File p = new File(path);
-        f = p.isAbsolute() ? p : new File(html.getParentFile(), path);
+        // the files the importer may read for the reference: it decodes a reference in two ways (an image or a script
+        // with URLDecoder, a style sheet as a URI path) and takes a path in the folder of the document
+        for (File c : candidates(html.getParentFile(), r))
+          if (c.exists()) {
+            try {
+              allowed(c.getAbsolutePath(), "The reference", false);
+            } catch (ToolError e) {
+              bad.add(r);
+              break;
+            }
+          }
+        continue;
       }
       // a reference to no file copies nothing (an alt text, for example)
       if (!f.exists())
         continue;
       try {
-        allowed(f.getAbsolutePath(), "The reference");
+        allowed(f.getAbsolutePath(), "The reference", false);
       } catch (ToolError e) {
         bad.add(r);
       }
     }
     return bad;
+  }
+
+  /** The files a relative or absolute reference of a document in the folder may name, as the importer reads it. */
+  static List<File> candidates(File folder, String ref) {
+    java.util.Set<String> paths = new java.util.LinkedHashSet<>();
+    for (String r : new String[] { ref, cut(ref) }) {
+      paths.add(r);
+      try {
+        paths.add(java.net.URLDecoder.decode(r, "UTF-8"));
+      } catch (IllegalArgumentException | java.io.UnsupportedEncodingException e) {
+        // not encoded
+      }
+      try {
+        paths.add(java.net.URLDecoder.decode(r.replace("+", "%2B"), "UTF-8"));
+      } catch (IllegalArgumentException | java.io.UnsupportedEncodingException e) {
+        // not encoded
+      }
+      try {
+        paths.add(com.unitesk.requality.tool.CoreUtils.URLDecode(r));
+      } catch (RuntimeException e) {
+        // not encoded
+      }
+    }
+    List<File> out = new ArrayList<>();
+    for (String p : paths) {
+      if (p.isEmpty())
+        continue;
+      File f = new File(p);
+      if (f.isAbsolute()) {
+        out.add(f);
+      } else {
+        out.add(new File(folder, p));
+        // the current folder of the process (the importer of older versions read it)
+        out.add(f.getAbsoluteFile());
+      }
+    }
+    return out;
+  }
+
+  /** The reference without its query and fragment. */
+  private static String cut(String r) {
+    int c = r.indexOf('#');
+    if (c >= 0)
+      r = r.substring(0, c);
+    c = r.indexOf('?');
+    if (c >= 0)
+      r = r.substring(0, c);
+    return r;
   }
 
   /** A file the agent may read: in an allowed folder, with one of the extensions. */

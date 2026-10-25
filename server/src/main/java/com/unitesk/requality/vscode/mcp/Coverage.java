@@ -2,12 +2,9 @@ package com.unitesk.requality.vscode.mcp;
 
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Map;
 
 import com.google.gson.JsonArray;
 import com.google.gson.JsonObject;
-import com.unitesk.requality.core.attribute.ReferenceValue;
-import com.unitesk.requality.core.attribute.reference.RelManager;
 import com.unitesk.requality.core.checker.IMark;
 import com.unitesk.requality.core.model.TreeDB;
 import com.unitesk.requality.core.model.TreeNode;
@@ -108,6 +105,15 @@ final class Coverage {
       List<Document> all = new ArrayList<>();
       collectDocuments(db.getNode(Document.getTypeRootQId()), all);
       for (Document d : all) {
+        // an older version of a document: the requirements trace to the newer one; it is named, not measured
+        TreeNode newer = Changes.linked(d, RequalityTools.SUPERSEDED_BY);
+        if (newer != null) {
+          JsonObject dj = new JsonObject();
+          dj.addProperty("document", d.getQualifiedId());
+          dj.addProperty("superseded_by", newer.getQualifiedId());
+          docs.add(dj);
+          continue;
+        }
         DocumentText dt;
         try {
           dt = DocumentText.of(d);
@@ -136,6 +142,9 @@ final class Coverage {
           }
         JsonObject dj = new JsonObject();
         dj.addProperty("document", d.getQualifiedId());
+        TreeNode older = Changes.linked(d, RequalityTools.PREVIOUS_VERSION);
+        if (older != null)
+          dj.addProperty("previous_version", older.getQualifiedId());
         dj.addProperty("locations", dt.locations.size());
         dj.addProperty("paragraphs", dt.paragraphs.size());
         dj.addProperty("covered_paragraphs", full);

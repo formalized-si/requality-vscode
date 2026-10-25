@@ -33,22 +33,30 @@ public final class McpMain {
       + "specification: import_document, read_document (filter uncovered), apply_changes (create, then locate with the exact "
       + "sentence as quote); a new version of a specification: update_document_version first (its result is the list of what "
       + "to fix), then apply_changes; traceability: trace_coverage; review of your changes: review_changes, undo (this "
-      + "session), revert_change (any change). Make related changes in one apply_changes call with a summary: it is one step "
-      + "for the review and for undo. Address a node by its path (/Requirements/A/B) or UUID and give the project name "
-      + "(list_projects) with each call. A project must be ready; a project in the format of an older Requality needs "
-      + "convert_project first. Files to import and report folders must be in the folders of the server.";
+      + "session), revert_change (any change), compare_with_revision (all changes since a Git commit); ReqIF files: "
+      + "import_reqif; project settings (attributes, enumerations, checker rules): get_project_settings, "
+      + "change_project_settings. Make related changes in one apply_changes call with a summary: it is one step for the "
+      + "review and for undo; check a large call with dry_run first. Address a node by its path (/Requirements/A/B), UUID "
+      + "or unique id, and give the project name (list_projects) with each call. A project must be ready; a project in the "
+      + "format of an older Requality needs convert_project first; a locked project is open in another process (a call "
+      + "waits for it). Files to import and report folders must be in the folders of the server (the user may allow "
+      + "another folder when the client asks).";
 
   static final String USAGE = "Usage: requality-mcp [options] [<folder with Requality catalogs>...]\n"
       + "The default folder is the current one. Options:\n"
       + "  --allow <folder>    the agent may also import files from this folder and write reports into it\n"
       + "  --convert           convert catalogs in an old format when they open, without a backup (else the tool\n"
       + "                      convert_project converts one after a backup)\n"
+      + "  --locks <folder>    the folder of the catalog locks (default ~/.requality/locks)\n"
       + "  --release-after <minutes>\n"
-      + "                      release a catalog that no tool used for this time, for another session or VS Code\n"
-      + "                      (the next call loads it again); default: never\n"
+      + "                      release a catalog that no tool used for this time (the next call loads it again);\n"
+      + "                      default: only when another session or VS Code waits for it (after 20 idle seconds)\n"
       + "  --storage <folder>  caches, logs, change histories and backups (default ~/.requality-mcp)\n"
       + "  --version           print the version\n"
       + "  --help              print this text\n";
+
+  /** How long a catalog another process waits for stays unused before the server gives it up. */
+  static final long HANDOFF_MS = Long.getLong("requality.handoff", 20_000);
 
   public static void main(String[] args) {
     // Before any Requality class is loaded: RLogger captures System.out in its static initializer.
@@ -61,6 +69,8 @@ public final class McpMain {
       System.setProperty("java.awt.headless", "true");
     // no HTTP or WebSocket server for the web editors: nothing shows them (DefaultAPISource, VSCODE-PATCH)
     System.setProperty("requality.noServers", "true");
+    // the JavaScript of the catalogs (formulas, checker rules) uses no Java class that reaches files or programs
+    ScriptSandbox.install();
 
     File resources = null;
     File storage = new File(System.getProperty("user.home"), ".requality-mcp");
@@ -94,6 +104,12 @@ public final class McpMain {
             break;
           case "--allow":
             allowed.add(folder(resolve(base, value(args, ++i, "--allow"))));
+            break;
+          case "--locks":
+            // the folder of the catalog locks (default ~/.requality/locks), read when the workspace starts
+            File locks = resolve(base, value(args, ++i, "--locks"));
+            locks.mkdirs();
+            System.setProperty("requality.locks", folder(locks).getPath());
             break;
           case "--convert":
             convert = true;
@@ -161,31 +177,39 @@ public final class McpMain {
       headless.initialize(folders);
       McpServer mcp = new McpServer(mcpIn, mcpOut, workers, RequalityServer.VERSION, INSTRUCTIONS);
       Core core = RequalityTools.register(mcp, headless, new Policy(roots));
-      if (releaseAfter > 0) {
-        long after = releaseAfter;
-        java.util.concurrent.ScheduledExecutorService timer = Executors.newSingleThreadScheduledExecutor(r -> {
-          Thread t = new Thread(r, "requality-mcp-release");
-          t.setDaemon(true);
-          return t;
-        });
-        // a catalog is released only between calls: no tool runs then
-        timer.scheduleWithFixedDelay(() -> mcp.exclusive(() -> core.releaseIdle(after)), 30, 30,
-            java.util.concurrent.TimeUnit.SECONDS);
-      }
+      // Idle catalogs are released: the ones no tool used for --release-after, and the ones another process (VS Code,
+      // another session) waits for that no tool used for HANDOFF_MS. A catalog is released only between calls.
+      long after = releaseAfter;
+      java.util.concurrent.ScheduledExecutorService timer = Executors.newSingleThreadScheduledExecutor(r -> {
+        Thread t = new Thread(r, "requality-mcp-release");
+        t.setDaemon(true);
+        return t;
+      });
+      timer.scheduleWithFixedDelay(() -> {
+        try {
+          if (!core.idle(after, HANDOFF_MS).isEmpty())
+            mcp.exclusive(() -> core.releaseIdle(after, HANDOFF_MS));
+        } catch (RuntimeException e) {
+          e.printStackTrace(stderr);
+        }
+      }, 2, 2, java.util.concurrent.TimeUnit.SECONDS);
       // a client that ends the server (SIGTERM) lets the running calls finish and the catalogs close
       HeadlessClient h = headless;
       Runtime.getRuntime().addShutdownHook(new Thread(() -> {
+        mcp.stop();
         try {
-          mcp.awaitIdle(20_000);
+          if (!mcp.awaitIdle(25_000))
+            stderr.println("requality-mcp: tool calls still run; the server stops (a change in progress is not saved)");
         } catch (InterruptedException e) {
           Thread.currentThread().interrupt();
         }
         h.close();
       }, "requality-mcp-shutdown"));
       mcp.listen();
-      // the input ended: the calls that run end first (at most a minute), their results are sent
-      if (!mcp.awaitIdle(60_000))
-        stderr.println("requality-mcp: tool calls still run after the input ended; the server stops");
+      // the input ended: the calls that run end first (a large import or update takes minutes), their results are sent
+      mcp.stop();
+      if (!mcp.awaitIdle(10 * 60_000))
+        stderr.println("requality-mcp: tool calls still run 10 minutes after the input ended; the server stops");
     } catch (Throwable t) {
       stderr.println("requality-mcp: the server failed");
       t.printStackTrace(stderr);

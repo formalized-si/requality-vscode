@@ -1,17 +1,24 @@
 #!/bin/sh
 # Installs the Requality MCP server (requality-mcp) from the GitHub releases of formalized-si/requality-vscode:
-#   curl -fsSL https://raw.githubusercontent.com/formalized-si/requality-vscode/main/scripts/install-mcp.sh | sh
+#   curl -fsSL https://raw.githubusercontent.com/formalized-si/requality-vscode/main/scripts/install-mcp.sh \
+#     -o install-mcp.sh && sh install-mcp.sh
+# ("curl ... | sh" also works, but when the download fails it runs nothing and still ends with exit code 0.)
 #
 # The archive of the platform contains a Java runtime. The newest release that has one is installed; a pre-release
 # only when no release has one, or with REQUALITY_MCP_PRERELEASE=1. Environment:
-#   REQUALITY_MCP_VERSION     a release, for example 1.5.0
-#   REQUALITY_MCP_PRERELEASE  1: the newest release with an archive, also a pre-release
-#   REQUALITY_MCP_HOME        the installation folder (default: ~/.local/share/requality-mcp)
-#   REQUALITY_MCP_BIN         the folder of the command link (default: ~/.local/bin)
-#   REQUALITY_MCP_ARCHIVE     a downloaded archive (.tar.gz or .zip) to install instead of a download
-#   REQUALITY_MCP_INSECURE    1: install also when the release gives no SHA-256 for the archive
-# When the GitHub CLI (gh) is installed and signed in, the script also verifies the build provenance attestation.
-# The server keeps its caches and change histories in ~/.requality-mcp, apart from the installation.
+#   REQUALITY_MCP_VERSION       a release, for example 1.5.0
+#   REQUALITY_MCP_PRERELEASE    1: the newest release with an archive, also a pre-release
+#   REQUALITY_MCP_HOME          the installation folder (default: ~/.local/share/requality-mcp)
+#   REQUALITY_MCP_BIN           the folder of the command link (default: ~/.local/bin)
+#   REQUALITY_MCP_ARCHIVE       a downloaded archive (.tar.gz or .zip) to install instead of a download
+#   REQUALITY_MCP_INSECURE      1: install also when the release gives no SHA-256 for the archive
+#   REQUALITY_MCP_RELEASES_URL  the releases API, for tests
+#                               (default: https://api.github.com/repos/formalized-si/requality-vscode/releases)
+# When the GitHub CLI (gh 2.68 or later) is signed in to github.com, the script also verifies the build provenance
+# attestation: the release workflow of the repository made the archive from the tag of the release. Else it tells why
+# the attestation is not checked.
+# A version that a running server uses stays; a later install removes it. The server keeps its caches and change
+# histories in ~/.requality-mcp, apart from the installation.
 #
 # All the work is in main, called on the last line: a download that ends early runs nothing.
 set -eu
@@ -40,7 +47,51 @@ sha256() {
 # the download link of the archive of the target in a JSON of releases, or nothing
 asset_url() {
   grep -o "\"browser_download_url\": *\"[^\"]*/requality-mcp-[0-9.]*-$2.tar.gz\"" "$1" | head -n 1 \
-    | sed 's/.*"\(https[^"]*\)"$/\1/' || true
+    | sed 's/.*"\(https*:[^"]*\)"$/\1/' || true
+}
+
+# the build provenance attestation of the archive: made by the release workflow of the repository from the tag of the
+# release (the folder of the download link); not checked when gh cannot check it
+attestation() {
+  if ! command -v gh > /dev/null 2>&1; then
+    echo "Build provenance attestation is not checked: no GitHub CLI (gh)."
+  elif ! gh attestation verify --help 2> /dev/null | grep -q -e '--source-ref'; then
+    echo "Build provenance attestation is not checked: it needs gh 2.68 or later."
+  elif ! gh auth status --hostname github.com > /dev/null 2>&1; then
+    echo "Build provenance attestation is not checked: gh is not signed in to github.com (gh auth login)."
+  else
+    tag=$(basename "$(dirname "$2")")
+    if out=$(gh attestation verify "$1" -R "$repo" --signer-workflow "$repo/.github/workflows/release.yml" \
+      --source-ref "refs/tags/$tag" 2>&1); then
+      echo "Build provenance attestation is correct."
+    else
+      printf '%s\n' "$out" >&2
+      fail "the archive has no valid build provenance attestation of the release workflow of $repo for $tag"
+    fi
+  fi
+}
+
+# the command lines of the running processes, one in a line
+processes() {
+  ps -A -ww -o args= 2> /dev/null && return 0
+  # no ps (a small container): the command lines of Linux
+  [ -d /proc/self ] || return 1
+  for f in /proc/[0-9]*/cmdline; do
+    { tr '\0' ' ' < "$f" && echo; } 2> /dev/null || true
+  done
+  return 0
+}
+
+# 0 when a running Java has the folder in its command line (a server of an MCP client runs from it), and when the
+# processes cannot be read
+in_use() {
+  processes > "$tmp/processes" || return 0
+  while IFS= read -r line; do
+    case "$line" in
+      *java*"$1/"* | *"$1/"*java*) return 0 ;;
+    esac
+  done < "$tmp/processes"
+  return 1
 }
 
 main() {
@@ -74,7 +125,8 @@ main() {
     archive=$(absolute "$REQUALITY_MCP_ARCHIVE")
     [ -f "$archive" ] || fail "no file $archive"
   else
-    api=https://api.github.com/repos/$repo/releases
+    api=${REQUALITY_MCP_RELEASES_URL:-https://api.github.com/repos/$repo/releases}
+    api=${api%/}
     url=
     if [ -n "${REQUALITY_MCP_VERSION:-}" ]; then
       curl -fsSL "$api/tags/v${REQUALITY_MCP_VERSION#v}" -o "$tmp/releases.json"
@@ -109,16 +161,14 @@ main() {
     else
       fail "the release gives no SHA-256 for the archive; set REQUALITY_MCP_INSECURE=1 to install it without the check"
     fi
-    # the build provenance attestation of the release workflow, when the GitHub CLI can check it
-    if command -v gh > /dev/null 2>&1 && gh auth status > /dev/null 2>&1; then
-      gh attestation verify "$archive" -R "$repo" > /dev/null 2>&1 \
-        || fail "the archive has no valid build provenance attestation of $repo"
-      echo "Build provenance attestation is correct."
-    fi
+    attestation "$archive" "$url"
   fi
 
   mkdir -p "$home" "$bin"
+  # the physical folder: a server runs from the physical folder of its version (see bin/requality-mcp)
+  home=$(cd -P -- "$home" && pwd -P)
   # the new version is unpacked and started in the installation folder (not in /tmp, which can forbid running programs)
+  staging="$home/.staging-$$"
   rm -rf "$staging"
   mkdir -p "$staging"
   case "$archive" in
@@ -126,29 +176,34 @@ main() {
     *) tar -xzf "$archive" -C "$staging" ;;
   esac
   dir=$(find "$staging" -mindepth 1 -maxdepth 1 -type d -name 'requality-mcp-*' | head -n 1)
-  [ -n "$dir" ] || { rm -rf "$staging"; fail "the archive has no requality-mcp folder"; }
+  [ -n "$dir" ] || fail "the archive has no requality-mcp folder"
   name=$(basename "$dir")
   chmod +x "$dir/bin/requality-mcp"
   # the new version must start before it replaces the installed one
   if ! version=$("$dir/bin/requality-mcp" --version); then
-    rm -rf "$staging"
     fail "$name does not start (it needs Java 17 or later when it has no jre/)"
   fi
   # the marker of a folder this script installed: only such folders are replaced and removed
   echo "$version" > "$dir/.requality-mcp-install"
   if [ -e "$home/$name" ] && [ ! -f "$home/$name/.requality-mcp-install" ]; then
-    rm -rf "$staging"
     fail "$home/$name exists and is not an installation of this script"
+  fi
+  if [ -e "$home/$name" ] && in_use "$home/$name"; then
+    fail "$name is running (an MCP client uses it): close the client, then install again"
   fi
   rm -rf "${home:?}/$name"
   mv "$dir" "$home/$name"
   rm -rf "$staging"
   ln -sfn "$home/$name" "$home/current"
   ln -sf "$home/current/bin/requality-mcp" "$bin/requality-mcp"
-  # the other versions this script installed go
+  # the other versions this script installed go, when no server runs from them
   for old in "$home"/requality-mcp-*; do
     if [ -f "$old/.requality-mcp-install" ] && [ "$old" != "$home/$name" ]; then
-      rm -rf "$old"
+      if in_use "$old"; then
+        echo "$(basename "$old") stays: a running server uses it. A later install removes it."
+      else
+        rm -rf "$old"
+      fi
     fi
   done
 

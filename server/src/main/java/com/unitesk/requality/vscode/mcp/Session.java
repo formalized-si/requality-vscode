@@ -60,9 +60,16 @@ final class Session {
 
   private JsonObject change(TreeDB db, String tool, String label, String summary, Callable<JsonArray> body, int reverts)
       throws Exception {
+    core.writable(db);
     History h = history(db);
     History.Capture capture = new History.Capture(h.blobs());
-    JsonArray ops = Core.transaction(db, label, true, true, capture, body);
+    JsonArray ops;
+    try {
+      ops = Core.transaction(db, label, true, true, capture, body);
+    } finally {
+      // a long change keeps the catalog in use until it ends
+      core.used(db);
+    }
     JsonObject e;
     try {
       e = h.add(db.getSemiProjectName(), tool, label, summary, ops, capture, reverts);
@@ -157,7 +164,7 @@ final class Session {
    * Reverts a change: its nodes become as they were before it, with their UUIDs, in one transaction. Refused when a node
    * of the change is not as the change left it, unless {@code force}.
    */
-  JsonObject revert(TreeDB db, int n, boolean force, boolean dryRun) throws Exception {
+  JsonObject revert(TreeDB db, int n, boolean force, boolean dryRun, boolean verbose) throws Exception {
     History h = history(db);
     synchronized (h) {
       JsonObject e = h.entry(n);
@@ -173,12 +180,19 @@ final class Session {
         throw new ToolError("Change " + n + " has no saved node states and cannot be reverted");
       String label = "Revert change " + n;
       JsonArray[] plan = { null };
+      JsonArray[] broken = { null };
       Callable<JsonArray> body = () -> {
         History.Plan p = History.plan(db, states);
-        if (!p.conflicts.isEmpty() && !force)
-          throw new ToolError("Change " + n + " cannot be reverted: " + conflicts(p.conflicts)
-              + ". Revert it anyway with force true: the later changes of these nodes are lost. Nothing was changed.");
+        if (!p.conflicts.isEmpty() && !force) {
+          List<Integer> later = later(h, n, p.conflictNodes);
+          throw new ToolError("Change " + n + " cannot be reverted: " + conflicts(p.conflicts) + ". "
+              + (later.isEmpty() ? "No later change of the agent made this (VS Code or another editor did). "
+                  : "Later changes of these nodes: " + later + ": revert them first, newest first. ")
+              + "Or revert it anyway with force true: the later changes of these nodes are lost and such links break. "
+              + "Nothing was changed.");
+        }
         plan[0] = describe(db, states, p);
+        broken[0] = p.brokenLinks;
         if (!dryRun)
           History.apply(db, states, p, h.blobs());
         return plan[0];
@@ -198,9 +212,65 @@ final class Session {
         propagate(h, entry);
         r.addProperty("change", entry.get("change").getAsInt());
       }
-      r.add("nodes", plan[0]);
+      summarize(r, plan[0], verbose);
+      if (broken[0] != null && broken[0].size() > 0) {
+        r.add("broken_links", first(broken[0], verbose ? Integer.MAX_VALUE : SHOWN));
+        r.addProperty("broken_link_count", broken[0].size());
+      }
       return r;
     }
+  }
+
+  /** A revert result lists this many nodes (all with verbose). */
+  static final int SHOWN = 20;
+
+  /** The counts of the nodes of a revert by what it does to them, and the first nodes (all with verbose). */
+  private static void summarize(JsonObject r, JsonArray nodes, boolean verbose) {
+    Map<String, Integer> counts = new LinkedHashMap<>();
+    for (String k : new String[] { "restore", "recreate", "delete" })
+      counts.put(k, 0);
+    for (JsonElement x : nodes)
+      counts.merge(x.getAsJsonObject().get("op").getAsString(), 1, Integer::sum);
+    JsonObject c = new JsonObject();
+    c.addProperty("restored", counts.get("restore"));
+    c.addProperty("recreated", counts.get("recreate"));
+    c.addProperty("deleted", counts.get("delete"));
+    r.add("counts", c);
+    r.add("nodes", first(nodes, verbose ? Integer.MAX_VALUE : SHOWN));
+    if (!verbose && nodes.size() > SHOWN)
+      r.addProperty("more_nodes", nodes.size() - SHOWN + " more (verbose true lists all)");
+  }
+
+  private static JsonArray first(JsonArray a, int n) {
+    if (a.size() <= n)
+      return a;
+    JsonArray out = new JsonArray();
+    for (int i = 0; i < n; i++)
+      out.add(a.get(i));
+    return out;
+  }
+
+  /** The later changes (done) of the agent that touched any of the nodes, in the order they were made. */
+  private static List<Integer> later(History h, int n, java.util.Set<UUID> nodes) {
+    List<Integer> out = new ArrayList<>();
+    for (JsonObject e : h.entries()) {
+      int c = e.get("change").getAsInt();
+      if (c <= n || !"done".equals(e.get("state").getAsString()))
+        continue;
+      try {
+        JsonObject st = h.states(c);
+        if (st == null)
+          continue;
+        for (UUID u : nodes)
+          if (st.getAsJsonObject("after").has(u.toString())) {
+            out.add(c);
+            break;
+          }
+      } catch (RuntimeException x) {
+        // states that cannot be read: not listed
+      }
+    }
+    return out;
   }
 
   /**
@@ -289,8 +359,49 @@ final class Session {
 
   // ---- review
 
+  /**
+   * One page of a change: the operations from {@code offset}, at most {@code limit}, and of the long lists of an operation
+   * (the requirements and new sentences of a document update) the items from {@code offset}, at most {@code limit}.
+   */
+  static JsonObject page(JsonObject e, int offset, int limit) {
+    JsonArray ops = e.getAsJsonArray("operations");
+    if (ops == null)
+      return e;
+    boolean cut = false;
+    if (ops.size() <= limit) {
+      // a few operations (an update, an import): their long lists are paged
+      for (JsonElement x : ops) {
+        if (!x.isJsonObject())
+          continue;
+        JsonObject op = x.getAsJsonObject();
+        for (String k : new ArrayList<>(op.keySet())) {
+          if (!op.get(k).isJsonArray() || op.getAsJsonArray(k).size() <= limit && offset == 0)
+            continue;
+          JsonArray a = op.getAsJsonArray(k);
+          op.add(k, slice(a, offset, limit));
+          op.addProperty(k + "_total", a.size());
+          cut |= offset + limit < a.size();
+        }
+      }
+    } else {
+      e.add("operations", slice(ops, offset, limit));
+      e.addProperty("operations_total", ops.size());
+      cut = offset + limit < ops.size();
+    }
+    if (cut)
+      e.addProperty("next_offset", offset + limit);
+    return e;
+  }
+
+  private static JsonArray slice(JsonArray a, int offset, int limit) {
+    JsonArray out = new JsonArray();
+    for (int i = Math.max(0, offset); i < a.size() && i < offset + limit; i++)
+      out.add(a.get(i));
+    return out;
+  }
+
   /** The changes, newest first: a summary of each one, or all of one change ({@code change}). */
-  JsonObject review(String project, int last, Integer change, boolean verbose) {
+  JsonObject review(String project, int last, Integer change, boolean verbose, int offset, int limit) {
     List<JsonObject> all = new ArrayList<>();
     Map<String, History> histories = new LinkedHashMap<>();
     for (Workspace.Project p : core.workspace().projects()) {
@@ -310,7 +421,7 @@ final class Session {
         throw new ToolError("Give the project of change " + change);
       for (JsonObject e : all)
         if (e.get("change").getAsInt() == change)
-          return e.deepCopy();
+          return page(e.deepCopy(), offset, limit);
       throw new ToolError("Project " + project + " has no change " + change);
     }
     all.sort((a, b) -> b.get("time").getAsString().compareTo(a.get("time").getAsString()));

@@ -17,6 +17,13 @@ The extension uses the original Requality core and the original user interface c
 
 ![The Requality Explorer, the Properties view, the Document Editor and the UniEditor](media/readme/overview.gif)
 
+## Two ways to use Requality
+
+- **In VS Code:** the views, editors and wizards of the Eclipse plug-in (refer to [Features](#features)).
+- **Without a window:** an MCP server for the AI agents on your computer (Claude Code, Codex, Cursor and others).
+  You give the jobs to the agent, and the agent uses Requality. Refer to
+  [Requality without a window (MCP server)](#requality-without-a-window-mcp-server).
+
 ## Features
 
 - The Requality Explorer is the view of the Eclipse plug-in, with its tree, its popup menu and its keys.
@@ -85,19 +92,28 @@ The tools follow the jobs of a requirements engineer:
 - turn a specification into requirements with document locations;
 - move the traceability to a new version of a specification;
 - show the coverage by document text and by tests;
-- show the changes of the agent for a review, with undo and revert.
+- show the changes of the agent for a review, with undo and revert, and compare a catalog with a Git revision.
 
-To install it on macOS or Linux (the script downloads the archive with a Java runtime from the GitHub releases):
+The agent also imports ReqIF files, changes the project settings (attributes, enumerations, mandatory attributes,
+checker rules) and makes the reports.
+
+The installers and the archives come with the releases from version 1.5.0. To install on macOS or Linux (the script
+downloads the archive with a Java runtime from the GitHub releases):
 
 ```
-curl -fsSL https://raw.githubusercontent.com/formalized-si/requality-vscode/main/scripts/install-mcp.sh | sh
+curl -fsSL https://raw.githubusercontent.com/formalized-si/requality-vscode/main/scripts/install-mcp.sh -o install-mcp.sh
+sh install-mcp.sh
 claude mcp add requality -- ~/.local/bin/requality-mcp /path/to/catalogs
 ```
 
-On Windows, use `scripts/install-mcp.ps1`. The VS Code extension contains the same server: `dist/server/bin/requality-mcp`.
+On Windows, use `scripts/install-mcp.ps1`. Before version 1.5.0 is released, build the server from the source code
+(refer to [docs/MCP.md](docs/MCP.md#install)). From version 1.5.0, the VS Code extension contains the same server:
+`dist/server/bin/requality-mcp`.
 
-- Only one Requality process can open a catalog at a time. Close the catalog in VS Code before the agent uses it.
-- The agent can import files and write reports only in the folders of the catalogs and in the `--allow` folders.
+- Only one Requality process can open a catalog at a time. Two sessions of the agent take turns: an idle session
+  releases a catalog when the other one needs it. VS Code keeps a catalog until you close it there.
+- The agent can import files and write reports only in the folders of the catalogs, in the `--allow` folders and in
+  the folders that you allow when the agent asks.
 - A catalog of an older Requality is converted only after a backup (`convert_project`).
 
 Refer to [docs/MCP.md](docs/MCP.md) for the other agents, the tools, the options and the features that need a window.

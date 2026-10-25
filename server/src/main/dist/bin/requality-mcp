@@ -6,7 +6,9 @@
 #
 # Java: $REQUALITY_JAVA, else the Java runtime of the package (jre/, or the one of the VS Code extension), else
 # $JAVA_HOME, else java on the PATH (Java 17 or later). $REQUALITY_JAVA_OPTS replaces the default -Xmx2g.
+# Java runs in the folder of the package; relative arguments start in the current folder.
 set -e
+unset CDPATH
 script="$0"
 # a link to the script (for example in ~/bin) points to the package
 hops=0
@@ -22,8 +24,9 @@ while [ -h "$script" ]; do
     *) script="$(dirname "$script")/$link" ;;
   esac
 done
-home=$(cd "$(dirname "$script")/.." && pwd)
-# relative arguments start in the current folder (the Windows launcher needs the variable; this one sets it too)
+# the physical folder, not a path through a link (an installer can point the link to another version while Java runs)
+home=$(cd -P -- "$(dirname -- "$script")/.." && pwd -P)
+# relative arguments start in the current folder (Java runs in the folder of the package)
 REQUALITY_CWD=$(pwd)
 export REQUALITY_CWD
 if [ -n "$REQUALITY_JAVA" ]; then
@@ -38,6 +41,16 @@ elif [ -n "$JAVA_HOME" ] && [ -x "$JAVA_HOME/bin/java" ]; then
 else
   java=java
 fi
+# a command name is found on the PATH, a relative path starts in the current folder: both before the cd below
+case "$java" in
+  */*) ;;
+  *) java=$(command -v "$java" || echo "$java") ;;
+esac
+case "$java" in
+  /* | "") ;;
+  */*) java="$REQUALITY_CWD/$java" ;;
+esac
+cd "$home"
 # the options are words: no quotes
 # shellcheck disable=SC2086
 exec "$java" ${REQUALITY_JAVA_OPTS:--Xmx2g} -Dfile.encoding=UTF-8 -Djava.awt.headless=true \

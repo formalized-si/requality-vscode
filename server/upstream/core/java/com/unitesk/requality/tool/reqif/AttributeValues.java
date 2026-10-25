@@ -32,7 +32,13 @@ public class AttributeValues implements Iterable<AbstractAttributeValue> {
     //sot.attributesMap.keySet();
     List<AbstractAttributeValue> list = new LinkedList<>();
     for (AttributeDefinition ad : sot.getDefinitions()) {
-      list.add(getValue(ad));
+      // VSCODE-PATCH: a missing value is the DEFAULT-VALUE of its definition, or none (ReqIF); the default of the
+      // datatype gave the first value of an enumeration
+      AbstractAttributeValue v = valuesByAttributeId.get(ad.getId());
+      if (v == null && ad.defvalues != null && !ad.defvalues.isEmpty())
+        v = ad.defvalues.iterator().next();
+      if (v != null)
+        list.add(v);
     }
     return list.iterator();
   }

@@ -152,7 +152,12 @@ final class DocumentText {
     for (TreeNode c : doc.getWorkChildren())
       if (c instanceof Location && !c.isDisposed())
         dt.locations.add((Location) c);
+    // a location of no requirement (left in an older version of a document by an update) covers nothing
+    List<Location> owned = new ArrayList<>();
     for (Location l : dt.locations)
+      if (l.getRequirements(false, false).length > 0)
+        owned.add(l);
+    for (Location l : owned)
       for (int[] f : fragments(l))
         for (Paragraph p : dt.paragraphs) {
           int from = Math.max(p.start, f[0]);
@@ -166,7 +171,7 @@ final class DocumentText {
       p.covered = Math.min(p.covered, p.weight());
     // the coverage of each sentence: a paragraph is covered when each of its sentences is
     boolean[] mask = new boolean[dt.text.length()];
-    for (Location l : dt.locations)
+    for (Location l : owned)
       for (int[] f : fragments(l))
         for (int i = Math.max(0, f[0]); i < Math.min(mask.length, f[1]); i++)
           mask[i] = true;

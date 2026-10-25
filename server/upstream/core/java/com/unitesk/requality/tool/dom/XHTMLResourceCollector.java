@@ -570,7 +570,9 @@ public class XHTMLResourceCollector {
       } else {
         String sourcePath = src + "/" + docImgSrc;
         File sf = new File(sourcePath);
-        if (!sf.exists())
+        // VSCODE-PATCH: an absolute path, not a path in the current folder of the process (a missing file of a document
+        // copied the file of that name from the folder the server runs in)
+        if (!sf.exists() && new File(docImgSrc).isAbsolute())
           sf = new File(docImgSrc);
         FileInputStream fis2 = new FileInputStream(sf);
         try {

@@ -13,7 +13,13 @@ The tools follow the jobs of a requirements engineer:
   sentence by sentence, in one change; flags changed modal words and numbers);
 - coverage and traceability: `trace_coverage`, and `test_coverage` from a coverage file of the test runs;
 - a review of the changes of the agent: `review_changes`, `undo`, `redo`, and `revert_change` for a change of any
-  session (the nodes come back with their UUIDs; a revert stops when the nodes were changed later).
+  session (the nodes come back with their UUIDs; a revert stops when the nodes were changed later, and names the later
+  changes and the links it would break); `compare_with_revision` shows the changes since a Git revision;
+- ReqIF: `import_reqif` imports the requirements of a ReqIF file (pictures and OLE objects are left out);
+- project settings: `get_project_settings` and `change_project_settings` (project attributes, enumerations, mandatory
+  attributes, checker rules, id prefix, default link, active node templates);
+- `apply_changes` makes all node types of the New menu (also virtual nodes), copies subtrees, and changes many nodes
+  at once (`update_all`, `rename_attribute`); a dry run reports every operation that fails.
 
 Prompts give these jobs as commands of the agent. The GitHub release has archives with a Java runtime and build
 provenance attestations. The VS Code extension contains the same server.
@@ -21,8 +27,13 @@ provenance attestations. The VS Code extension contains the same server.
 - The agent can import files and write reports only in the folders of the catalogs and in the `--allow` folders.
   An HTML document that refers to a URL or to a file outside these folders is refused.
 - The server converts a catalog of an older Requality only after a backup (`convert_project`), or with `--convert`.
-- The server does not write over the files of a catalog that changed on disk (for example by `git pull`);
-  `open_project` loads the catalog again. `--release-after` releases idle catalogs for other sessions.
+- The server loads a catalog again when its files changed on disk (for example by `git pull`), and does not write over
+  such files. Two sessions take turns with a catalog: an idle session releases it when the other one waits for it.
+  The history of the changes is safe when two servers share the storage folder.
+- The JavaScript of a catalog (checker rules, formulas) runs in a sandbox in the MCP server, and report templates
+  cannot run programs (FreeMarker 2.3.34 with the safer class resolver). Jetty 9.4.58; Jersey and Jackson are gone.
+- When the client can ask the user (MCP elicitation), the agent can use a file outside the folders of the server after
+  the user allows its folder.
 - The HTTP and WebSocket servers of the web editors accept connections from this computer only, and the WebSocket
   servers only from the pages of the editors (Origin). The headless server starts none.
 - Apache Tika 3.3.3 and POI 5.5.1 replace Tika 2.7.0 (XXE in the XFA forms of a PDF: CVE-2025-54988,
