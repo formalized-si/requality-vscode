@@ -114,7 +114,17 @@ final class Coverage {
       List<Document> all = new ArrayList<>();
       collectDocuments(db.getNode(Document.getTypeRootQId()), all);
       for (Document d : all) {
-        DocumentText dt = DocumentText.of(d);
+        DocumentText dt;
+        try {
+          dt = DocumentText.of(d);
+        } catch (Exception e) {
+          // a document without readable content does not stop the report
+          JsonObject dj = new JsonObject();
+          dj.addProperty("document", d.getQualifiedId());
+          dj.addProperty("error", "cannot be read: " + (e.getMessage() != null ? e.getMessage() : e.getClass().getSimpleName()));
+          docs.add(dj);
+          continue;
+        }
         int[] t = dt.coverageTotals();
         int full = 0;
         int partial = 0;

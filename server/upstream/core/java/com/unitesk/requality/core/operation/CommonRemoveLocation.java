@@ -202,6 +202,26 @@ public class CommonRemoveLocation {
 //    }
 //  }
   
+  /**
+   * VSCODE-PATCH: the UUID of a location reference of a requirement. The catalogs converted from an older format
+   * reference a location by its path ("/Documents/a.xhtml/&lt;uuid&gt;"), which UUID.fromString rejected, so the
+   * requirement could not be deleted.
+   */
+  static UUID locationUUID(String ref) {
+    try {
+      return UUID.fromString(ref);
+    } catch (IllegalArgumentException e) {
+      int slash = ref.lastIndexOf('/');
+      if (slash >= 0)
+        try {
+          return UUID.fromString(ref.substring(slash + 1));
+        } catch (IllegalArgumentException e2) {
+          // not a location reference
+        }
+      return null;
+    }
+  }
+
   public void reactOnRequirementRemove(TreeDB db, NodeDesc req, byte flag, boolean guiMessages, RemoveRequirementLocationCollection r) {
     AttributeDefinition ad = req.getAttributes().get(Requirement.ATTR_LOCATIONS);
     if(ad==null)
@@ -233,7 +253,9 @@ public class CommonRemoveLocation {
       List<UUID> toRem = null;
       for(Object o: val) {
         String locId = (String) o;
-        UUID loc = UUID.fromString(locId);
+        UUID loc = locationUUID(locId); // VSCODE-PATCH: a location addressed by its path
+        if (loc == null)
+          continue;
         Map<UUID, String> reqs = RelManager.getRevertLinks(db, loc, false, Requirement.ATTR_LOCATIONS);
         reqs.remove(req.getUUId());//remove removed req
         boolean rem = false;

@@ -247,6 +247,7 @@ public class WSServer extends WebSocketHandler implements IPortStatusProvider{
         qtr.setReservedThreads(1);
       }
       wss.connector.setPort(wss.port);
+      wss.connector.setHost("127.0.0.1"); // VSCODE-PATCH: this computer only
       wss.connector.setReuseAddress(true);
       wss.server.setConnectors(new Connector[] {wss.connector});
       wss.server.setHandler(wss);

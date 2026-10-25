@@ -27,13 +27,19 @@ jobs:
       - run: npm run build
       - run: npm run test:server
       - run: npm run test:unit
-      # the launcher of the MCP server (bin/requality-mcp) in an empty folder, and its installer
+      # the launcher of the MCP server (bin/requality-mcp) in an empty folder, and its installer: an install, an install
+      # over it, and the smoke test through the installed command (a relative installation folder becomes absolute)
       - run: npm run test:mcp
       - run: |
           node scripts/package-mcp.js --no-build --no-runtime
-          REQUALITY_MCP_HOME=$RUNNER_TEMP/requality-mcp REQUALITY_MCP_BIN=$RUNNER_TEMP/bin \
-            REQUALITY_MCP_ARCHIVE=$(ls release/requality-mcp-*.zip | head -n 1) sh scripts/install-mcp.sh
-          node test/mcp/smoke.js $RUNNER_TEMP/requality-mcp/current
+          archive=$(ls release/requality-mcp-*.zip | head -n 1)
+          cd "$RUNNER_TEMP"
+          for i in 1 2; do
+            REQUALITY_MCP_HOME="mcp home" REQUALITY_MCP_BIN=bin REQUALITY_MCP_ARCHIVE="$GITHUB_WORKSPACE/$archive" \
+              sh "$GITHUB_WORKSPACE/scripts/install-mcp.sh"
+          done
+          test "$(ls -d "$RUNNER_TEMP/mcp home"/requality-mcp-* | wc -l)" -eq 1
+          node "$GITHUB_WORKSPACE/test/mcp/smoke.js" --command "$RUNNER_TEMP/bin/requality-mcp"
       - run: xvfb-run -a npm run test:integration
         env:
           VSCODE_TEST_VERSION: ${{ matrix.vscode }}
@@ -72,14 +78,25 @@ jobs:
       - run: npm run test:server
       - run: npm run test:unit
       - run: npm run test:mcp
-      # the installer of the MCP server with the archive without a Java runtime (the Java of the job runs it)
+      # the installer of the MCP server with the archive without a Java runtime (the Java of the job runs it), in Windows
+      # PowerShell 5.1 and in PowerShell 7 (an install over the first one), in a folder with a space and Cyrillic
+      # letters; the smoke test runs through the installed command
       - run: node scripts/package-mcp.js --no-build --no-runtime
-      - shell: pwsh
+      - shell: powershell
         run: |
-          $env:REQUALITY_MCP_HOME = "$env:RUNNER_TEMP\requality-mcp"
+          # "Треб mcp", from the character codes: the script file of the step can be read in another code page
+          $env:REQUALITY_MCP_HOME = "$env:RUNNER_TEMP\" + (-join [char[]](0x0422, 0x0440, 0x0435, 0x0431)) + ' mcp'
           $env:REQUALITY_MCP_ARCHIVE = (Get-ChildItem release\requality-mcp-*.zip | Select-Object -First 1).FullName
           ./scripts/install-mcp.ps1
-          node test/mcp/smoke.js (Get-ChildItem -Directory "$env:REQUALITY_MCP_HOME\requality-mcp-*" | Select-Object -First 1).FullName
+      - shell: pwsh
+        run: |
+          # "Треб mcp", from the character codes: the script file of the step can be read in another code page
+          $env:REQUALITY_MCP_HOME = "$env:RUNNER_TEMP\" + (-join [char[]](0x0422, 0x0440, 0x0435, 0x0431)) + ' mcp'
+          $env:REQUALITY_MCP_ARCHIVE = (Get-ChildItem release\requality-mcp-*.zip | Select-Object -First 1).FullName
+          ./scripts/install-mcp.ps1
+          if (@(Get-ChildItem -Directory "$env:REQUALITY_MCP_HOME\requality-mcp-*").Count -ne 1) { throw 'one version expected' }
+          node test/mcp/smoke.js --command "$env:REQUALITY_MCP_HOME\requality-mcp.cmd"
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
       - run: npm run test:integration
         env:
           VSCODE_TEST_VERSION: stable

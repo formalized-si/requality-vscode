@@ -31,6 +31,9 @@ import com.unitesk.requality.vscode.mcp.McpServer.ToolError;
  * coverage of the paragraphs by the locations of the document.
  */
 final class DocumentText {
+  /** The elements whose text is no text of the document (it counts for the offsets). */
+  private static final Set<String> SCRIPTS = new HashSet<>(Arrays.asList("script", "style"));
+
   /** The elements whose text is a paragraph. */
   private static final Set<String> BLOCKS = new HashSet<>(Arrays.asList("p", "li", "td", "th", "h1", "h2", "h3", "h4", "h5",
       "h6", "pre", "div", "dd", "dt", "caption", "blockquote", "figcaption", "address", "body"));
@@ -41,14 +44,17 @@ final class DocumentText {
     final int start;
     final int end;
     final String text;
+    /** The level of a heading (h1 to h6), 0 for other text. */
+    final int heading;
     int covered;
     final Set<Location> locations = new LinkedHashSet<>();
 
-    Paragraph(int index, int start, int end, String text) {
+    Paragraph(int index, int start, int end, String text, int heading) {
       this.index = index;
       this.start = start;
       this.end = end;
       this.text = text;
+      this.heading = heading;
     }
 
     /** Characters that are not white space. */
@@ -91,7 +97,15 @@ final class DocumentText {
     // XML and HTML parsers (the SAX text of the core, the DOM of the Document Editor) read CR LF and CR as LF: the same
     // offsets on Windows, where the imported documents have CR LF
     html = html.replace("\r\n", "\n").replace('\r', '\n');
-    org.jsoup.nodes.Document d = Jsoup.parse(html);
+    // An imported document is XHTML, and the core counts the offsets in its XML text: the XML parser reads it the same
+    // way (an HTML parser drops the first line break of a <pre> and reads <script/> as an open element). Content that
+    // is no XML is read as HTML.
+    org.jsoup.nodes.Document d = Jsoup.parse(html, "", org.jsoup.parser.Parser.xmlParser());
+    Element body = d.selectFirst("body");
+    if (body == null) {
+      d = Jsoup.parse(html);
+      body = d.body();
+    }
     StringBuilder all = new StringBuilder();
     List<int[]> runs = new ArrayList<>();
     List<Element> owners = new ArrayList<>();
@@ -101,12 +115,13 @@ final class DocumentText {
         String s = n instanceof TextNode ? ((TextNode) n).getWholeText() : n instanceof DataNode ? ((DataNode) n).getWholeData() : null;
         if (s == null || s.isEmpty())
           return;
-        Element block = n.parent() instanceof Element ? (Element) n.parent() : null;
+        Element parent = n.parent() instanceof Element ? (Element) n.parent() : null;
+        Element block = parent;
         while (block != null && !BLOCKS.contains(block.normalName()))
           block = block.parent();
         int start = all.length();
         all.append(s);
-        boolean data = n instanceof DataNode;
+        boolean data = n instanceof DataNode || parent != null && SCRIPTS.contains(parent.normalName());
         if (data)
           return; // script and style text counts for the offsets, it is no paragraph
         if (!runs.isEmpty() && owners.get(owners.size() - 1) == block && runs.get(runs.size() - 1)[1] == start)
@@ -120,13 +135,17 @@ final class DocumentText {
       @Override
       public void tail(Node n, int depth) {
       }
-    }, d.body());
+    }, body);
     DocumentText dt = new DocumentText(doc, all.toString());
-    for (int[] r : runs) {
+    for (int i = 0; i < runs.size(); i++) {
+      int[] r = runs.get(i);
       // the line breaks inside a block are the ones of the HTML source: single spaces
       String t = dt.text.substring(r[0], r[1]).replaceAll("[\\s\\u00a0]+", " ").trim();
+      Element owner = owners.get(i);
+      String name = owner == null ? "" : owner.normalName();
+      int heading = name.length() == 2 && name.charAt(0) == 'h' && Character.isDigit(name.charAt(1)) ? name.charAt(1) - '0' : 0;
       if (!t.isEmpty())
-        dt.paragraphs.add(new Paragraph(dt.paragraphs.size(), r[0], r[1], t));
+        dt.paragraphs.add(new Paragraph(dt.paragraphs.size(), r[0], r[1], t, heading));
     }
     for (TreeNode c : doc.getWorkChildren())
       if (c instanceof Location && !c.isDisposed())
@@ -202,6 +221,8 @@ final class DocumentText {
     o.addProperty("p", p.index);
     o.addProperty("start", p.start);
     o.addProperty("end", p.end);
+    if (p.heading > 0)
+      o.addProperty("heading", p.heading);
     o.addProperty("coverage", p.coverage());
     o.addProperty("text", p.text);
     if (!p.locations.isEmpty()) {
@@ -238,11 +259,31 @@ final class DocumentText {
     return o;
   }
 
-  /**
-   * The range of a quote: its words with any white space (or none, between block elements) between them; in one
-   * paragraph when {@code paragraph} is not negative; the {@code occurrence}-th match (1 = first, 0 = the only one).
-   */
-  int[] find(String quote, int paragraph, int occurrence) {
+  /** A character as the quote search compares it: typographic quotes and dashes as ASCII ones, letters in lower case. */
+  static char fold(char c) {
+    switch (c) {
+      case '\u2018': case '\u2019': case '\u201a': case '\u201b': case '\u2032': case '`': case '\u00b4':
+        return '\'';
+      case '\u201c': case '\u201d': case '\u201e': case '\u201f': case '\u2033': case '\u00ab': case '\u00bb':
+        return '"';
+      case '\u2010': case '\u2011': case '\u2012': case '\u2013': case '\u2014': case '\u2015': case '\u2212':
+        return '-';
+      case '\u00a0': case '\u2007': case '\u202f':
+        return ' ';
+      default:
+        return Character.toLowerCase(c);
+    }
+  }
+
+  /** The text with each character folded (the same length: the offsets stay). */
+  static String fold(String s) {
+    char[] c = s.toCharArray();
+    for (int i = 0; i < c.length; i++)
+      c[i] = fold(c[i]);
+    return new String(c);
+  }
+
+  private static java.util.regex.Pattern pattern(String quote) {
     StringBuilder re = new StringBuilder();
     for (String w : quote.trim().split("[\\s\\u00a0]+")) {
       if (w.isEmpty())
@@ -253,6 +294,24 @@ final class DocumentText {
     }
     if (re.length() == 0)
       throw new ToolError("Empty quote");
+    return java.util.regex.Pattern.compile(re.toString());
+  }
+
+  private static List<int[]> matches(java.util.regex.Pattern p, String text, int from, int to) {
+    List<int[]> found = new ArrayList<>();
+    java.util.regex.Matcher m = p.matcher(text);
+    m.region(from, to);
+    while (m.find())
+      found.add(new int[] { m.start(), m.end() });
+    return found;
+  }
+
+  /**
+   * The range of a quote: its words with any white space (or none, between block elements) between them; in one
+   * paragraph when {@code paragraph} is not negative; the {@code occurrence}-th match (1 = first, 0 = the only one). A
+   * quote that differs only in typographic quotes, dashes or letter case is found too.
+   */
+  int[] find(String quote, int paragraph, int occurrence) {
     int from = 0;
     int to = text.length();
     if (paragraph >= 0) {
@@ -261,14 +320,12 @@ final class DocumentText {
       from = paragraphs.get(paragraph).start;
       to = paragraphs.get(paragraph).end;
     }
-    List<int[]> found = new ArrayList<>();
-    java.util.regex.Matcher m = java.util.regex.Pattern.compile(re.toString()).matcher(text);
-    m.region(from, to);
-    while (m.find())
-      found.add(new int[] { m.start(), m.end() });
+    List<int[]> found = matches(pattern(quote), text, from, to);
+    if (found.isEmpty())
+      found = matches(pattern(fold(quote)), fold(text), from, to);
     if (found.isEmpty())
       throw new ToolError("The quote does not occur in " + (paragraph >= 0 ? "paragraph " + paragraph + " of " : "")
-          + doc.getQualifiedId() + " (see read_document)");
+          + doc.getQualifiedId() + closest(quote));
     if (occurrence == 0 && found.size() > 1) {
       List<Integer> ps = new ArrayList<>();
       for (int[] f : found) {
@@ -280,5 +337,21 @@ final class DocumentText {
     if (occurrence > found.size())
       throw new ToolError("The quote occurs only " + found.size() + " times");
     return found.get(Math.max(occurrence, 1) - 1);
+  }
+
+  /** The sentence of the document most like the quote, for the error of a quote that does not occur. */
+  private String closest(String quote) {
+    SpecUpdate.Sentence best = null;
+    double score = 0;
+    for (SpecUpdate.Sentence s : SpecUpdate.sentences(this)) {
+      double sc = SpecUpdate.similarity(quote, s.text);
+      if (sc > score) {
+        score = sc;
+        best = s;
+      }
+    }
+    if (best == null || score < 0.3)
+      return " (see read_document)";
+    return ". The most similar text is in paragraph " + best.p + ": \"" + best.text + "\"";
   }
 }

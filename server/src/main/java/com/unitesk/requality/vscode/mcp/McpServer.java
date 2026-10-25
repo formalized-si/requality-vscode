@@ -146,52 +146,114 @@ public final class McpServer {
     prompts.put(prompt.name, prompt);
   }
 
-  /** Reads messages until the input ends. */
+  /** The ids of requests the client cancelled (notifications/cancelled): their results are not sent. */
+  private final java.util.Set<String> cancelled = java.util.concurrent.ConcurrentHashMap.newKeySet();
+  /** Requests that run now, and their ids. */
+  private final java.util.concurrent.atomic.AtomicInteger running = new java.util.concurrent.atomic.AtomicInteger();
+  private final java.util.Set<String> runningIds = java.util.concurrent.ConcurrentHashMap.newKeySet();
+
+  /** Reads messages until the input ends. A malformed message gets an error and the server continues. */
   public void listen() throws IOException {
     BufferedReader r = new BufferedReader(new InputStreamReader(in, StandardCharsets.UTF_8));
     String line;
     while ((line = r.readLine()) != null) {
       if (line.isBlank())
         continue;
-      JsonElement msg;
       try {
-        msg = JsonParser.parseString(line);
-      } catch (RuntimeException e) {
-        send(error(null, -32700, "Parse error: " + e.getMessage()));
-        continue;
-      }
-      if (msg.isJsonArray()) {
-        for (JsonElement m : msg.getAsJsonArray())
-          if (m.isJsonObject())
-            dispatch(m.getAsJsonObject());
-      } else if (msg.isJsonObject()) {
-        dispatch(msg.getAsJsonObject());
-      } else {
-        send(error(null, -32600, "Invalid request"));
+        handleLine(line);
+      } catch (Throwable t) {
+        // no message may stop the server
+        t.printStackTrace(System.err);
       }
     }
   }
 
+  private void handleLine(String line) {
+    JsonElement msg;
+    try {
+      msg = JsonParser.parseString(line);
+    } catch (RuntimeException e) {
+      send(error(null, -32700, "Parse error: " + e.getMessage()));
+      return;
+    }
+    if (msg.isJsonArray() && msg.getAsJsonArray().size() > 0) {
+      for (JsonElement m : msg.getAsJsonArray())
+        if (m.isJsonObject())
+          dispatch(m.getAsJsonObject());
+        else
+          send(error(null, -32600, "Invalid request: not an object"));
+    } else if (msg.isJsonObject()) {
+      dispatch(msg.getAsJsonObject());
+    } else {
+      send(error(null, -32600, "Invalid request"));
+    }
+  }
+
+  private static boolean isString(JsonElement e) {
+    return e != null && e.isJsonPrimitive() && e.getAsJsonPrimitive().isString();
+  }
+
   private void dispatch(JsonObject msg) {
-    if (!msg.has("method"))
+    JsonElement idE = msg.get("id");
+    JsonElement id = idE == null || idE.isJsonNull() ? null : idE;
+    if (id != null && !(id.isJsonPrimitive() && (id.getAsJsonPrimitive().isString() || id.getAsJsonPrimitive().isNumber()))) {
+      send(error(null, -32600, "Invalid request: the id must be a string or a number"));
+      return;
+    }
+    JsonElement m = msg.get("method");
+    if (m == null)
       return; // a response: this server sends no requests
-    String method = msg.get("method").getAsString();
-    JsonElement id = msg.has("id") && !msg.get("id").isJsonNull() ? msg.get("id") : null;
-    JsonObject params = msg.has("params") && msg.get("params").isJsonObject() ? msg.getAsJsonObject("params") : new JsonObject();
-    if (id == null)
-      return; // notifications/initialized, notifications/cancelled
+    if (!isString(m)) {
+      if (id != null)
+        send(error(id, -32600, "Invalid request: the method must be a string"));
+      return;
+    }
+    String method = m.getAsString();
+    JsonElement p = msg.get("params");
+    if (p != null && !p.isJsonNull() && !p.isJsonObject()) {
+      if (id != null)
+        send(error(id, -32602, "Invalid params: params must be an object"));
+      return;
+    }
+    JsonObject params = p != null && p.isJsonObject() ? p.getAsJsonObject() : new JsonObject();
+    if (id == null) {
+      // notifications: initialized, cancelled (a running core operation is not stopped; its result is not sent)
+      // only a request that runs can be cancelled (a later request may have the id of a finished one)
+      if (method.equals("notifications/cancelled") && params.has("requestId") && runningIds.contains(params.get("requestId").toString()))
+        cancelled.add(params.get("requestId").toString());
+      return;
+    }
+    running.incrementAndGet();
+    runningIds.add(id.toString());
     workers.execute(() -> {
+      JsonObject out;
       try {
-        send(result(id, handle(method, params)));
+        out = result(id, handle(method, params));
       } catch (InvalidParams e) {
-        send(error(id, -32602, e.getMessage()));
+        out = error(id, -32602, e.getMessage());
       } catch (UnsupportedOperationException e) {
-        send(error(id, -32601, "Method not found: " + method));
+        out = error(id, -32601, "Method not found: " + method);
       } catch (Throwable t) {
         t.printStackTrace(System.err);
-        send(error(id, -32603, t.getClass().getSimpleName() + (t.getMessage() != null ? ": " + t.getMessage() : "")));
+        out = error(id, -32603, t.getClass().getSimpleName() + (t.getMessage() != null ? ": " + t.getMessage() : ""));
+      } finally {
+        running.decrementAndGet();
       }
+      runningIds.remove(id.toString());
+      if (!cancelled.remove(id.toString()))
+        send(out);
     });
+  }
+
+  /** Waits until no request runs, at most the time given; true when none runs. */
+  public boolean awaitIdle(long millis) throws InterruptedException {
+    long end = System.currentTimeMillis() + millis;
+    while (running.get() > 0) {
+      if (System.currentTimeMillis() > end)
+        return false;
+      Thread.sleep(50);
+    }
+    return true;
   }
 
   private JsonElement handle(String method, JsonObject params) throws Exception {
@@ -237,14 +299,14 @@ public final class McpServer {
         return r;
       }
       case "prompts/get": {
-        String name = params.has("name") ? params.get("name").getAsString() : null;
+        String name = isString(params.get("name")) ? params.get("name").getAsString() : null;
         Prompt p = name == null ? null : prompts.get(name);
         if (p == null)
           throw new InvalidParams("Unknown prompt: " + name);
         JsonObject args = params.has("arguments") && params.get("arguments").isJsonObject() ? params.getAsJsonObject("arguments")
             : new JsonObject();
         for (String[] a : p.arguments)
-          if (Boolean.parseBoolean(a[2]) && (!args.has(a[0]) || args.get(a[0]).getAsString().isBlank()))
+          if (Boolean.parseBoolean(a[2]) && (!isString(args.get(a[0])) || args.get(a[0]).getAsString().isBlank()))
             throw new InvalidParams("Missing argument " + a[0]);
         JsonObject content = new JsonObject();
         content.addProperty("type", "text");
@@ -265,8 +327,10 @@ public final class McpServer {
   }
 
   private JsonObject callTool(JsonObject params) {
-    String name = params.has("name") ? params.get("name").getAsString() : null;
-    Tool tool = name == null ? null : tools.get(name);
+    if (!isString(params.get("name")))
+      throw new InvalidParams("Invalid params: name must be the name of a tool");
+    String name = params.get("name").getAsString();
+    Tool tool = tools.get(name);
     if (tool == null)
       throw new InvalidParams("Unknown tool: " + name);
     JsonObject args = params.has("arguments") && params.get("arguments").isJsonObject() ? params.getAsJsonObject("arguments")

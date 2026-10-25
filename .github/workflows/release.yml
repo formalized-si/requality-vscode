@@ -2,19 +2,19 @@ name: Release
 # A tag v<version> makes the packages (one for each platform with a Java runtime, one without), a GitHub release with
 # them, and publishes them to the Visual Studio Marketplace (secret VSCE_PAT) and to Open VSX (secret OVSX_PAT).
 # An odd minor version (v1.5.x) is a pre-release: the packages are marked by scripts/package-platforms.js.
-# The release also has the archives of the Requality MCP server (requality-mcp-*, scripts/package-mcp.js).
+# The release also has the archives of the Requality MCP server (requality-mcp-*, scripts/package-mcp.js), with build
+# provenance attestations (gh attestation verify <archive> -R formalized-si/requality-vscode).
 on:
   push:
     tags: ['v*']
   workflow_dispatch:
 permissions:
   contents: write
+  id-token: write
+  attestations: write
 jobs:
   release:
     runs-on: ubuntu-latest
-    env:
-      VSCE_PAT: ${{ secrets.VSCE_PAT }}
-      OVSX_PAT: ${{ secrets.OVSX_PAT }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -28,6 +28,16 @@ jobs:
       - run: npm ci
       - run: npm run package:platforms
       - run: node scripts/package-mcp.js --no-build
+      # the archive of this machine with its own Java runtime, before anything is published
+      - name: Smoke test of the MCP archive
+        run: |
+          mkdir -p "$RUNNER_TEMP/mcp"
+          tar -xzf release/requality-mcp-*-linux-x64.tar.gz -C "$RUNNER_TEMP/mcp"
+          # the launcher takes jre/ of the archive before JAVA_HOME
+          node test/mcp/smoke.js "$(ls -d "$RUNNER_TEMP"/mcp/requality-mcp-*)"
+      - uses: actions/attest-build-provenance@v2
+        with:
+          subject-path: release/requality-mcp-*
       - uses: actions/upload-artifact@v4
         with:
           name: requality-vscode-packages
@@ -42,9 +52,17 @@ jobs:
           minor=$(echo "${GITHUB_REF_NAME#v}" | cut -d. -f2)
           pre=$([ $((minor % 2)) -eq 1 ] && echo --prerelease || true)
           gh release create "$GITHUB_REF_NAME" release/*.vsix release/requality-mcp-* --title "$GITHUB_REF_NAME" --notes-file CHANGELOG.md $pre
+      # the tokens are given only to the steps that publish
       - name: Visual Studio Marketplace
-        if: startsWith(github.ref, 'refs/tags/') && env.VSCE_PAT != ''
-        run: npx --no-install vsce publish --packagePath release/*.vsix
+        if: startsWith(github.ref, 'refs/tags/')
+        env:
+          VSCE_PAT: ${{ secrets.VSCE_PAT }}
+        run: |
+          if [ -n "$VSCE_PAT" ]; then npx --no-install vsce publish --packagePath release/*.vsix; else echo "No VSCE_PAT"; fi
       - name: Open VSX
-        if: startsWith(github.ref, 'refs/tags/') && env.OVSX_PAT != ''
-        run: for f in release/*.vsix; do npx --yes ovsx@1.3.0 publish "$f" -p "$OVSX_PAT"; done
+        if: startsWith(github.ref, 'refs/tags/')
+        env:
+          OVSX_PAT: ${{ secrets.OVSX_PAT }}
+        run: |
+          if [ -z "$OVSX_PAT" ]; then echo "No OVSX_PAT"; exit 0; fi
+          for f in release/*.vsix; do npx --yes ovsx@1.3.0 publish "$f" -p "$OVSX_PAT"; done

@@ -272,6 +272,36 @@ public class TransactionStorage extends AbstractTreeStorage {
     return storage;
   }
 
+  /**
+   * VSCODE-PATCH: the nodes this transaction may have changed: created, deleted, renamed, moved (with their old and new
+   * parents), or with attributes or resources it read or wrote. The MCP server of the VS Code port compares their
+   * states before and after the transaction to record a change it can revert.
+   */
+  public java.util.Set<UUID> getTouchedNodes() {
+    java.util.Set<UUID> s = new java.util.HashSet<>();
+    s.addAll(newId.keySet());
+    s.addAll(oldId.keySet());
+    s.addAll(newAttr.keySet());
+    s.addAll(oldAttr.keySet());
+    s.addAll(resourсes.keySet());
+    for (Map.Entry<UUID, Collection<UUID>> e : newChildren.entrySet()) {
+      Collection<UUID> old = oldChildren.get(e.getKey());
+      if (old != null && old.equals(e.getValue()))
+        continue;
+      s.add(e.getKey());
+      // the children that came or went (created, deleted, moved), not the siblings that stayed
+      for (UUID c : e.getValue())
+        if (old == null || !old.contains(c))
+          s.add(c);
+      if (old != null)
+        for (UUID c : old)
+          if (!e.getValue().contains(c))
+            s.add(c);
+    }
+    s.remove(null);
+    return s;
+  }
+
   private UUID getOldParent(UUID uuid) {
     for (UUID pUUId : oldChildren.keySet()) {
       if (oldChildren.get(pUUId).contains(uuid)) {

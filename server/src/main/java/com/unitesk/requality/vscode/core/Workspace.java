@@ -71,6 +71,9 @@ public final class Workspace {
   }
 
   private final RequalityServer server;
+  /** The start of the error of a project whose catalog another process holds (see CatalogLocks). */
+  public static final String LOCKED = "The catalog is open in another Requality process";
+
   /** The catalogs this server loads are locked for it (one server per catalog, see CatalogLocks). */
   private final CatalogLocks locks = CatalogLocks.forUser();
   /** The workspace folders (replaced as a whole when they change). */
@@ -497,6 +500,19 @@ public final class Workspace {
     locks.releaseAll();
   }
 
+  /**
+   * Takes the lock of a catalog this server is about to create: the tracker loads a catalog it creates itself, without
+   * {@link #load}. False when another process holds it.
+   */
+  public boolean lock(File dir) throws IOException {
+    return locks.acquire(dir);
+  }
+
+  /** Releases the lock of {@link #lock} (the catalog was not created). */
+  public void unlock(File dir) {
+    locks.release(dir);
+  }
+
   /** (Re)loads the workspace project in a folder (on the loader thread); false when the folder is not a project. */
   public boolean loadProject(File dir) {
     Project p;
@@ -532,9 +548,11 @@ public final class Workspace {
         return;
       }
     }
+    // a new load clears the error of the last one (a lock that another process held, for example)
+    p.error = null;
     try {
       if (!locks.acquire(p.dir)) {
-        p.error = "The catalog is open in another Requality process (VS Code or requality-mcp): " + p.dir;
+        p.error = LOCKED + " (VS Code or requality-mcp): " + p.dir;
         changed();
         return;
       }

@@ -31,7 +31,8 @@ final class RequalityPrompts {
               + "3. Find the requirement statements (for example sentences with shall, must, should, is required to). "
               + "Plan one Requirement for each statement under " + parent + " (when " + parent + " does not exist, create "
               + "it first, with the last part of the path as its id), with a short name. When the document has "
-              + "sections, group the requirements under a group requirement for each section.\n"
+              + "sections (the paragraphs with a heading level), group the requirements under a group requirement for "
+              + "each section.\n"
               + "4. Make the plan with apply_changes, in as few calls as possible: operations create (with \"as\"), then "
               + "locate with \"quote\" set to the exact sentence (add \"paragraph\" when the sentence occurs more than once). "
               + "Give each call a summary.\n"
@@ -50,15 +51,20 @@ final class RequalityPrompts {
           String doc = arg(a, "document", "");
           String file = arg(a, "file", "");
           return "The specification " + doc + " of the Requality project " + project + " has a new version: " + file + ".\n\n"
-              + "1. Run update_document_version with document " + doc + " and file " + file + ".\n"
-              + "2. Check each requirement with the status \"changed\": compare the old and the new text. When the meaning "
-              + "changed, update the name (and the description, if it has one). When the new location marks the wrong "
-              + "sentence, unlocate it (new_location) and locate the right one.\n"
-              + "3. For each requirement with the status \"lost\": when its statement is gone from the new version, delete "
-              + "the requirement; when it is there in other words (see suggestions), locate it.\n"
+              + "1. Run update_document_version with document " + doc + " and file " + file + ". It imports the new "
+              + "version and moves the locations in one change; by default (detach_old) the requirements then trace to the "
+              + "new version only, and the old document stays as the history.\n"
+              + "2. Check each requirement with the status \"changed\", first the ones with modality_changed or "
+              + "numbers_changed: compare the old and the new text. When the meaning changed, update the name (and the "
+              + "description, if it has one). When the new location marks the wrong sentence, unlocate it (new_location) "
+              + "and locate the right one.\n"
+              + "3. For each requirement with the status \"lost\": when its statement is in the new version in other words "
+              + "(see suggestions), locate it. When its statement is gone, look at it with get_node: do not delete a "
+              + "requirement that has test purposes, children or links before I confirm it; list these for me.\n"
               + "4. Create requirements for the uncovered_statements that are requirements, with their locations.\n"
               + "5. Make the changes with apply_changes in as few calls as possible, each with a summary.\n"
-              + "6. Report for each requirement: unchanged, changed (old and new text), removed or new.";
+              + "6. Report for each requirement: unchanged, changed (old and new text), removed or new, and the ones that "
+              + "wait for my decision.";
         }));
 
     mcp.add(new Prompt("coverage_audit", "Coverage audit",
@@ -83,9 +89,11 @@ final class RequalityPrompts {
         a -> {
           String project = arg(a, "project", null);
           return "Show me what the agent changed" + (project != null ? " in the Requality project " + project : "")
-              + ": run review_changes. For each change give its time, its summary and, for each operation, the node and "
-              + "the values before and after, in a short readable list. Mark the changes that are undone. Tell me that undo "
-              + "reverts the newest change that is done.";
+              + ": run review_changes. For each change give its number, time, summary and state (done, undone or "
+              + "reverted) in a short readable list. When I ask about a change, show its operations with the values before "
+              + "and after (review_changes with project and change). Tell me how to take a change back: undo for the newest "
+              + "changes of this session, revert_change for any change (first with dry_run; it is refused when the nodes "
+              + "were changed later, and force reverts anyway).";
         }));
   }
 }

@@ -89,6 +89,8 @@ test {
     systemProperty 'requality.resources', layout.buildDirectory.dir('dist/resources').get().asFile.absolutePath
     // the catalog locks of the test servers (CatalogLocks), not in the home folder
     systemProperty 'requality.locks', layout.buildDirectory.dir('catalog-locks').get().asFile.absolutePath
+    // a test that finds a catalog of another process waits 3 s for it, not the 45 s of a server
+    systemProperty 'requality.lockWait', '3000'
     // as Main: AWT is headless except on Windows (the Swing bridge works headless; the server has no AWT windows)
     if (!System.getProperty('os.name').toLowerCase().startsWith('windows'))
         systemProperty 'java.awt.headless', 'true'

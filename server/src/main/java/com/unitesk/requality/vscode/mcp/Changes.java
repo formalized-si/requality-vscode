@@ -3,6 +3,7 @@ package com.unitesk.requality.vscode.mcp;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
@@ -32,12 +33,29 @@ import com.unitesk.requality.vscode.mcp.McpServer.InvalidParams;
 import com.unitesk.requality.vscode.mcp.McpServer.ToolError;
 
 /**
- * apply_changes: a batch of operations on one project in one transaction of its tree. Either all operations are made
- * (one undo step) or none; {@code dry_run} makes them and rolls them back. Later operations refer to the nodes earlier
- * ones created by their {@code as} name ("$name").
+ * apply_changes: a batch of operations on one project, made in the transaction of the caller (one undo step), all of
+ * them or none. Later operations refer to the nodes earlier ones created by their {@code as} name ("$name").
  */
 final class Changes {
   static final int MAX_OPERATIONS = 500;
+
+  /** The keys each operation takes. */
+  static final Map<String, List<String>> KEYS = new LinkedHashMap<>();
+  static {
+    KEYS.put("create", Arrays.asList("parent", "type", "id", "name", "description", "attributes", "as"));
+    KEYS.put("update", Arrays.asList("node", "id", "name", "description", "attributes", "as"));
+    KEYS.put("delete", Arrays.asList("node"));
+    KEYS.put("move", Arrays.asList("node", "parent", "after"));
+    KEYS.put("link", Arrays.asList("from", "to", "attribute"));
+    KEYS.put("unlink", Arrays.asList("from", "to", "attribute"));
+    KEYS.put("locate", Arrays.asList("requirement", "document", "quote", "paragraph", "occurrence", "start", "end", "as"));
+    KEYS.put("unlocate", Arrays.asList("location", "requirement"));
+    KEYS.put("resolve", Arrays.asList("item", "status"));
+  }
+
+  /** The node types create makes (documents come with import_document). */
+  static final List<String> TYPES = Arrays.asList(Requirement.TYPE_NAME, TestPurpose.TYPE_NAME, "Comment", "TextNode", "DocFolder",
+      "ReportFolder");
 
   private final TreeDB db;
   private final Map<String, TreeNode> aliases = new HashMap<>();
@@ -47,33 +65,49 @@ final class Changes {
     this.db = db;
   }
 
-  /** Makes the operations; returns the result of each one (with before/after for the journal). */
-  static JsonArray apply(TreeDB db, JsonArray operations, String label, boolean dryRun) throws Exception {
+  /** Checks the form of the operations (before a transaction starts). */
+  static void check(JsonArray operations) {
     if (operations == null || operations.isEmpty())
       throw new InvalidParams("Give at least one operation");
     if (operations.size() > MAX_OPERATIONS)
       throw new InvalidParams("At most " + MAX_OPERATIONS + " operations in one call");
+    for (int i = 0; i < operations.size(); i++) {
+      JsonElement e = operations.get(i);
+      if (!e.isJsonObject())
+        throw new InvalidParams("Operation " + i + " is not an object");
+      JsonObject op = e.getAsJsonObject();
+      String kind = Core.optStr(op, "op", null);
+      if (kind == null)
+        throw new InvalidParams("Operation " + i + " has no 'op' (" + String.join(", ", KEYS.keySet()) + ")");
+      List<String> keys = KEYS.get(kind);
+      if (keys == null)
+        throw new InvalidParams("Operation " + i + ": unknown op '" + kind + "' (" + String.join(", ", KEYS.keySet()) + ")");
+      for (String k : op.keySet())
+        if (!k.equals("op") && !keys.contains(k))
+          throw new InvalidParams("Operation " + i + " (" + kind + "): unknown key '" + k + "'; " + kind + " takes "
+              + String.join(", ", keys));
+    }
+  }
+
+  /** Makes the operations in the open transaction; returns the result of each one (for the review). */
+  static JsonArray run(TreeDB db, JsonArray operations) throws Exception {
+    check(operations);
     Changes c = new Changes(db);
-    return Core.transaction(db, label, true, !dryRun, () -> {
-      JsonArray results = new JsonArray();
-      for (int i = 0; i < operations.size(); i++) {
-        JsonElement e = operations.get(i);
-        if (!e.isJsonObject())
-          throw new InvalidParams("Operation " + i + " is not an object");
-        JsonObject op = e.getAsJsonObject();
-        String kind = Core.optStr(op, "op", null);
-        try {
-          JsonObject r = c.one(kind, op);
-          r.addProperty("i", i);
-          results.add(r);
-        } catch (InvalidParams | ToolError ex) {
-          throw new ToolError("Operation " + i + " (" + kind + "): " + ex.getMessage() + ". Nothing was changed.");
-        } catch (Exception ex) {
-          throw new ToolError("Operation " + i + " (" + kind + "): " + Core.message(ex) + ". Nothing was changed.");
-        }
+    JsonArray results = new JsonArray();
+    for (int i = 0; i < operations.size(); i++) {
+      JsonObject op = operations.get(i).getAsJsonObject();
+      String kind = Core.optStr(op, "op", null);
+      try {
+        JsonObject r = c.one(kind, op);
+        r.addProperty("i", i);
+        results.add(r);
+      } catch (InvalidParams | ToolError ex) {
+        throw new ToolError("Operation " + i + " (" + kind + "): " + ex.getMessage() + ". Nothing was changed.");
+      } catch (Exception ex) {
+        throw new ToolError("Operation " + i + " (" + kind + "): " + Core.message(ex) + ". Nothing was changed.");
       }
-      return results;
-    });
+    }
+    return results;
   }
 
   private TreeNode ref(JsonObject op, String key) {
@@ -117,7 +151,7 @@ final class Changes {
 
   private JsonObject create(JsonObject op) throws Exception {
     TreeNode parent = ref(op, "parent");
-    String type = Core.optStr(op, "type", Requirement.TYPE_NAME);
+    String type = Core.optEnum(op, "type", Requirement.TYPE_NAME, TYPES.toArray(new String[0]));
     String id = Core.optStr(op, "id", null);
     TreeLogic tl = (TreeLogic) db.getTreeLogic();
     if (id == null)
@@ -145,7 +179,6 @@ final class Changes {
   private JsonObject update(JsonObject op) throws Exception {
     TreeNode n = ref(op, "node");
     JsonObject before = snapshot(n);
-    JsonObject raw = raw(n);
     String newId = Core.optStr(op, "id", null);
     if (newId != null && !newId.equals(n.getId())) {
       try {
@@ -161,7 +194,6 @@ final class Changes {
     JsonObject r = result("update", n);
     r.add("before", before);
     r.add("after", snapshot(n));
-    r.add("raw", raw);
     return r;
   }
 
@@ -173,9 +205,6 @@ final class Changes {
     JsonObject before = snapshot(n);
     before.addProperty("nodes_under", count(n) - 1);
     r.add("before", before);
-    JsonObject raw = rawTree(n);
-    place(n, raw);
-    r.add("raw", raw);
     n.delete();
     return r;
   }
@@ -196,12 +225,9 @@ final class Changes {
     if (tl.checkVNodeRecursion(n, parent))
       throw new ToolError("cannot move " + n.getQualifiedId() + ": a virtual node under it would contain itself");
     String from = n.getQualifiedId();
-    JsonObject raw = new JsonObject();
-    place(n, raw);
     new MoveOperation(n, parent, after, true).excecute();
     JsonObject r = result("move", n);
     r.addProperty("from", from);
-    r.add("raw", raw);
     return r;
   }
 
@@ -223,7 +249,8 @@ final class Changes {
       raw = other.getLocalName() + "::" + to.getUserVisibleName(true);
     } else {
       to = ref(op, "to");
-      raw = to.getUserVisibleName(true);
+      // the UUID, as the "Fix References" operation of Requality writes it: a rename or a move keeps the link
+      raw = to.getSUUId();
     }
     String attr = Core.optStr(op, "attribute", db.getDefReferenceName());
     if (attr.startsWith("_"))
@@ -306,7 +333,7 @@ final class Changes {
       start = f[0];
       end = f[1];
     } else if (op.has("paragraph") && !op.has("start")) {
-      int p = op.get("paragraph").getAsInt();
+      int p = Core.optInt(op, "paragraph", -1);
       if (p < 0 || p >= dt.paragraphs.size())
         throw new ToolError("no paragraph " + p + " (the document has " + dt.paragraphs.size() + ")");
       // the paragraph without its leading and trailing white space
@@ -319,8 +346,8 @@ final class Changes {
     } else {
       if (!op.has("start") || !op.has("end"))
         throw new InvalidParams("give 'quote', 'paragraph', or 'start' and 'end'");
-      start = op.get("start").getAsInt();
-      end = op.get("end").getAsInt();
+      start = Core.optInt(op, "start", -1);
+      end = Core.optInt(op, "end", -1);
       if (start < 0 || end > dt.text.length() || start >= end)
         throw new ToolError("invalid range " + start + ".." + end + " (the text has " + dt.text.length() + " characters)");
     }
@@ -345,19 +372,12 @@ final class Changes {
     Location l = (Location) ln;
     Document doc = l.getDocument();
     String marked = doc != null ? text(doc).marked(l) : null;
-    JsonObject raw = new JsonObject();
-    if (doc != null)
-      raw.addProperty("document", doc.getSUUId());
-    JsonArray ranges = new JsonArray();
-    for (int[] f : DocumentText.fragments(l))
-      ranges.add(f[0] + Location.FRAGMENT_SEPARATOR + f[1]);
-    raw.add("ranges", ranges);
-    Attribute ld = l.attrs().getAttribute(TreeNode.ATTR_DESCRIPTION);
-    if (ld != null && ld.getValue() != null)
-      raw.addProperty("description_html", ld.getValue().toString());
     List<Requirement> reqs = new ArrayList<>(Arrays.asList(l.getRequirements(false, true)));
-    reqs.removeIf(r -> r == null);
+    reqs.removeIf(r -> r == null || r.isDisposed());
     TreeNode only = op.has("requirement") && !op.get("requirement").isJsonNull() ? ref(op, "requirement") : null;
+    if (only != null && !reqs.contains(only))
+      throw new ToolError(only.getQualifiedId() + " has no location " + l.getSUUId() + " (its requirements: "
+          + DocumentText.requirements(l) + ")");
     JsonArray removedFrom = new JsonArray();
     for (Requirement r : reqs)
       if (only == null || r == only) {
@@ -365,11 +385,10 @@ final class Changes {
         r.commitAttributes();
         removedFrom.add(r.getQualifiedId());
       }
-    boolean deleted = false;
-    if (only == null || reqs.size() <= 1) {
+    // the location goes when no requirement marks it any more
+    boolean deleted = only == null || reqs.size() == 1;
+    if (deleted)
       l.delete();
-      deleted = true;
-    }
     JsonObject r = new JsonObject();
     r.addProperty("op", "unlocate");
     r.addProperty("location", l.getSUUId());
@@ -379,12 +398,6 @@ final class Changes {
       r.addProperty("text", marked);
     r.add("requirements", removedFrom);
     r.addProperty("location_deleted", deleted);
-    JsonArray reqUuids = new JsonArray();
-    for (Requirement q : reqs)
-      if (only == null || q == only)
-        reqUuids.add(q.getSUUId());
-    raw.add("requirements", reqUuids);
-    r.add("raw", raw);
     return r;
   }
 
@@ -393,13 +406,8 @@ final class Changes {
     TreeNode item = ref(op, "item");
     if (!(item instanceof com.unitesk.requality.nodetype.ToDoItem))
       throw new ToolError(item.getQualifiedId() + " is not a review item (see trace_coverage, review_items)");
-    String status = Core.optStr(op, "status", "COMPLETED").toUpperCase(java.util.Locale.ROOT);
-    com.unitesk.requality.core.operation.document.Task.Status st;
-    try {
-      st = com.unitesk.requality.core.operation.document.Task.Status.valueOf(status);
-    } catch (IllegalArgumentException e) {
-      throw new InvalidParams("status: COMPLETED or CHECK");
-    }
+    com.unitesk.requality.core.operation.document.Task.Status st = com.unitesk.requality.core.operation.document.Task.Status
+        .valueOf(Core.optEnum(op, "status", "COMPLETED", "COMPLETED", "CHECK"));
     String before = item.attrs().getStringAttributeValue(com.unitesk.requality.nodetype.ToDoItem.ATTR_STATUS);
     item.attrs().setConstAttribute(com.unitesk.requality.nodetype.ToDoItem.ATTR_STATUS, st.toString(), Flag.HIDDEN);
     item.commitAttributes();
@@ -410,262 +418,12 @@ final class Changes {
     return r;
   }
 
-  // ---- revert
-
-  /**
-   * Reverts a change of the journal, also of an earlier session (undo knows only the changes of its own server): the
-   * inverse of each operation, the newest first, in one transaction. An operation that cannot be reverted (its node is
-   * gone, for example) is reported and the others are reverted.
-   */
-  static JsonArray revert(TreeDB db, JsonArray operations, String label) throws Exception {
-    Changes c = new Changes(db);
-    return Core.write(db, label, () -> {
-      JsonArray notes = new JsonArray();
-      for (int i = operations.size() - 1; i >= 0; i--) {
-        JsonObject r = operations.get(i).getAsJsonObject();
-        String op = Core.optStr(r, "op", "");
-        JsonObject note = new JsonObject();
-        note.addProperty("op", op);
-        if (r.has("path"))
-          note.addProperty("path", r.get("path").getAsString());
-        String why;
-        try {
-          why = c.inverse(op, r);
-        } catch (InvalidParams | ToolError e) {
-          why = e.getMessage();
-        }
-        note.addProperty("reverted", why == null || why.startsWith("restored"));
-        if (why != null)
-          note.addProperty("note", why);
-        notes.add(note);
-      }
-      return notes;
-    });
-  }
-
-  private TreeNode byUuid(JsonObject o, String key) {
-    if (o == null || !o.has(key) || o.get(key).isJsonNull())
-      return null;
-    try {
-      TreeNode n = db.getNode(java.util.UUID.fromString(o.get(key).getAsString()));
-      return n == null || n.isDisposed() ? null : n;
-    } catch (IllegalArgumentException e) {
-      return null;
-    }
-  }
-
-  /** The inverse of one operation; null when it is done, else why it is not (or how). */
-  private String inverse(String op, JsonObject r) throws Exception {
-    JsonObject raw = r.has("raw") && r.get("raw").isJsonObject() ? r.getAsJsonObject("raw") : null;
-    switch (op) {
-      case "create":
-      case "import": {
-        TreeNode n = byUuid(r, "uuid");
-        if (n == null)
-          return "the node is gone already";
-        if (!db.getTreeLogic().canBeDeleted(n))
-          return "the node cannot be deleted";
-        n.delete();
-        return null;
-      }
-      case "update": {
-        TreeNode n = byUuid(r, "uuid");
-        if (n == null)
-          return "the node is gone";
-        if (raw == null)
-          return "the change has no saved values";
-        restoreValues(n, raw);
-        n.commitAttributes();
-        return null;
-      }
-      case "delete": {
-        if (raw == null)
-          return "the change has no saved nodes";
-        TreeNode parent = byUuid(raw, "parent");
-        if (parent == null)
-          return "the parent is gone";
-        if (parent.findWorkChild(raw.get("id").getAsString()) != null)
-          return "the parent has a child with the id " + raw.get("id").getAsString() + " again";
-        TreeNode n = restore(parent, raw);
-        position(n, parent, byUuid(raw, "after"));
-        return "restored as " + n.getQualifiedId() + " (the restored nodes have new UUIDs)";
-      }
-      case "move": {
-        TreeNode n = byUuid(r, "uuid");
-        TreeNode parent = byUuid(raw, "parent");
-        if (n == null || parent == null)
-          return "the node or its old parent is gone";
-        position(n, parent, byUuid(raw, "after"));
-        return null;
-      }
-      case "link":
-      case "unlink": {
-        if (r.has("unchanged"))
-          return null; // the operation changed nothing
-        JsonObject o = new JsonObject();
-        o.addProperty("from", r.get("uuid").getAsString());
-        o.addProperty("to", r.get("to").getAsString());
-        o.addProperty("attribute", r.get("attribute").getAsString());
-        link(o, !op.equals("link"));
-        return null;
-      }
-      case "locate": {
-        JsonObject loc = r.getAsJsonObject("location");
-        if (byUuid(loc, "uuid") == null)
-          return "the location is gone";
-        JsonObject o = new JsonObject();
-        o.addProperty("location", loc.get("uuid").getAsString());
-        unlocate(o);
-        return null;
-      }
-      case "unlocate": {
-        TreeNode d = byUuid(raw, "document");
-        if (!(d instanceof Document))
-          return "the document is gone";
-        Location l = ((Document) d).createLocation(null);
-        List<Object> frags = new ArrayList<>();
-        for (JsonElement e : raw.getAsJsonArray("ranges"))
-          frags.add(e.getAsString());
-        l.attrs().setConstAttribute(Location.ATTR_MARKUP, new ListValue(AttributeType.STRING, frags), Flag.HIDDEN);
-        if (raw.has("description_html"))
-          l.setDescription(raw.get("description_html").getAsString());
-        l.commitAttributes();
-        for (JsonElement e : raw.getAsJsonArray("requirements")) {
-          JsonObject q = new JsonObject();
-          q.add("uuid", e);
-          TreeNode req = byUuid(q, "uuid");
-          if (req instanceof Requirement) {
-            ((Requirement) req).addLocation(l.getUUId());
-            req.commitAttributes();
-          }
-        }
-        return null;
-      }
-      case "resolve": {
-        TreeNode item = byUuid(r, "uuid");
-        if (item == null)
-          return "the review item is gone";
-        if (r.has("before"))
-          item.attrs().setConstAttribute(com.unitesk.requality.nodetype.ToDoItem.ATTR_STATUS, r.get("before").getAsString(), Flag.HIDDEN);
-        else
-          item.attrs().removeAttribute(com.unitesk.requality.nodetype.ToDoItem.ATTR_STATUS);
-        item.commitAttributes();
-        return null;
-      }
-      case "update_version": {
-        int n = 0;
-        if (r.has("new_locations"))
-          for (JsonElement e : r.getAsJsonArray("new_locations")) {
-            JsonObject q = new JsonObject();
-            q.add("uuid", e);
-            if (byUuid(q, "uuid") instanceof Location) {
-              JsonObject o = new JsonObject();
-              o.add("location", e);
-              unlocate(o);
-              n++;
-            }
-          }
-        if (r.has("detached"))
-          for (JsonElement e : r.getAsJsonArray("detached")) {
-            JsonObject q = new JsonObject();
-            q.add("r", e.getAsJsonArray().get(0));
-            q.add("l", e.getAsJsonArray().get(1));
-            TreeNode req = byUuid(q, "r");
-            if (req instanceof Requirement && byUuid(q, "l") instanceof Location) {
-              ((Requirement) req).addLocation(java.util.UUID.fromString(q.get("l").getAsString()));
-              req.commitAttributes();
-            }
-          }
-        return n == 0 ? "no location of the update is left" : null;
-      }
-      default:
-        return "an operation " + op + " cannot be reverted";
-    }
-  }
-
-  /** The id, name, description and user attributes of a raw snapshot, on the node. */
-  private void restoreValues(TreeNode n, JsonObject raw) throws Exception {
-    String id = raw.get("id").getAsString();
-    if (!id.equals(n.getId())) {
-      try {
-        db.getTreeLogic().isIdValidExc(n, id);
-      } catch (Exception e) {
-        throw new ToolError("cannot change the id back to '" + id + "': " + Core.message(e));
-      }
-      n.setId(id);
-    }
-    n.setName(raw.has("name") ? raw.get("name").getAsString() : "");
-    n.setDescription(raw.has("description_html") ? raw.get("description_html").getAsString() : "");
-    JsonObject attrs = raw.has("attributes") ? raw.getAsJsonObject("attributes") : new JsonObject();
-    for (String k : new ArrayList<>(n.attrs().getLocalAttributeKeys())) {
-      if (k.startsWith("_") || k.startsWith("%") || attrs.has(k))
-        continue;
-      Attribute a = n.attrs().getAttribute(k);
-      if (a != null && a.isUserVisible() && a.isLocal(n.getUUId()) && settable(a) != null)
-        n.attrs().removeAttribute(k);
-    }
-    for (Map.Entry<String, JsonElement> e : attrs.entrySet())
-      setAttribute(n, e.getKey(), e.getValue());
-  }
-
-  /** Makes a node of a raw snapshot (and the nodes under it) again under the parent. */
-  private TreeNode restore(TreeNode parent, JsonObject raw) throws Exception {
-    String type = raw.get("type").getAsString();
-    TreeNode c = parent.createChild(raw.get("id").getAsString(), type);
-    if (raw.has("name"))
-      c.setName(raw.get("name").getAsString());
-    if (raw.has("description_html"))
-      c.setDescription(raw.get("description_html").getAsString());
-    if (raw.has("attributes"))
-      for (Map.Entry<String, JsonElement> e : raw.getAsJsonObject("attributes").entrySet())
-        setAttribute(c, e.getKey(), e.getValue());
-    c.commitAttributes();
-    if (c instanceof Requirement && raw.has("locations")) {
-      for (JsonElement e : raw.getAsJsonArray("locations")) {
-        JsonObject q = new JsonObject();
-        q.add("uuid", e);
-        if (byUuid(q, "uuid") instanceof Location)
-          ((Requirement) c).addLocation(java.util.UUID.fromString(e.getAsString()));
-      }
-      c.commitAttributes();
-    }
-    if (raw.has("children"))
-      for (JsonElement e : raw.getAsJsonArray("children"))
-        restore(c, e.getAsJsonObject());
-    return c;
-  }
-
-  /** Puts a node under the parent after the sibling (null: first). */
-  private static void position(TreeNode n, TreeNode parent, TreeNode after) {
-    if (after != null) {
-      new MoveOperation(n, parent, after, true).excecute();
-      return;
-    }
-    List<TreeNode> children = parent.getSortedWorkChildren();
-    if (!children.isEmpty() && children.get(0) == n)
-      return;
-    if (children.isEmpty() || (children.size() == 1 && children.get(0) == n)) {
-      if (n.getWorkParent() != parent)
-        new MoveOperation(n, parent, null, true).excecute();
-      return;
-    }
-    new MoveOperation(n, parent, children.get(0) == n ? children.get(1) : children.get(0), false).excecute();
-  }
-
   // ---- helpers
 
   private void alias(JsonObject op, TreeNode n) {
     String as = Core.optStr(op, "as", null);
     if (as != null)
       aliases.put(as.startsWith("$") ? as.substring(1) : as, n);
-  }
-
-  private static JsonObject result(String op, TreeNode n) {
-    JsonObject r = new JsonObject();
-    r.addProperty("op", op);
-    r.addProperty("path", n.getQualifiedId());
-    r.addProperty("uuid", n.getSUUId());
-    return r;
   }
 
   private static int count(TreeNode n) {
@@ -676,91 +434,12 @@ final class Changes {
     return c;
   }
 
-  /** The parent and the previous sibling of a node (where a revert puts it back). */
-  private static void place(TreeNode n, JsonObject raw) {
-    TreeNode parent = n.getWorkParent();
-    if (parent == null)
-      return;
-    raw.addProperty("parent", parent.getSUUId());
-    List<TreeNode> siblings = parent.getSortedWorkChildren();
-    int i = siblings.indexOf(n);
-    if (i > 0)
-      raw.addProperty("after", siblings.get(i - 1).getSUUId());
-  }
-
-  /** A value an operation can set again: strings, numbers, booleans, HTML, lists of plain values; else null. */
-  private static JsonElement settable(Attribute a) {
-    Object v = a.getValue();
-    if (v == null)
-      return null;
-    switch (a.getType()) {
-      case INT:
-      case FLOAT:
-        return v instanceof Number ? new com.google.gson.JsonPrimitive((Number) v) : null;
-      case BOOL:
-        return v instanceof Boolean ? new com.google.gson.JsonPrimitive((Boolean) v) : null;
-      case STRING:
-      case HTML:
-        return new com.google.gson.JsonPrimitive(v.toString());
-      case LIST: {
-        if (!(v instanceof ListValue))
-          return null;
-        JsonArray arr = new JsonArray();
-        for (Object o : ((ListValue) v).getValues()) {
-          if (o instanceof ReferenceValue)
-            return null;
-          arr.add(String.valueOf(o));
-        }
-        return arr;
-      }
-      default:
-        return null;
-    }
-  }
-
-  /** What a revert needs to make a node again: type, id, name, description HTML, user attributes, locations. */
-  static JsonObject raw(TreeNode n) {
-    JsonObject o = new JsonObject();
-    o.addProperty("uuid", n.getSUUId());
-    o.addProperty("type", n.getType());
-    o.addProperty("id", n.getId());
-    if (n.getName() != null)
-      o.addProperty("name", n.getName());
-    Attribute da = n.attrs().getAttribute(TreeNode.ATTR_DESCRIPTION);
-    if (da != null && da.getValue() != null && da.isLocal(n.getUUId()))
-      o.addProperty("description_html", da.getValue().toString());
-    JsonObject attrs = new JsonObject();
-    for (String k : n.attrs().getLocalAttributeKeys()) {
-      if (k.startsWith("_") || k.startsWith("%"))
-        continue;
-      Attribute a = n.attrs().getAttribute(k);
-      if (a == null || !a.isUserVisible() || !a.isLocal(n.getUUId()))
-        continue;
-      JsonElement v = settable(a);
-      if (v != null)
-        attrs.add(k, v);
-    }
-    o.add("attributes", attrs);
-    if (n instanceof Requirement) {
-      JsonArray locs = new JsonArray();
-      for (Location l : ((Requirement) n).getLocations(false))
-        if (l != null && !l.isDisposed())
-          locs.add(l.getSUUId());
-      o.add("locations", locs);
-    }
-    return o;
-  }
-
-  /** {@link #raw} of a node and of the nodes under it (not the locations of a document). */
-  static JsonObject rawTree(TreeNode n) {
-    JsonObject o = raw(n);
-    JsonArray children = new JsonArray();
-    for (TreeNode c : n.getSortedWorkChildren())
-      if (c != null && !c.isDisposed() && !(c instanceof Location))
-        children.add(rawTree(c));
-    if (children.size() > 0)
-      o.add("children", children);
-    return o;
+  private static JsonObject result(String op, TreeNode n) {
+    JsonObject r = new JsonObject();
+    r.addProperty("op", op);
+    r.addProperty("path", n.getQualifiedId());
+    r.addProperty("uuid", n.getSUUId());
+    return r;
   }
 
   /** What review_changes shows of a node: id, name, description (text) and user attributes. */

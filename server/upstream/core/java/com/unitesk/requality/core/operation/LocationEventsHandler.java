@@ -32,7 +32,8 @@ public class LocationEventsHandler {
                     if(attrs.contains(Location.ATTR_MARKUP))
                     {
                       TreeNode doc = targ.getWorkParent();
-                      if(!docLocUpdateLabel.contains(doc))
+                      // VSCODE-PATCH: a location of a document deleted in the same operation has no parent
+                      if(doc != null && !docLocUpdateLabel.contains(doc))
                         docLocUpdateLabel.add(doc);
                     }
                   if(targ.getType().equals(Requirement.TYPE_NAME)){
@@ -41,8 +42,9 @@ public class LocationEventsHandler {
                         return;
                   	  Requirement r = (Requirement) targ;
                   	  for(TreeNode node:r.getLocations(false)) {
-                        TreeNode doc = node.getWorkParent();
-                        if(!docLocUpdateLabel.contains(doc))
+                        TreeNode doc = node == null ? null : node.getWorkParent();
+                        // VSCODE-PATCH: a location of a deleted document has no parent
+                        if(doc != null && !docLocUpdateLabel.contains(doc))
                           docLocUpdateLabel.add(doc);
                   	  }
                   	}
@@ -54,11 +56,16 @@ public class LocationEventsHandler {
     });
 	ConcurrentLinkedQueue<Requirement> reqToUp = new ConcurrentLinkedQueue<Requirement>();
 	for(TreeNode dup: docLocUpdateLabel) {
+      // VSCODE-PATCH: a document deleted in the same operation has no locations to update
+      if(dup.isDisposed())
+        continue;
       for(TreeNode loc:dup.getActiveWorkChildren())
       {
+    	  if(!(loc instanceof Location))
+    	    continue;
     	  Location l = (Location) loc;
     	  for(Requirement r:l.getRequirements())
-    	    if(!reqToUp.contains(r))
+    	    if(r != null && !reqToUp.contains(r))
     		  reqToUp.add(r);
       }
     }

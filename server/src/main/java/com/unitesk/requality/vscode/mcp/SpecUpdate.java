@@ -23,11 +23,12 @@ import com.unitesk.requality.nodetype.Requirement;
 import com.unitesk.requality.vscode.mcp.McpServer.ToolError;
 
 /**
- * update_document_version: the requirement locations of a document move to its new version sentence by sentence. A
- * marked text found again in the new version moves unchanged; a text whose sentence changed moves to the most similar
- * sentence (status "changed", with its similarity); a text with no similar sentence is "lost". The old document and its
- * locations stay, as with the Update Document processor of Requality, whose character diff split the marked texts into
- * fragments of other sentences. The result also lists the uncovered statements of the new version.
+ * update_document_version: the requirement locations of a document move to its new version sentence by sentence, in
+ * the transaction of the caller. A marked text found again in the new version moves unchanged; a text whose sentence
+ * changed moves to the most similar sentence (status "changed", with its similarity and flags when its modal words,
+ * negations or numbers changed); a text with no similar sentence is "lost". The old document stays, as with the Update
+ * Document processor of Requality, whose character diff split the marked texts into fragments of other sentences. The
+ * result also lists the uncovered statements of the new version.
  */
 final class SpecUpdate {
   private SpecUpdate() {
@@ -35,20 +36,47 @@ final class SpecUpdate {
 
   /** The least similarity of a changed sentence; a suggestion for a lost text needs SUGGEST. */
   static final double MOVE = 0.6;
-  static final double SUGGEST = 0.4;
-  private static final Pattern STATEMENT = Pattern.compile("\\b(shall|must|should|required|requires|will)\\b",
-      Pattern.CASE_INSENSITIVE);
+  static final double SUGGEST = 0.5;
+  private static final int FLAGS = Pattern.CASE_INSENSITIVE | Pattern.UNICODE_CASE | Pattern.UNICODE_CHARACTER_CLASS;
+  /** A requirement statement, in English or Russian. */
+  static final Pattern STATEMENT = Pattern.compile("\\b(shall|must|should|required|requires|will|mandatory|"
+      + "должен|должна|должно|должны|обязан|обязана|обязано|обязаны|необходимо|следует|требуется|допускается|запрещается)\\b", FLAGS);
 
-  /** Words that every requirement statement has: they tell nothing about which sentence it is. */
+  /** The words that make the force of a statement: a change of them changes its meaning, also when the rest stays. */
+  private static final Set<String> MODAL = new HashSet<>(Arrays.asList("shall", "must", "should", "may", "can", "will", "might",
+      "could", "required", "optional", "recommended", "mandatory", "not", "no", "never", "only", "должен", "должна", "должно",
+      "должны", "может", "могут", "следует", "необходимо", "обязан", "обязана", "обязано", "обязаны", "допускается",
+      "запрещается", "рекомендуется", "не", "нет", "никогда", "только"));
+
+  /** Words that tell nothing about which sentence a text is (English and Russian). */
   private static final Set<String> COMMON = new HashSet<>(Arrays.asList("a", "an", "the", "and", "or", "of", "to", "in", "on",
       "for", "with", "by", "at", "as", "from", "is", "are", "be", "been", "it", "its", "this", "that", "these", "those", "when",
-      "if", "then", "shall", "must", "should", "will", "may", "can", "not", "no"));
+      "if", "then", "и", "в", "во", "на", "с", "со", "по", "к", "ко", "о", "об", "от", "до", "для", "из", "у", "за", "при", "а",
+      "но", "или", "что", "это", "как", "то", "же", "ли"));
+
+  private static final Pattern NUMBER = Pattern.compile("\\d+(?:[.,]\\d+)*");
 
   private static Set<String> words(String s) {
     Set<String> w = new HashSet<>();
     for (String t : s.toLowerCase(Locale.ROOT).split("[^\\p{L}\\p{N}]+"))
       if (!t.isEmpty() && !COMMON.contains(t))
         w.add(t);
+    return w;
+  }
+
+  private static Set<String> modal(String s) {
+    Set<String> w = new HashSet<>();
+    for (String t : s.toLowerCase(Locale.ROOT).split("[^\\p{L}\\p{N}]+"))
+      if (MODAL.contains(t))
+        w.add(t);
+    return w;
+  }
+
+  private static Set<String> numbers(String s) {
+    Set<String> w = new HashSet<>();
+    Matcher m = NUMBER.matcher(s);
+    while (m.find())
+      w.add(m.group().replace(',', '.'));
     return w;
   }
 
@@ -173,6 +201,8 @@ final class SpecUpdate {
     double similarity = 1;
     int exact;
     int lost;
+    boolean modalityChanged;
+    boolean numbersChanged;
     JsonArray suggestions = new JsonArray();
     Location created;
 
@@ -187,20 +217,24 @@ final class SpecUpdate {
     }
   }
 
-  static JsonObject run(TreeDB db, Document oldDoc, Document newDoc) throws Exception {
-    return run(db, oldDoc, newDoc, false);
-  }
-
-  /** {@code detachOld}: the requirements keep no location in the old document (it stays, as the history). */
+  /**
+   * Moves the locations in the open transaction. {@code detachOld}: the requirements keep no location in the old
+   * document (it stays, as the history).
+   */
   static JsonObject run(TreeDB db, Document oldDoc, Document newDoc, boolean detachOld) throws Exception {
     if (oldDoc == newDoc)
       throw new ToolError("The old and the new document are the same node");
     DocumentText oldT = DocumentText.of(oldDoc);
     DocumentText newT = DocumentText.of(newDoc);
     if (!newT.locations.isEmpty())
-      throw new ToolError(newDoc.getQualifiedId() + " has locations already; give a new version without locations");
+      throw new ToolError(newDoc.getQualifiedId() + " has locations already (an update made it?); give a new version without "
+          + "locations");
+    if (oldT.locations.isEmpty())
+      throw new ToolError(oldDoc.getQualifiedId() + " has no locations: nothing to move. Import the new version with "
+          + "import_document");
     List<Sentence> sentences = sentences(newT);
     List<Move> moves = new ArrayList<>();
+    boolean owned = false;
     for (Location l : oldT.locations) {
       Move mv = new Move(l);
       for (Requirement r : l.getRequirements(false, true))
@@ -208,6 +242,7 @@ final class SpecUpdate {
           mv.requirements.add(r);
       if (mv.requirements.isEmpty())
         continue; // a location of no requirement does not move
+      owned = true;
       for (int[] f : DocumentText.fragments(l)) {
         if (f[0] < 0 || f[1] > oldT.text.length())
           continue;
@@ -229,9 +264,12 @@ final class SpecUpdate {
           mv.newRanges.add(new int[] { s.start, s.end });
           mv.newTexts.add(s.text);
           mv.similarity = Math.min(mv.similarity, sc);
+          mv.modalityChanged |= !modal(text).equals(modal(s.text));
+          mv.numbersChanged |= !numbers(text).equals(numbers(s.text));
         } else {
           mv.lost++;
-          if (b != null && sc >= SUGGEST) {
+          // a suggestion is a statement of the new version like the lost text
+          if (b != null && sc >= SUGGEST && STATEMENT.matcher(((Sentence) b[0]).text).find()) {
             Sentence s = (Sentence) b[0];
             JsonObject sug = new JsonObject();
             sug.addProperty("p", s.p);
@@ -243,35 +281,42 @@ final class SpecUpdate {
       }
       moves.add(mv);
     }
-    // one transaction: one undo step
-    Core.write(db, "Update document version", () -> {
-      for (Move mv : moves) {
-        if (mv.newRanges.isEmpty())
-          continue;
-        Location l = newDoc.createLocation(null);
-        List<Object> frags = new ArrayList<>();
-        Set<String> seen = new HashSet<>();
-        for (int[] r : mv.newRanges)
-          if (seen.add(r[0] + Location.FRAGMENT_SEPARATOR + r[1]))
-            frags.add(r[0] + Location.FRAGMENT_SEPARATOR + r[1]);
-        frags.sort(Location.FRAGMENT_SORTER);
+    if (!owned)
+      throw new ToolError("The locations of " + oldDoc.getQualifiedId() + " belong to no requirement (was it updated already, "
+          + "with detach_old?): nothing to move");
+    // one new location for each set of ranges: the old locations that move to the same text share it
+    Map<String, Location> byRanges = new java.util.HashMap<>();
+    for (Move mv : moves) {
+      if (mv.newRanges.isEmpty())
+        continue;
+      List<Object> frags = new ArrayList<>();
+      Set<String> seen = new HashSet<>();
+      for (int[] r : mv.newRanges)
+        if (seen.add(r[0] + Location.FRAGMENT_SEPARATOR + r[1]))
+          frags.add(r[0] + Location.FRAGMENT_SEPARATOR + r[1]);
+      frags.sort(Location.FRAGMENT_SORTER);
+      String key = frags.toString();
+      Location l = byRanges.get(key);
+      if (l == null) {
+        l = newDoc.createLocation(null);
         l.attrs().setConstAttribute(Location.ATTR_MARKUP, new ListValue(AttributeType.STRING, frags), Flag.HIDDEN);
         l.setDescription("<p>" + Changes.escape(String.join(" ", new java.util.LinkedHashSet<>(mv.newTexts))) + "</p>");
         l.commitAttributes();
-        for (Requirement r : mv.requirements) {
+        byRanges.put(key, l);
+      }
+      for (Requirement r : mv.requirements)
+        if (!r.getLocations(false).contains(l)) {
           r.addLocation(l.getUUId());
           r.commitAttributes();
         }
-        mv.created = l;
-      }
-      if (detachOld)
-        for (Move mv : moves)
-          for (Requirement r : mv.requirements) {
-            r.removeLocation(mv.old);
-            r.commitAttributes();
-          }
-      return null;
-    });
+      mv.created = l;
+    }
+    if (detachOld)
+      for (Move mv : moves)
+        for (Requirement r : mv.requirements) {
+          r.removeLocation(mv.old);
+          r.commitAttributes();
+        }
     // the result for each requirement (a requirement can have several locations in the document)
     Map<Requirement, List<Move>> byReq = new LinkedHashMap<>();
     for (Move mv : moves)
@@ -322,8 +367,13 @@ final class SpecUpdate {
         if (mv.created != null) {
           lo.addProperty("new_location", mv.created.getSUUId());
           lo.addProperty("new_text", String.join(" … ", new java.util.LinkedHashSet<>(mv.newTexts)));
-          if ("changed".equals(mv.status()))
+          if ("changed".equals(mv.status())) {
             lo.addProperty("similarity", Math.round(mv.similarity * 100) / 100.0);
+            if (mv.modalityChanged)
+              lo.addProperty("modality_changed", true);
+            if (mv.numbersChanged)
+              lo.addProperty("numbers_changed", true);
+          }
         }
         if (mv.suggestions.size() > 0)
           lo.add("suggestions", mv.suggestions);
@@ -367,8 +417,9 @@ final class SpecUpdate {
     }
     o.add("uncovered_statements", fresh);
     o.addProperty("note", (detachOld ? "The requirements have no locations in the old document now; the document stays. "
-        : "The old document and its locations stay (detach_old removes them from the requirements). ")
-        + "Fix the changed and lost requirements and add the uncovered statements with apply_changes.");
+        : "The requirements keep their locations in the old document too (detach_old false). ")
+        + "Check the changed requirements (modality_changed and numbers_changed first), fix the lost ones, and add the "
+        + "uncovered statements with apply_changes.");
     return o;
   }
 }

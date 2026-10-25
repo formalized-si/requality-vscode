@@ -1,7 +1,8 @@
 @echo off
 rem Requality MCP server: Requality without a window, for AI agents (Model Context Protocol on standard input/output).
 rem
-rem Usage: requality-mcp [--storage <dir>] [<folder with Requality catalogs>...]   (default folder: the current one)
+rem Usage: requality-mcp [options] [<folder with Requality catalogs>...]   (default folder: the current one;
+rem requality-mcp --help lists the options)
 rem
 rem Java: %REQUALITY_JAVA%, else the Java runtime of the package (jre\, or the one of the VS Code extension), else
 rem %JAVA_HOME%, else java on the PATH (Java 17 or later). %REQUALITY_JAVA_OPTS% replaces the default -Xmx2g.

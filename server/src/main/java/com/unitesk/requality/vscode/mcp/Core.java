@@ -34,13 +34,17 @@ final class Core {
   static final long LOAD_WAIT_MS = 180_000;
   /** How long a write waits while another transaction (an editor, a checker) holds the tree. */
   static final long TRANSACTION_WAIT_MS = 30_000;
-  /** How long a closed project may stay closed before a tool reports it closed (a conversion reopens it). */
+  /** How long a converted project may stay closed before a tool reports it closed (a conversion reopens it). */
   static final long CLOSED_WAIT_MS = 15_000;
 
   private final HeadlessClient headless;
 
   Core(HeadlessClient headless) {
     this.headless = headless;
+  }
+
+  HeadlessClient headless() {
+    return headless;
   }
 
   Workspace workspace() {
@@ -50,25 +54,63 @@ final class Core {
   // ---- arguments
 
   static String str(JsonObject a, String key) {
-    JsonElement e = a.get(key);
-    if (e == null || e.isJsonNull() || e.getAsString().isEmpty())
+    String s = optStr(a, key, null);
+    if (s == null || s.isEmpty())
       throw new InvalidParams("Missing argument " + key);
+    return s;
+  }
+
+  /** A string argument; a number or a boolean is taken as its text, an object or an array is an error. */
+  static String optStr(JsonObject a, String key, String def) {
+    JsonElement e = a.get(key);
+    if (e == null || e.isJsonNull())
+      return def;
+    if (!e.isJsonPrimitive())
+      throw new InvalidParams("Argument " + key + " must be a string, not " + e);
     return e.getAsString();
   }
 
-  static String optStr(JsonObject a, String key, String def) {
-    JsonElement e = a.get(key);
-    return e == null || e.isJsonNull() ? def : e.getAsString();
-  }
-
+  /** An integer argument (a JSON number or a string of digits). */
   static int optInt(JsonObject a, String key, int def) {
     JsonElement e = a.get(key);
-    return e == null || e.isJsonNull() ? def : e.getAsInt();
+    if (e == null || e.isJsonNull())
+      return def;
+    try {
+      if (e.isJsonPrimitive()) {
+        double d = e.getAsJsonPrimitive().isNumber() ? e.getAsDouble() : Double.parseDouble(e.getAsString().trim());
+        if (d == Math.rint(d) && Math.abs(d) <= Integer.MAX_VALUE)
+          return (int) d;
+      }
+    } catch (NumberFormatException x) {
+      // below
+    }
+    throw new InvalidParams("Argument " + key + " must be an integer, not " + e);
   }
 
+  /** A boolean argument (true, false, or the strings "true" and "false"). */
   static boolean optBool(JsonObject a, String key, boolean def) {
     JsonElement e = a.get(key);
-    return e == null || e.isJsonNull() ? def : e.getAsBoolean();
+    if (e == null || e.isJsonNull())
+      return def;
+    if (e.isJsonPrimitive()) {
+      if (e.getAsJsonPrimitive().isBoolean())
+        return e.getAsBoolean();
+      String s = e.getAsString().trim();
+      if (s.equalsIgnoreCase("true") || s.equalsIgnoreCase("false"))
+        return Boolean.parseBoolean(s);
+    }
+    throw new InvalidParams("Argument " + key + " must be true or false, not " + e);
+  }
+
+  /** One of the values (in any case); the value as it is written in {@code values}. */
+  static String optEnum(JsonObject a, String key, String def, String... values) {
+    String s = optStr(a, key, null);
+    if (s == null)
+      return def;
+    for (String v : values)
+      if (v.equalsIgnoreCase(s.trim()))
+        return v;
+    throw new InvalidParams("Argument " + key + " must be one of " + String.join(", ", values) + ", not " + s);
   }
 
   // ---- projects
@@ -93,18 +135,22 @@ final class Core {
     long end = System.currentTimeMillis() + LOAD_WAIT_MS;
     long closedSince = 0;
     while (true) {
-      // a format conversion closes the project and opens it again: a closed project is closed only when it stays so
+      if (headless.needsConversion(p.localName))
+        throw new ToolError("Project " + projectName + " has the catalog format of an older Requality. Convert it with "
+            + "convert_project (it makes a backup first), or start requality-mcp with --convert");
+      // a format conversion closes the project and opens it again: a converted project is closed when it stays so
       if (p.closed) {
         long now = System.currentTimeMillis();
         if (closedSince == 0)
           closedSince = now;
-        else if (now - closedSince > CLOSED_WAIT_MS)
+        if (!headless.converted(p.localName) || now - closedSince > CLOSED_WAIT_MS)
           throw new ToolError("Project " + projectName + " is closed (open it with open_project)");
       } else {
         closedSince = 0;
       }
       if (p.error != null)
-        throw new ToolError("Project " + projectName + " cannot be loaded: " + p.error);
+        throw new ToolError("Project " + projectName + " cannot be loaded: " + p.error
+            + (p.error.startsWith(Workspace.LOCKED) ? ". Close it there, then load it again with open_project" : ""));
       TreeDB db = Nodes.findDB(p.localName);
       if (!p.closed && db != null && !p.loading && Nodes.isReady(db))
         return db;
@@ -155,6 +201,15 @@ final class Core {
 
   /** A transaction that commits ({@code commit}) or rolls back (a dry run) when the body ends without an exception. */
   static <T> T transaction(TreeDB db, String name, boolean undoable, boolean commit, Callable<T> body) throws Exception {
+    return transaction(db, name, undoable, commit, null, body);
+  }
+
+  /**
+   * {@link #transaction(TreeDB, String, boolean, boolean, Callable)} that records the node states before and after the
+   * commit in {@code capture} (null: none), for the history of the agent changes.
+   */
+  static <T> T transaction(TreeDB db, String name, boolean undoable, boolean commit, History.Capture capture, Callable<T> body)
+      throws Exception {
     long end = System.currentTimeMillis() + TRANSACTION_WAIT_MS;
     while (!db.startTransaction(name, true)) {
       if (System.currentTimeMillis() > end)
@@ -165,13 +220,30 @@ final class Core {
     try {
       T r = body.call();
       if (commit) {
-        db.commit(undoable);
+        if (capture != null)
+          capture.before(db);
+        // the commit ends the transaction also when it fails: no rollback after it
         open = false;
+        com.unitesk.requality.core.transaction.TransactionStorage ts;
+        try {
+          ts = db.commit(undoable);
+        } catch (RuntimeException e) {
+          e.printStackTrace(System.err);
+          throw new ToolError("The change could not be saved: " + message(e) + ". Parts of it can be in the project: check "
+              + "it with get_tree and get_node");
+        }
+        if (capture != null)
+          capture.after(db, ts);
       }
       return r;
     } finally {
       if (open)
-        db.rollback();
+        try {
+          db.rollback();
+        } catch (RuntimeException e) {
+          // the exception of the body tells what failed
+          e.printStackTrace(System.err);
+        }
     }
   }
 

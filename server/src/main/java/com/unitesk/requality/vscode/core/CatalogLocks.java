@@ -18,8 +18,11 @@ import java.util.Map;
  * lock when its process ends.
  */
 public final class CatalogLocks {
-  /** How long a load waits for the lock (a restarted server waits for the previous one to exit). */
-  static final long WAIT_MS = 10_000;
+  /**
+   * How long a load waits for the lock: a restarted server waits for the previous one to exit, which closes its catalogs
+   * in at most 30 seconds.
+   */
+  static final long WAIT_MS = 45_000;
 
   private final File dir;
   private final long waitMs;
@@ -34,11 +37,14 @@ public final class CatalogLocks {
     this.waitMs = waitMs;
   }
 
-  /** The locks of the user ({@code -Drequality.locks=<dir>} puts them elsewhere, as the tests do). */
+  /**
+   * The locks of the user ({@code -Drequality.locks=<dir>} puts them elsewhere and {@code -Drequality.lockWait=<ms>}
+   * changes the wait, as the tests do).
+   */
   public static CatalogLocks forUser() {
     String d = System.getProperty("requality.locks");
     return new CatalogLocks(d != null && !d.isEmpty() ? new File(d)
-        : new File(new File(System.getProperty("user.home"), ".requality"), "locks"));
+        : new File(new File(System.getProperty("user.home"), ".requality"), "locks"), Long.getLong("requality.lockWait", WAIT_MS));
   }
 
   private static String key(File catalog) throws IOException {
@@ -70,11 +76,19 @@ public final class CatalogLocks {
         lock = ch.tryLock();
       } catch (OverlappingFileLockException e) {
         lock = null;
+      } catch (IOException | RuntimeException e) {
+        ch.close();
+        throw e;
       }
       if (lock != null) {
-        ch.truncate(0);
-        ch.write(java.nio.ByteBuffer.wrap((ProcessHandle.current().pid() + " " + catalog.getCanonicalPath() + "\n")
-            .getBytes(StandardCharsets.UTF_8)));
+        try {
+          // the process that holds the lock, for a person who looks for it
+          ch.truncate(0);
+          ch.write(java.nio.ByteBuffer.wrap((ProcessHandle.current().pid() + " " + catalog.getCanonicalPath() + "\n")
+              .getBytes(StandardCharsets.UTF_8)));
+        } catch (IOException e) {
+          // the lock holds without the note
+        }
         synchronized (held) {
           held.put(k, lock);
         }

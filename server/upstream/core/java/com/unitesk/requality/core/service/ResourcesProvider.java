@@ -58,7 +58,7 @@ public class ResourcesProvider implements IPortStatusProvider {
   protected Path imagesFolder = null;
   private static String generateRandom() {
     StringBuilder sb = new StringBuilder();
-    Random r = new Random();
+    Random r = new java.security.SecureRandom(); // VSCODE-PATCH: the path token is the only access check of the server
     char c = '0';
     for(int i = 0;i<12;i++)
       switch(r.nextInt(3)) {
@@ -137,7 +137,7 @@ public class ResourcesProvider implements IPortStatusProvider {
               try {
                   if(PortUtils.testPortIsFree(port)) {
                     portState = PortStatus.NOT_INITED;
-                    server = new Server(port);
+                    server = new Server(new java.net.InetSocketAddress("127.0.0.1", port)); // VSCODE-PATCH: this computer only
                     //.setStopAtShutdown(true);
                     connector = new ServerConnector(server,1,1);
                     QueuedThreadPool qtr = (QueuedThreadPool) connector.getExecutor();
@@ -146,7 +146,9 @@ public class ResourcesProvider implements IPortStatusProvider {
                     qtr.setReservedThreads(1);
                     qtr.setStopTimeout(-1);
                     qtr.setIdleTimeout(-1);
-                    connector.setPort(port);                    
+                    connector.setPort(port);
+                    connector.setHost("127.0.0.1"); // VSCODE-PATCH: this computer only
+
                     String resPath = ResManager.getManager().getJSResourcesPath();
                     ServletContextHandler basecontext = new ServletContextHandler(null, "/", ServletContextHandler.NO_SESSIONS);
                     basecontext.setResourceBase(resPath);
@@ -178,9 +180,9 @@ public class ResourcesProvider implements IPortStatusProvider {
                     server.setHandler(contexts);
                     
                     server.start();
-                    System.err.println(server.dump());
+                    // VSCODE-PATCH: no server dump and no path token in the output and the logs (the token is the access check)
                     RLogger.logInfo("Http server for documents was started on port "+port);
-                    RLogger.logInfo("SERVER INITIATED "+RANDOM_STRING+" "+server.getState());
+                    RLogger.logInfo("SERVER INITIATED "+server.getState());
                     portState = PortStatus.STARTED;
                     initiated  = true;
                 }

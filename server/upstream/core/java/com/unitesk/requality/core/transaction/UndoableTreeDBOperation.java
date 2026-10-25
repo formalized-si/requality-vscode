@@ -63,5 +63,10 @@ public class UndoableTreeDBOperation {
   public String getName() {
     return tstorage.getVisibleName();
   }
+
+  /** VSCODE-PATCH: the transaction this operation undoes and redoes (the MCP server knows the changes by it). */
+  public TransactionStorage getTransaction() {
+    return tstorage;
+  }
 }
 

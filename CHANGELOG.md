@@ -9,13 +9,21 @@ New: the Requality MCP server, Requality without a window for AI agents (`requal
 The tools follow the jobs of a requirements engineer:
 
 - requirements from a specification: `import_document`, `read_document`, `apply_changes`;
-- a new version of a specification: `update_document_version` (moves the locations sentence by sentence);
-- coverage and traceability: `trace_coverage`;
-- a review of the changes of the agent: `review_changes`, `undo`, `revert_change` (also for earlier sessions).
+- a new version of a specification: `update_document_version` (imports the new version and moves the locations
+  sentence by sentence, in one change; flags changed modal words and numbers);
+- coverage and traceability: `trace_coverage`, and `test_coverage` from a coverage file of the test runs;
+- a review of the changes of the agent: `review_changes`, `undo`, `redo`, and `revert_change` for a change of any
+  session (the nodes come back with their UUIDs; a revert stops when the nodes were changed later).
 
-Prompts give these jobs as commands of the agent. The GitHub release has archives with a Java runtime.
-The VS Code extension contains the same server.
+Prompts give these jobs as commands of the agent. The GitHub release has archives with a Java runtime and build
+provenance attestations. The VS Code extension contains the same server.
 
+- The agent can import files and write reports only in the folders of the catalogs and in the `--allow` folders.
+- The server converts a catalog of an older Requality only after a backup (`convert_project`), or with `--convert`.
+- The HTTP and WebSocket servers of the web editors accept connections from this computer only. The headless server
+  starts none.
+- Fixes of the core: a requirement of a converted catalog can be deleted; an undo that removes a document with its
+  locations does not fail; the report export does not copy files outside the report folder.
 - Only one Requality process opens a catalog: a catalog that VS Code shows is not open in the MCP server, and the
   opposite.
 - The name field of the Properties view has the experimental check box **Ignore**.

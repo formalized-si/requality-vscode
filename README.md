@@ -79,9 +79,13 @@ The **Requality** side bar and the **Requality** panel show the views of the Req
 ## Requality without a window (MCP server)
 
 The Requality MCP server is Requality without a window, for AI agents on your computer (Claude Code, Codex, Cursor
-and others). The agent starts the server and uses its tools through the Model Context Protocol. The tools follow the jobs of a requirements
-engineer: turn a specification into requirements with document locations, move the traceability to a new version of a
-specification, tell the coverage, and show the changes of the agent for a review (with undo).
+and others). The agent starts the server and uses its tools through the Model Context Protocol.
+The tools follow the jobs of a requirements engineer:
+
+- turn a specification into requirements with document locations;
+- move the traceability to a new version of a specification;
+- show the coverage by document text and by tests;
+- show the changes of the agent for a review, with undo and revert.
 
 To install it on macOS or Linux (the script downloads the archive with a Java runtime from the GitHub releases):
 
@@ -92,8 +96,11 @@ claude mcp add requality -- ~/.local/bin/requality-mcp /path/to/catalogs
 
 On Windows, use `scripts/install-mcp.ps1`. The VS Code extension contains the same server: `dist/server/bin/requality-mcp`.
 
-Only one Requality process can open a catalog at a time. Close the catalog in VS Code before the agent uses it.
-Refer to [docs/MCP.md](docs/MCP.md) for the other agents, the tools and the options.
+- Only one Requality process can open a catalog at a time. Close the catalog in VS Code before the agent uses it.
+- The agent can import files and write reports only in the folders of the catalogs and in the `--allow` folders.
+- A catalog of an older Requality is converted only after a backup (`convert_project`).
+
+Refer to [docs/MCP.md](docs/MCP.md) for the other agents, the tools, the options and the features that need a window.
 
 ## Eclipse views in VS Code
 
@@ -297,7 +304,7 @@ If the minor number of the version is odd, the packages and the GitHub release a
 | `npm run test:server` | The Java tests of the server. |
 | `npm run test:unit` | The unit tests of the renderer and of the extension. |
 | `npm run test:integration` | The tests of the extension in a VS Code that the test downloads. |
-| `npm run test:mcp` | The test of `dist/server/bin/requality-mcp`: an agent creates a catalog and a requirement. |
+| `npm run test:mcp` | The test of `dist/server/bin/requality-mcp`: its options, and two sessions of an agent (a change of the first session is reverted in the second one). |
 | `npm test` | All the tests above. |
 
 - The server tests download the public ETSI TS 103 096 catalog into `server/build/test-catalogs`.

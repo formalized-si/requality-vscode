@@ -77,6 +77,19 @@ class CatalogLocksTest {
       JsonObject p = ps.get(0).getAsJsonObject();
       assertEquals("broken", p.get("state").getAsString(), p.toString());
       assertTrue(p.get("error").getAsString().contains("another Requality process"), p.toString());
+      // the other process ends: a new load of the catalog takes the lock and clears the error
+      other.getOutputStream().close();
+      assertTrue(other.waitFor(30, TimeUnit.SECONDS));
+      assertTrue(h.server().workspace().loadProject(catalog));
+      long end = System.currentTimeMillis() + 180_000;
+      String state;
+      do {
+        Thread.sleep(200);
+        p = ((JsonObject) h.call("workspace/projects", null)).getAsJsonArray("projects").get(0).getAsJsonObject();
+        state = p.get("state").getAsString();
+      } while (!state.equals("ready") && System.currentTimeMillis() < end);
+      assertEquals("ready", state, p.toString());
+      assertFalse(p.has("error"), p.toString());
     } finally {
       other.destroyForcibly();
       h.close();

@@ -110,11 +110,25 @@ public class ReportExportHandler implements IReportExportOperation {
   private void handleHref(File repfolder, String filename, URI savePath) throws MalformedURLException, IOException, URISyntaxException {
     handleHref(repfolder, filename, savePath, new HashSet<>());
   }
+
+  /**
+   * VSCODE-PATCH: true when the file is in the folder. An image path of a description with "../" must not read a file
+   * outside the report or write one outside the export folder.
+   */
+  private static boolean inside(URI folder, URI file) {
+    try {
+      return java.nio.file.Paths.get(file).normalize().startsWith(java.nio.file.Paths.get(folder).normalize());
+    } catch (RuntimeException e) {
+      return false;
+    }
+  }
   private void handleHref(File repfolder, String filename, URI savePath,Set<String> washere) throws MalformedURLException, IOException, URISyntaxException {
     String fn = filename.toLowerCase();
     if(!fn.endsWith("htm") && !fn.endsWith("html")){
       String sname = CoreUtils.URLEncode(filename);
-      RequalityCLI.copyfile(URI.create(repfolder.toURI()+"/"+sname), URI.create(savePath+"/"+sname));
+      URI from = URI.create(repfolder.toURI()+"/"+sname), to = URI.create(savePath+"/"+sname);
+      if(inside(repfolder.toURI(), from) && inside(savePath, to))
+        RequalityCLI.copyfile(from, to);
       return;
     }
     if(washere.contains(filename))
@@ -142,6 +156,8 @@ public class ReportExportHandler implements IReportExportOperation {
           try {
             URI from=new URI(repfolder.toURI() + "/" + CoreUtils.URLEncode(src)), 
                 to = new URI(savePath.toURL() + "/" + CoreUtils.URLEncode(src));
+            if(!inside(repfolder.toURI(), from) || !inside(savePath, to))
+              continue;
             File f =
                 RequalityCLI.copyfile(
                     null,
@@ -167,7 +183,8 @@ public class ReportExportHandler implements IReportExportOperation {
               String newalt = alt;
               if(alt!=null){
                 File fa = new File(new URI(savePath + "/" + CoreUtils.URLEncode(alt)));
-                if(fa.exists()){
+                if(fa.exists() && inside(savePath, fa.toURI())
+                    && inside(repfolder.toURI(), URI.create(repfolder.toURI().toURL() + "/" + CoreUtils.URLEncode(alt)))){
                   String shorta =
                       alt;//"images/" + alt.substring(alt.lastIndexOf("/") + 1);
                   try {
