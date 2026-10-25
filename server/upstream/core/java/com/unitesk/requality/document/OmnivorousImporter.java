@@ -597,7 +597,7 @@ public class OmnivorousImporter {
     }
 
     public Set<MediaType> getSupportedTypes(ParseContext context) {
-      return null;
+      return Collections.emptySet();
     }
 
     public void parse(InputStream stream, ContentHandler handler, Metadata metadata, ParseContext context)

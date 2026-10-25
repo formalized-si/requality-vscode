@@ -74,6 +74,8 @@ import com.unitesk.requality.core.attribute.Flag;
 import com.unitesk.requality.core.attribute.valueprovider.ConstValueProvider;
 import com.unitesk.requality.core.attribute.valueprovider.HtmlValueProvider;
 import com.unitesk.requality.core.attribute.valueprovider.TempFolderFilesProvider;
+import com.unitesk.requality.core.checker.IMark;
+import com.unitesk.requality.core.checker.StorageProblem;
 import com.unitesk.requality.core.events.Moment;
 import com.unitesk.requality.core.lock.LockIsBusy;
 import com.unitesk.requality.core.lock.LockType;
@@ -104,12 +106,16 @@ import com.unitesk.requality.core.storage.formatversion.LegalicyNodeMapper;
 import com.unitesk.requality.vscode.port.eclipse.natures.ReqCatalogue;
 import com.unitesk.requality.nodetype.ErrorNode;
 import com.unitesk.requality.tool.CoreUtils;
+import com.unitesk.requality.tool.UUIDDuplicationHelper;
 
 public class ResourceStorage extends AbstractTreeStorage implements IUUIDsCachedTreeStorage {
   public static final String RESOURCE_SUFFIX = ResManager.RESOURCES_SUFFIX;
   private static final String ROOT_NODE_FILENAME = "root.json";
   private Map<UUID,Map<String,AttributeDefinition>> activeAttributes =
-      new HashMap<>();
+      new ConcurrentHashMap<>();
+  private Map<UUID, Collection <IMark>> nodeProblems = new HashMap<>();
+  private Set<UUID> brokenNodes = new HashSet<>();
+  private Map<UUID, IResource> storedUUIDFiles = new HashMap<>();
   private IProject project;
   UUID rootNodeUUID = null;
   private ISchedulingRule activeRules = null;
@@ -122,11 +128,16 @@ public class ResourceStorage extends AbstractTreeStorage implements IUUIDsCached
     return deltaProcessor;
   }
   
-  public static Object getLockObject(IProject p){
+  public static Object getLockObject(IProject p, UUID r){
     Object l = markerProjectLocks.get(p);
     if(l==null){
-      l = ResManager.getManager().getTracker().getLocalName(p);
-      markerProjectLocks.put(p, l);
+      synchronized(markerProjectLocks) {
+        l = markerProjectLocks.get(p);
+        if(l == null) {
+          l = ResManager.getManager().getTracker().getLocalName(p)+(r==null?"null":r.toString());
+          markerProjectLocks.put(p, l);
+        }
+      }
     }
     return l;
   }
@@ -144,6 +155,7 @@ public class ResourceStorage extends AbstractTreeStorage implements IUUIDsCached
       if (file.exists()) {
         //if (!resourceMap.inCache(file)) {
         rootNodeUUID = getFileUUID(file, false); //resourceMap.cachePut(file, uuid);
+        storedUUIDFiles.put(rootNodeUUID, file);
         //            }
         //            rootNodeUUID = resourceMap.cacheGet(file);
       }
@@ -168,7 +180,7 @@ public class ResourceStorage extends AbstractTreeStorage implements IUUIDsCached
   }
   
   public IFolder getResourceFolder(UUID uuid) {
-    Lock rl = readLock(uuid);
+    Lock rl = null;
     IFolder resFolder = null;
     try{
       String id = getNodeId(uuid);
@@ -188,7 +200,6 @@ public class ResourceStorage extends AbstractTreeStorage implements IUUIDsCached
     }finally{
       //boolean rl = true,wl = false;
       try{
-        rl.unlock();
 //        if (resFolder!=null && !resFolder.isSynchronized(1)){
 //          rl = false;
 //          writeLock();
@@ -218,7 +229,7 @@ public class ResourceStorage extends AbstractTreeStorage implements IUUIDsCached
   @Override
   public String getNodeId(UUID uuid) {
     if (uuid == null) return null;
-    Lock rl = readLock(uuid);
+    Lock rl = null;
     try{
       if (uuid.equals(getRootNode())) {
         return "/";
@@ -236,16 +247,16 @@ public class ResourceStorage extends AbstractTreeStorage implements IUUIDsCached
       return CoreUtils.getFileName(fid, false);
     }
     finally{
-      rl.unlock();
     }
   }
 
   @Override
   public Map<String, AttributeDefinition> getStorageAttributes(UUID uuid) {
-    Lock rl = readLock(uuid);
+    Lock rl = null;
     try{
       if(activeAttributes.containsKey(uuid))
         return activeAttributes.get(uuid);
+      rl = readLock(uuid);
       IFile file = null;
       try {
         file = getResource(uuid, LockType.LOCK_WAIT);
@@ -267,8 +278,12 @@ public class ResourceStorage extends AbstractTreeStorage implements IUUIDsCached
       try {
         Map<String, AttributeDefinition> mp = NodeMapper.getAttributes(uuid, nodeSource, 
           fileFolder);
-        if(mp!=null)
+        if(mp!=null) {
+          if(brokenNodes.contains(uuid))
+            mp.put(TreeNode.ATTR_TYPE, new AttributeDefinition(uuid, TreeNode.ATTR_TYPE, 
+                  new ConstValueProvider(AttributeType.STRING, ErrorNode.TYPE_NAME)));
           activeAttributes.put(uuid, mp);
+        }
         return mp;
       } 
       catch (IOException | JSONException e) {
@@ -300,7 +315,8 @@ public class ResourceStorage extends AbstractTreeStorage implements IUUIDsCached
           }
       }
     }finally{
-      rl.unlock();
+      if(rl!=null)
+        rl.unlock();
     }
   }
 
@@ -310,6 +326,8 @@ public class ResourceStorage extends AbstractTreeStorage implements IUUIDsCached
     try{
       activeAttributes.clear();
       resinited = false;
+      storedUUIDFiles.clear();
+      storedUUIDFiles.put(rootNodeUUID, project.getFile(ROOT_NODE_FILENAME));
       if(!del)
         clearProblems();
       //rs.initRoot();
@@ -342,7 +360,7 @@ public class ResourceStorage extends AbstractTreeStorage implements IUUIDsCached
   public void clearPersistent(UUID uuId) {
     //getCacheStorage().clearCachedCache(uuId.toString());
     //TreeDB.getCPCacheStorage().clearCachedCache(uuId.toString());
-    synchronized (getLockObject(getProject())) {//TODO it it necessary?
+    synchronized (getLockObject(getProject(), uuId)) {//TODO it it necessary?
       IFile file = null;
       try {
         file = getResource(uuId, LockType.NO_LOCK);
@@ -491,7 +509,6 @@ public class ResourceStorage extends AbstractTreeStorage implements IUUIDsCached
     if (!childrenFolder.exists()) {
       return result;
     }
-
     try {
       for (IResource res : childrenFolder.members()) {
         if (res.getType() == IResource.FILE && res.getName().toLowerCase().endsWith(".json")) {
@@ -501,10 +518,24 @@ public class ResourceStorage extends AbstractTreeStorage implements IUUIDsCached
               if (childUUID != null) {
                 if(result.isEmpty())
                   result = new HashSet<>();
+                UUID recordedUUID = childUUID;
                 if(childUUID.equals(uid)) {
                   RLogger.logError("Node cannot be added to itself");
-                }else
-                  result.add(childUUID);
+                }else {
+                  IResource path = storedUUIDFiles.get(childUUID);
+                  if(path == null || path.equals(res)){
+                    storedUUIDFiles.put(childUUID, res);
+                  }else {
+                    recordedUUID = UUIDDuplicationHelper.getIncremented(childUUID);
+                    IResource resNew = storedUUIDFiles.get(recordedUUID);
+                    while(resNew!=null && !resNew.equals(path)) {
+                      recordedUUID =  UUIDDuplicationHelper.getIncremented(recordedUUID);
+                      resNew = storedUUIDFiles.get(recordedUUID);
+                    }
+                    recordUUIDDuplication(uid, childUUID, recordedUUID, path, res);
+                  }
+                  result.add(recordedUUID);
+                }
               }
             } catch (Exception e) {
               e.printStackTrace(); //cannot load
@@ -996,7 +1027,7 @@ public class ResourceStorage extends AbstractTreeStorage implements IUUIDsCached
                 l = 2;
                 getResourceMap().writeLock();
                 IPath newPath = nodeFile.getParent().getFullPath();
-    
+                
                 newPath = newPath.addTrailingSeparator();
                 IPath newFilePath = newPath.append(id + ".json");
                 if (nodeFile.getFullPath().equals(newFilePath)) 
@@ -1006,6 +1037,8 @@ public class ResourceStorage extends AbstractTreeStorage implements IUUIDsCached
                 } catch (Exception e) {
                   e.printStackTrace();
                 }
+                
+                
                 IFolder folder =
                     project.getFolder(
                         newPath
@@ -1032,6 +1065,8 @@ public class ResourceStorage extends AbstractTreeStorage implements IUUIDsCached
                 //                if (!newFile.getCharset().equals("UTF-8")) {
                 //                  newFile.setCharset("UTF-8", monitor);
                 //                }
+                storedUUIDFiles.put(uuid, newFile);
+                
                 CacheStorage cs = getCacheStorage();
                 CacheTransactionDescription r = cs.startCacheTransaction("alter cache on node move", 2);
                 try {
@@ -1206,7 +1241,7 @@ public class ResourceStorage extends AbstractTreeStorage implements IUUIDsCached
           RLogger.logError(e);
         }
       }
-    }, activeAttributes, ares!=null?ares.getProject():null, flag);
+    }, activeAttributes, storedUUIDFiles, ares!=null?ares.getProject():null, flag);
   }
 
   private static IResourceAble[] EMPTY = new IResourceAble[0];
@@ -1546,6 +1581,7 @@ public class ResourceStorage extends AbstractTreeStorage implements IUUIDsCached
 //        }
 //      }, null);
        moveJob.oprationsAfter();
+       storedUUIDFiles.put(curNodeUUId, toFile);
      }catch(Exception e) {
        RLogger.logError(e);       
      }
@@ -1604,6 +1640,7 @@ public class ResourceStorage extends AbstractTreeStorage implements IUUIDsCached
         //TODO delete?
       if (in.available() > 0) {
         Lock wl = writeLock(uuid); 
+        boolean wlo = true;
         try{
           final IFolder folder = getResourceFolder(uuid);
           if (folder == null) {
@@ -1619,12 +1656,12 @@ public class ResourceStorage extends AbstractTreeStorage implements IUUIDsCached
               new IWorkspaceRunnable() {
                 @Override
                 public void run(IProgressMonitor monitor) throws CoreException {
-                  wl.lock();
                   //long t = System.currentTimeMillis();
                   try
                   {
                     if (del != null) {
                       del.resourceChanged(uuid, resName, Moment.BEFORE, flag);
+                    wl.lock();
                     try {
                       //folder.refreshLocal(0, monitor);
                       if (!folder.exists()) {
@@ -1678,11 +1715,11 @@ public class ResourceStorage extends AbstractTreeStorage implements IUUIDsCached
                 }
                 finally{
                   try {
-          in.close();
-          } catch (IOException e) {
-          // TODO Auto-generated catch block
-           RLogger.logError(e);
-          }
+                    in.close();
+                  } catch (IOException e) {
+                    //  TODO Auto-generated catch block
+                    RLogger.logError(e);
+                  }
                   wl.unlock();
                 }
                   //                        }
@@ -1695,8 +1732,8 @@ public class ResourceStorage extends AbstractTreeStorage implements IUUIDsCached
           };
          IWorkspace works = ResourcesPlugin.getWorkspace();
          wl.unlock();
+         wlo = false;
           runWithoutDeltaProc(setResourceContents, folder.getParent());
-          wl.lock();
           run(new IWorkspaceRunnable(){
           
             @Override
@@ -1709,7 +1746,8 @@ public class ResourceStorage extends AbstractTreeStorage implements IUUIDsCached
           }, null);
         }
         finally{
-          wl.unlock();
+          if(wlo)
+            wl.unlock();
         }
       }else {
         try {
@@ -2022,7 +2060,7 @@ public class ResourceStorage extends AbstractTreeStorage implements IUUIDsCached
   } 
   public void clearProblems(){
     if(project.isOpen() && project.isAccessible() && !project.getWorkspace().isTreeLocked()){
-      synchronized (getLockObject(project)) {//lock for markers
+      synchronized (getLockObject(project, null)) {//lock for markers
         try {
           project.deleteMarkers(EclipseCheckerContainer.REQUALITY_MARKER_WARN_TYPE, true, IResource.DEPTH_INFINITE);
           project.deleteMarkers(IMarker.PROBLEM, true, IResource.DEPTH_INFINITE);
@@ -2053,6 +2091,7 @@ public class ResourceStorage extends AbstractTreeStorage implements IUUIDsCached
     try{
       super.clearNodeCache(uuId);
       getVersionsStorage().remove(uuId);
+      storedUUIDFiles.remove(uuId);
       rm = getResourceMap();
       rm.writeLock();
       java.nio.file.Path res = null;
@@ -2229,5 +2268,33 @@ public class ResourceStorage extends AbstractTreeStorage implements IUUIDsCached
     return getUUId(project.getFile(relPath.toString()),false, b);//TODO test
   }
 
+  
+  private void addNodeProblem(UUID node, IMark problem) {
+    Collection<IMark> probs = nodeProblems.get(node);
+    if(probs == null) {
+      probs = new LinkedList<>();
+      nodeProblems.put(node, probs);
+    }
+    probs.add(problem);
+  }
 
+  
+  private void recordUUIDDuplication(UUID parent, UUID duplication,UUID temporaryId, IResource resFirst, IResource resSecond){// TODO Auto-generated method stub
+    String pathFirst = resFirst.toString(),
+           pathSecond = resSecond.toString();
+    //brokenNodes.add(temporaryId);
+    getResourceMap().cachePut(resSecond.getLocation().toFile().toPath(), toRelativePath(resSecond),temporaryId, true, -1);
+    addNodeProblem(parent, new StorageProblem(parent, StorageProblem.ERROR_ID_UUID_PARENT_DUP,
+       StorageProblem.MESSAGE_UUID_PARENT_DUP, duplication.toString(), pathFirst, pathSecond,
+       parent.toString(), temporaryId.toString()));
+    addNodeProblem(duplication, new StorageProblem(temporaryId, StorageProblem.ERROR_ID_UUID_FIRST_DUP,
+       StorageProblem.MESSAGE_UUID_FIRST_DUP, duplication.toString(), pathSecond, temporaryId.toString()));
+    addNodeProblem(temporaryId, new StorageProblem(temporaryId, StorageProblem.ERROR_ID_UUID_DUP,
+       StorageProblem.MESSAGE_UUID_DUP, duplication.toString(), pathFirst, temporaryId.toString()));
+  }
+
+  @Override 
+  public Collection<IMark> getStorageNodeProblems(UUID uid){
+    return nodeProblems.get(uid);
+  }
 }

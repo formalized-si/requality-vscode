@@ -117,7 +117,7 @@
 		<h${lvl} style="margin-bottom:0px;" class="markerror"><table style="border-radius:5px 5px 0px 0px; border: outset 1px ${covclass}; width:100%;" class="${covclass}">
 			<tr>
 				<td onClick="toggle('block${block}', '${block}');">
-					<img id="${block}" width="20px" height="20px" src="data:image/gif;base64,R0lGODlhAQABAAD/ACwAAAAAAQABAAACADs%3D" onLoad="this.onload=null; this.src=get_png_image_src(0);"/>
+					<img id="${block}" class="base64" width="20px" height="20px" src="data:image/gif;base64,R0lGODlhAQABAAD/ACwAAAAAAQABAAACADs%3D" onLoad="this.onload=null; this.src=get_png_image_src(0);"/>
 					<text style="text-align:center;"><strong>${utils.htmlEscape(node.getUserVisibleName(true))} ${covYellowInfo}</strong></text><text style="color:red"><strong> *</strong></text>
 				</td>
 				<#if showbuttons><td><button class="addtest" style="float:right;" onclick='callAddTest("${node.getQualifiedId()}");return false'>Add test</button></td></#if>
@@ -128,7 +128,7 @@
 		<h${lvl} style="margin-bottom:0px;"><table style="border-radius:5px 5px 0px 0px; border: outset 1px ${covclass}; width:100%;" class="${covclass}">
 			<tr>
 			<td onClick="toggle('block${block}', '${block}');">
-				<img id="${block}" width="20px" height="20px" src="data:image/gif;base64,R0lGODlhAQABAAD/ACwAAAAAAQABAAACADs%3D" onLoad="this.onload=null; this.src=get_png_image_src(0);"/>
+				<img id="${block}" class="base64" width="20px" height="20px" src="data:image/gif;base64,R0lGODlhAQABAAD/ACwAAAAAAQABAAACADs%3D" onLoad="this.onload=null; this.src=get_png_image_src(0);"/>
 				<text style="text-align:center"><strong>${utils.htmlEscape(node.getUserVisibleName(true))} ${covYellowInfo}</strong></text></td>
 			<#if showbuttons><td><button class="addtest" style="float:right;" onclick='callAddTest("${node.getQualifiedId()}");return false'>Add test</button></td></#if>
 			</tr>
@@ -154,7 +154,7 @@
     </#if>
     <#if (testsCount>0)>   	
     	<div onclick = "toggletest('testblock${block}', 'title${block}');" style="margin:10px;">
-    		<img class="title${block}" style="display:inline; float:left;" width="20px" height="20px" src="data:image/gif;base64,R0lGODlhAQABAAD/ACwAAAAAAQABAAACADs%3D" onLoad="this.onload=null; this.src=get_png_image_src(1);"/>
+    		<img class="title${block} base64" style="display:inline; float:left;" width="20px" height="20px" src="data:image/gif;base64,R0lGODlhAQABAAD/ACwAAAAAAQABAAACADs%3D" onLoad="this.onload=null; this.src=get_png_image_src(1);"/>
 			<text class="title${block}" style="text-align:left; font-weight: bold; border-bottom: 1px dashed;">Развернуть список тестов</text>
 		</div>
 		<div class="hidden" id = "testblock${block}">
@@ -231,7 +231,7 @@
 								<#if (testsCount>1)>
 									<td style="text-align:left; border: none;" >
 										<div style="width:18em; white-space: nowrap; cursor: pointer; cursor: hand;" onClick="toggletest('block${block}', '${block}');">
-										<img class="${block}" style="display:inline; float:left;" width="20px" height="20px" src="data:image/gif;base64,R0lGODlhAQABAAD/ACwAAAAAAQABAAACADs%3D" onLoad="this.onload=null; this.src=get_png_image_src(1);"/>
+										<img class="${block} base64" style="display:inline; float:left;" width="20px" height="20px" src="data:image/gif;base64,R0lGODlhAQABAAD/ACwAAAAAAQABAAACADs%3D" onLoad="this.onload=null; this.src=get_png_image_src(1);"/>
 										<text class="${block}" style="text-align:left; font-weight: bold; border-bottom: 1px dashed;">Развернуть список тестов</text></div>
 									</td>
 								</#if>
@@ -344,7 +344,12 @@
 <meta http-equiv="Content-Type" content="text/html; charset=utf-8"/>
 
 <style type="text/css">
-
+<#if fitImages?? >
+  img:not(.base64),object{
+    max-width: 100%;
+    object-fit: contain;
+  }
+</#if>
 .green {
 	background: #bcee68;
 }

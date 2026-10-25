@@ -368,13 +368,14 @@ class ProjectOperationsTest {
     execute("org.eclipse.ui.project.buildAutomatically", projectItem).get(60, TimeUnit.SECONDS);
     assertFalse(ResourcesPlugin.getWorkspace().isAutoBuilding());
     assertFalse(workspaceState().get("autoBuilding").getAsBoolean());
-    List<JsonObject> ctx = new ArrayList<>(h.notifications("client/setContext"));
-    JsonObject last = null;
-    for (JsonObject c : ctx)
-      if ("requality.autoBuilding".equals(c.get("key").getAsString()))
-        last = c;
-    assertNotNull(last);
-    assertFalse(last.get("value").getAsBoolean());
+    // the handler sets the context key after the workspace setting; the client receives the notification later
+    h.await("the context key requality.autoBuilding = false", v -> {
+      JsonObject last = null;
+      for (JsonObject c : new ArrayList<>(h.notifications("client/setContext")))
+        if ("requality.autoBuilding".equals(c.get("key").getAsString()))
+          last = c;
+      return last != null && !last.get("value").getAsBoolean();
+    });
     // Build Project (navigator) and Build All are offered now.
     assertTrue(popup(projectItem).containsKey("Build Project"), popup(projectItem).toString());
     assertTrue(state("org.eclipse.ui.project.buildAll", projectItem).get("enabled").getAsBoolean());

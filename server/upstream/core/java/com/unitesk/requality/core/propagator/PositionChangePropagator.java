@@ -4,7 +4,6 @@ import java.util.Collection;
 import java.util.Collections;
 import java.util.HashSet;
 import java.util.List;
-import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Set;
 import java.util.UUID;
@@ -12,6 +11,7 @@ import java.util.UUID;
 import com.unitesk.requality.core.api.IAttributeChangePropagator;
 import com.unitesk.requality.core.attribute.Attribute;
 import com.unitesk.requality.core.attribute.ListValue;
+import com.unitesk.requality.core.attribute.MapValue;
 import com.unitesk.requality.core.attribute.valueprovider.ChildPositionsProvider;
 import com.unitesk.requality.core.attribute.valueprovider.ChildStructuredPositionsProvider;
 import com.unitesk.requality.core.attribute.valueprovider.StructuredIndexProvider;
@@ -63,24 +63,22 @@ public class PositionChangePropagator implements IAttributeChangePropagator {
     boolean changed = false;
     if(changes.contains(ChildStructuredPositionsProvider.ATTR_KEY)) {
       Attribute cpos = changes.getNew(ChildStructuredPositionsProvider.ATTR_KEY);
-      Map<String, String> amap = cpos==null?null:cpos.getGValue();
+      MapValue amap = cpos==null?null:cpos.getGValue();
       Attribute oldMap = changes.getOld(ChildStructuredPositionsProvider.ATTR_KEY);
-      Map<String, String> omap = oldMap == null?Collections.emptyMap():oldMap.getGValue();
+      MapValue omap = oldMap == null?null:oldMap.getGValue();
       Set<String> handled = Collections.emptySet();
-      if(amap!=null) {
+      if(amap!=null && amap.getValues()!=null) {
         TreeDB db = node.getTreeDB();
   
-        for(Entry<String, String> en:amap.entrySet()) {
+        for(Entry<String, Object> en:amap.getValues().entrySet()) {
             TreeNode nde = db.getCachedNodeOrVirt(
                 UUID.fromString(en.getKey()));
             if(handled.isEmpty())
               handled = new HashSet<>();
             handled.add(en.getKey());
             if(nde != null) {
-              String poso = omap.get(en.getKey());
-              int oldPos = poso == null ? -1 : Integer.parseInt(poso);
-              int newPos = Integer.parseInt(en.getValue());
-              if(oldPos!=newPos) {
+              Integer oldPos = omap!=null&&omap.getValues()!=null?(Integer) omap.getValues().get(en.getKey()):null;
+              if(oldPos!=null && oldPos!=-1) {
                 nde.updateLocalAttribute(StructuredIndexProvider.ATTR_KEY);
                 nde.commitAttributes();
                 changed = true;
@@ -88,10 +86,10 @@ public class PositionChangePropagator implements IAttributeChangePropagator {
             }
         }
       }
-      if(omap!=null) {
+      if(omap!=null && omap.getValues()!=null) {
         TreeDB db = node.getTreeDB();
-        for(Entry<String, String> enold : omap.entrySet()) {
-            if (!handled.contains(enold.getKey()) && !enold.getValue().equals("-1"))//if index exists before
+        for(Entry<String, Object> enold : omap.getValues().entrySet()) {
+            if (!handled.contains(enold.getKey()) && enold.getValue()!=null && !enold.getValue().equals(-1))//if index exists before
             {
               TreeNode nde = db.getCachedNodeOrVirt(
                  UUID.fromString(enold.getKey()));
@@ -107,21 +105,20 @@ public class PositionChangePropagator implements IAttributeChangePropagator {
 
     if(changes.contains(ChildPositionsProvider.ATTR_KEY)) {
       Attribute cpos = changes.getNew(ChildPositionsProvider.ATTR_KEY);
-      Map<String, String> amap = cpos==null?null:cpos.getGValue();
+      MapValue amap = cpos==null?null:cpos.getGValue();
       Attribute oldMap = changes.getOld(ChildPositionsProvider.ATTR_KEY);
-      Map<String, String> omap = oldMap == null?Collections.emptyMap():oldMap.getGValue();
+      MapValue omap = oldMap == null?null:oldMap.getGValue();
       Set<String> handled = Collections.emptySet();
-      if(amap!=null)
-        for(Entry<String, String> en:amap.entrySet()) {
+      if(amap!=null && amap.getValues()!=null)
+        for(Entry<String, Object> en:amap.getValues().entrySet()) {
           TreeNode nde = node.getTreeDB().getCachedNodeOrVirt(
               UUID.fromString(en.getKey()));
           if(handled.isEmpty())
               handled = new HashSet<>();
             handled.add(en.getKey());
           if(nde != null) {
-            String poso = omap.get(en.getKey());
-          int oldPos = poso == null ? -1 : Integer.parseInt(poso);
-            int newPos = Integer.parseInt(en.getValue());
+            Integer oldPos = omap!=null && omap.getValues()!=null? (Integer) (omap.getValues().get(en.getKey())):null;
+            Integer newPos = (Integer)en.getValue();
             if(oldPos!=newPos) {
               changed = true;
               nde.updateLocalAttribute(TreeNode.ATTR_CHILD_INDEX);
@@ -129,9 +126,9 @@ public class PositionChangePropagator implements IAttributeChangePropagator {
             }
           }
         }
-      if(omap!=null)
-        for(Entry<String, String> en:omap.entrySet()) 
-          if(!handled.contains(en.getKey())&& !en.getValue().equals("-1"))
+      if(omap!=null && omap.getValues()!=null)
+        for(Entry<String, Object> en:omap.getValues().entrySet()) 
+          if(!handled.contains(en.getKey())&& en.getValue()!=null && !en.getValue().equals(-1))
           {
             TreeNode nde = node.getTreeDB().getCachedNodeOrVirt(
                 UUID.fromString(en.getKey()));
@@ -139,14 +136,9 @@ public class PositionChangePropagator implements IAttributeChangePropagator {
                 handled = new HashSet<>();
               handled.add(en.getKey());
             if(nde != null) {
-              String poso = omap.get(en.getKey());
-            int oldPos = poso == null ? -1 : Integer.parseInt(poso);
-              int newPos = Integer.parseInt(en.getValue());
-              if(oldPos!=newPos) {
-                changed = true;
-                nde.updateLocalAttribute(TreeNode.ATTR_CHILD_INDEX);
-                nde.commitAttributes();
-              }
+              changed = true;
+              nde.updateLocalAttribute(TreeNode.ATTR_CHILD_INDEX);
+              nde.commitAttributes();
             }
           }
     }

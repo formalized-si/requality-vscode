@@ -13,6 +13,7 @@ import com.unitesk.jsonclone.JSONException;
 import com.unitesk.jsonclone.JSONObject;
 import com.unitesk.requality.core.attribute.AttributeStorage;
 import com.unitesk.requality.core.attribute.AttributeType;
+import com.unitesk.requality.core.attribute.MapValue;
 import com.unitesk.requality.core.attribute.TypedValue;
 import com.unitesk.requality.core.exception.NullParentException;
 import com.unitesk.requality.core.model.TreeDB;
@@ -24,7 +25,6 @@ import com.unitesk.requality.nodetype.TextNode;
 
 public class ChildStructuredPositionsProvider implements IValueProvider {
   public static final String ATTR_KEY = "_childrenStructuredPositions";
-  private static final TypedValue EMPTY_ANSWER = new TypedValue(AttributeType.MAP, Collections.emptyMap());
   public static String TYPE = "ChildStructuredPositions";
   private static ChildStructuredPositionsProvider one = new ChildStructuredPositionsProvider();
   public static boolean checkIsStructural(TreeDB db, ITreeStorage storage, Collection<Object> childs) {
@@ -50,12 +50,12 @@ public class ChildStructuredPositionsProvider implements IValueProvider {
 	}catch(NullParentException npe) {
 	}
     if(par==null)
-      return EMPTY_ANSWER;//root node
+      return MapValue.EMPTY_ANSWERS.get(AttributeType.INT);//root node
     else {
       List<Object> ln = as.getNode().attrs().getListAttributeValue(ShownChildrenProvider.ATTR_KEY);
       if(ln == null)
         return null;//TODO possible?
-      Map<String, String> pos = ln==null||ln.size()==0?Collections.emptyMap():new HashMap<>();
+      Map<String, Object> pos = ln==null||ln.size()==0?Collections.emptyMap():new HashMap<>();
       int i = 0;
       TreeDB db = as.getNode().getTreeDB();
       ITreeStorage storage = db.getStorage();
@@ -64,11 +64,11 @@ public class ChildStructuredPositionsProvider implements IValueProvider {
         TreeNode chi = db.getCachedNodeOrVirt(uid);
         Collection childs = chi == null?storage.getChildren(uid):chi.getActiveWorkChildrenUUIDs();
         if(checkIsStructural(db, storage, childs))
-          pos.put(uid.toString(), Integer.toString(i++));
+          pos.put(uid.toString(), i++);
         else
-          pos.put(uid.toString(), Integer.toString(-1));
+          pos.put(uid.toString(),-1);
       }
-      return pos.isEmpty() ? EMPTY_ANSWER: new TypedValue(AttributeType.MAP, pos);//root node
+      return pos.isEmpty() ?  MapValue.EMPTY_ANSWERS.get(AttributeType.INT): new TypedValue(AttributeType.MAP, new MapValue(AttributeType.INT, pos));//root node
     }
   }
   

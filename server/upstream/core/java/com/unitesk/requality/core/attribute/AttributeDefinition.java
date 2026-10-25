@@ -350,4 +350,15 @@ public class AttributeDefinition {
             tv.getValue()!=null && 
             ((ListValue)tv.getValue()).getType().equals(AttributeType.REFERENCE);
   }
+  public static String attrDescToStringValue(AttributeDefinition ad, String def) {
+    if(ad == null)
+      return def;
+    TypedValue tv = ad.getRawValue();
+    if(tv == null)
+      return def;
+    Object tva = tv.getGValue();
+    if(tva == null)
+      return def;
+    return tva.toString();//TODO sep for ref?
+  }
 }

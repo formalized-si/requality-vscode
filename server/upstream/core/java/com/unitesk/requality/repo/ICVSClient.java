@@ -162,7 +162,9 @@ public interface ICVSClient {
 
   public RepoTreeState<File, String> getContainerByPath(String s, TreeDB db) throws Exception;
 
-  public RevisionInfo getHeadRevision(TreeDB db) throws Exception;
+  public RevisionInfo getBranchHeadRevision(TreeDB db) throws Exception;
+  
+  public RevisionInfo getCurrentRevision(TreeDB db) throws Exception;
 
   public void resetToHead(IProgressMonitor mon);
 

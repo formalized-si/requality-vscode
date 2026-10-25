@@ -10,26 +10,35 @@ try{
 			var div = document.getElementById("searchBar");
 			if(div.classList.contains("search-hidden"))
 				div.classList.remove("search-hidden");
-			
+			// auto focus search input field
+			var inp = document.getElementById("search-value");
+			if(inp){
+				inp.focus();
+				inp.select(); 
+			}
 		},
 		hide: function(){
 			var div = document.getElementById("searchBar");
 			if(!div.classList.contains("search-hidden"))
 				div.classList.add("search-hidden");
+			var inp = document.getElementById("search-value");
+			if(inp) inp.value = "";
 		},
 		nextCall: function(inp, cs){
-		  var casev = false;
-		  if(cs && cs.value)
-		    casev = cs.checked;
-		  if(inp && inp.value)
-		  	window.sb.findText(inp.value, casev, false, true);
+		  	window.sb.search(inp, cs, false);
 		},
 		prevCall: function(inp, cs){
-		  var casev = false;
-		  if(cs && cs.value)
-		    casev = cs.checked;
-		  if(inp && inp.value)
-		   	window.sb.findText(inp.value, casev, true, true);
+		  	window.sb.search(inp, cs, true);
+		},
+		fromTop: function(inp, cs){
+			var sel = window.getSelection();
+			if(sel) sel.removeAllRanges();
+			window.sb.search(inp, cs, false);
+		},
+		search: function(inp, cs, backwards){
+			var needle = inp ? inp.value : "";
+			var casev = cs ? cs.checked : false;
+			if(needle) window.sb.findText(needle, casev, backwards, true);
 		},
 		init: function(){
 			var div = document.createElement("div");
@@ -43,7 +52,9 @@ try{
 			var prev = document.createElement("button");
 			prev.id="search-prev";
 			prev.innerText="↑";
-			var casen = document.createElement("input"); 
+			var casen = document.createElement("input");
+			// keep focus on the input field
+			prev.addEventListener("mousedown", function(e){ e.preventDefault(); });
 			prev.addEventListener("click", function(e){
 			  e.preventDefault();
 			  e.stopPropagation();
@@ -52,6 +63,7 @@ try{
 			var nxt = document.createElement("button");
 			nxt.id="search-next";
 			nxt.innerText="↓";
+			nxt.addEventListener("mousedown", function(e){ e.preventDefault(); });
 			nxt.addEventListener("click", function(e){
               e.preventDefault();
 			  e.stopPropagation();
@@ -61,11 +73,12 @@ try{
 			casen.id="caseSensitive";
 			casen.checked = false;
 			casen.type="checkbox";
+			casen.addEventListener("change", function(){ window.sb.fromTop(inp, casen); });
 			// <label for="scales">
 			var caseLab = document.createElement("label");
 			caseLab.for = "caseSensitive";
 			caseLab.innerHTML = "Учитывать регистр";
-			
+
 			var cls = document.createElement("button");
 			cls.id="close";
 			cls.innerHTML="X";
@@ -94,7 +107,10 @@ try{
 			    if(enterPressed && (!document.getElementById("searchBar")||!document.getElementById("searchBar").classList.contains("search-hidden"))){
 			        event.preventDefault();
 			        event.stopPropagation();
-			    	window.sb.nextCall(inp, casen);
+			        if(event.shiftKey)
+			    		window.sb.prevCall(inp, casen);
+			    	else
+			    		window.sb.nextCall(inp, casen);
 			    }
 			};
 			div.onkeydown = keyPressedEvent;
@@ -110,10 +126,10 @@ try{
 			div.appendChild(form);
 			document.body.appendChild(div);
 			document.addEventListener("keydown", function(e) {
-			  if (e.keyCode == 70 && e.ctrlKey || e.keyCode === 114) {
+			  // 70 is "f"; e.metaKey is `cmd` on macos; 114 is "F3"
+			  if (e.keyCode == 70 && (e.ctrlKey || e.metaKey) || e.keyCode === 114) {
 				window.sb.show();
 			    e.preventDefault();
-			    keyPressedEvent(e);
 			  }
 			});
 		}

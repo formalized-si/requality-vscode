@@ -26,7 +26,8 @@ public abstract class StorageDeleteOperation<F, Fld>{
   private IStorageDeltaListener dt;
   public void delete(IStorageDeltaListener dt,  ResourceMap rm, NodeDescSet nd, IFileAble<F, Fld> ares, IContainerAble<Fld> childsCont, 
       IContainerAble<Fld> resourcesCont, IContainerAbleRefresher contUpdater,
-      Map<UUID,Map<String,AttributeDefinition>> activeAttributes,
+      Map<UUID,Map<String,AttributeDefinition>> activeAttributes,//TODO replace two maps by some func?
+      Map<UUID, F> storedUUIds,
       Object project, byte opFlag) {
     this.dt = dt;
     UUID uuid = nd.root.getUUId();
@@ -105,8 +106,10 @@ public abstract class StorageDeleteOperation<F, Fld>{
         return null;
       }).forEach(one->{if(one!=null) {delNodeDesc.put(one.uid, one);toh.add(one.uid);}});
       //remove from cache
-      for(DeleteNodeResources<F, Fld> dnr: deleteQueue)
+      for(DeleteNodeResources<F, Fld> dnr: deleteQueue) {
         activeAttributes.remove(dnr.uid);
+        storedUUIds.remove(dnr.uid);
+      }
       rm.writeLock();
       try{
         for(DeleteNodeResources<F, Fld> dns:deleteQueue)

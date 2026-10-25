@@ -8,6 +8,7 @@ import com.unitesk.jsonclone.JSONException;
 import com.unitesk.jsonclone.JSONObject;
 import com.unitesk.requality.core.attribute.AttributeStorage;
 import com.unitesk.requality.core.attribute.AttributeType;
+import com.unitesk.requality.core.attribute.MapValue;
 import com.unitesk.requality.core.attribute.TypedValue;
 import com.unitesk.requality.core.model.TreeNode;
 
@@ -22,9 +23,12 @@ public class ChildIndexProvider implements IValueProvider {
     if(par==null)
       return ROOT_RESPONCE;//root node
     else {
-      Map<String, String> childInd = (Map<String, String>)
-          par.attrs().getAttributeValue(ChildPositionsProvider.ATTR_KEY,Collections.emptyMap());
-      return new TypedValue(AttributeType.INT, Integer.parseInt(childInd.getOrDefault(as.getNode().getSUUId(),"0")));
+      MapValue childInd = (MapValue)
+          par.attrs().getAttributeValue(ChildPositionsProvider.ATTR_KEY,null);
+      Integer val = -1;
+      if(childInd != null && childInd.getValues()!=null)
+        val = (Integer) childInd.getValues().getOrDefault(as.getNode().getSUUId(),-1);
+      return new TypedValue(AttributeType.INT, val);
     }
   }
     

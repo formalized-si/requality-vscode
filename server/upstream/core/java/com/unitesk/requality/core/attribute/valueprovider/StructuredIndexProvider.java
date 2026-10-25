@@ -8,6 +8,7 @@ import com.unitesk.jsonclone.JSONException;
 import com.unitesk.jsonclone.JSONObject;
 import com.unitesk.requality.core.attribute.AttributeStorage;
 import com.unitesk.requality.core.attribute.AttributeType;
+import com.unitesk.requality.core.attribute.MapValue;
 import com.unitesk.requality.core.attribute.TypedValue;
 import com.unitesk.requality.core.exception.NullParentException;
 import com.unitesk.requality.core.model.TreeNode;
@@ -27,9 +28,11 @@ public class StructuredIndexProvider implements IValueProvider {
     if(par==null)
       return ROOT_RESPONCE;//root node
     else {
-      Map<String, String> childInd = (Map<String, String>)
-          par.attrs().getAttributeValue(ChildStructuredPositionsProvider.ATTR_KEY,Collections.emptyMap());
-      return new TypedValue(AttributeType.INT, Integer.parseInt(childInd.getOrDefault(as.getNode().getSUUId(),"-1")));
+      MapValue childInd = (MapValue)
+          par.attrs().getAttributeValue(ChildStructuredPositionsProvider.ATTR_KEY,null);
+      if(childInd == null || childInd.getValues() == null)
+        return ROOT_RESPONCE;//root node;
+      return new TypedValue(AttributeType.INT, childInd.getValues().get(as.getNode().getSUUId()));
     }
   }
     

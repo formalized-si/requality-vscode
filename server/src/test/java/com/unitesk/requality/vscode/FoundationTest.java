@@ -46,7 +46,7 @@ class FoundationTest {
     // Folder name differs from the .project name, as in the published catalog.
     TestCatalogs.copyEtsi(h.workspace, "TS103096");
     JsonObject init = h.initialize(h.workspace);
-    assertEquals("1.4.0", init.get("version").getAsString());
+    assertEquals("1.5.0", init.get("version").getAsString());
   }
 
   @AfterAll
@@ -223,6 +223,24 @@ class FoundationTest {
       return sel instanceof com.unitesk.requality.core.model.TreeNode
           && ((com.unitesk.requality.core.model.TreeNode) sel).getUUId().toString().equals(doc);
     });
+    // Select Image of the CKEditor image dialog (branch unstable): the page sends the path of the selected file, the
+    // core copies the image to its temporary images folder and answers with the address the resources server serves.
+    java.nio.file.Path png = java.nio.file.Files.createTempFile(h.workspace.toPath(), "image", ".png");
+    javax.imageio.ImageIO.write(new java.awt.image.BufferedImage(4, 3, java.awt.image.BufferedImage.TYPE_INT_RGB), "png", png.toFile());
+    com.google.gson.JsonObject upload = new com.google.gson.JsonObject();
+    upload.addProperty("operation", "uploadImage");
+    upload.addProperty("path", png.toString());
+    upload.addProperty("location", url);
+    upload.addProperty("session", session);
+    ws.sendText(upload.toString(), true).get();
+    String loaded = h.await2("the uploaded image", () -> received.stream().filter(m -> m.contains("\"sendImageLoaded\"")).findFirst().orElse(null));
+    JsonObject image = JsonParser.parseString(loaded).getAsJsonObject().getAsJsonObject("data");
+    assertFalse(image.has("error"), loaded);
+    String imageUrl = image.get("path").getAsString();
+    HttpResponse<byte[]> served = http.send(HttpRequest.newBuilder(URI.create(imageUrl)).build(), HttpResponse.BodyHandlers.ofByteArray());
+    // the servlet streams static files with 202 ("loading parts", ResourcesServlet.outContent)
+    assertEquals(2, served.statusCode() / 100, imageUrl + " " + served.statusCode());
+    assertTrue(java.util.Arrays.equals(java.nio.file.Files.readAllBytes(png), served.body()), imageUrl);
     ws.sendClose(WebSocket.NORMAL_CLOSURE, "done").get(10, TimeUnit.SECONDS);
     h.closeShell(shellId);
   }

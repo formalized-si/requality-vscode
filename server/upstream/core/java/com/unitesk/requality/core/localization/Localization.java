@@ -7,6 +7,7 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.MissingResourceException;
 import java.util.ResourceBundle;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReadWriteLock;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
@@ -23,6 +24,7 @@ public class Localization {
   private static List<ResourceBundle> activeLocalizationBundle =
      null;
   private static Map<Locale, List<ResourceBundle>> localizationBundles = new HashMap<>();
+  private static ConcurrentHashMap<String, String> stringCache = new ConcurrentHashMap<>();
   private static Locale activeLocale = null;
   private static Localization one = new Localization();//for report calls
   public static Locale getLocale() {
@@ -115,11 +117,23 @@ public class Localization {
       return null;
     }
     try {
-      for(ResourceBundle rb:activeLocalizationBundle) {
-        String res = rb.getString(source.name().toLowerCase()+"."+id);
-        if(res!=null)
-          return res;
+      String key = source.name().toLowerCase()+"."+id;
+      String cached = stringCache.get(key);
+      if(cached == null) {
+        synchronized (stringCache) {
+          cached = stringCache.get(key);
+          if(cached == null) {
+            String res = null; 
+            for(ResourceBundle rb:activeLocalizationBundle) { 
+              res = rb.getString(key);
+              if(res!=null)
+                break;
+            }
+            cached = res;
+          }
+        }
       }
+      return cached;
     }catch(MissingResourceException mre) {
       String bname = getBundleNames(); 
       RLogger.logDebug(String.format("try to get %s.%s from %s in locale %s but resource is missing", source.name(),id,bname, activeLocale.toString()));

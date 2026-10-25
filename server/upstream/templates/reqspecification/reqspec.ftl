@@ -147,6 +147,12 @@
 <meta http-equiv="Content-Type" content="text/html; charset=utf-8">
 <style type="text/css">
 
+<#if fitImages?? >
+  img,object{
+    max-width: 100%;
+    object-fit: contain;
+  }
+</#if>
 	.notResolved   { background: pink }
 	p { margin: 1mm }
 	table, th, td { border: 1px solid black; }

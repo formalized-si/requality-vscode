@@ -253,9 +253,18 @@
 	        		</#if><#t>
 	        		<#local first = true/>
        				<#local key = error.getAdditionalData()[0]/><#t>
-       				<#local storedVers = error.getAdditionalData()[2]/><#t>
+       				<#if error.getAdditionalData()[2]??><#t>
+       					<#local storedVers = error.getAdditionalData()[2]/><#t>
+       				<#else><#t>
+       					<#local storedVers = "NONE"/><#t>
+       				</#if><#t>
        				<#local linkTarget = node.getTreeDB().getNode(error.getNodeTo())/><#t>
-       				<#local nowVers = error.getAdditionalData()[4]/><#t>
+       				<#if error.getAdditionalData()[4]??><#t>
+						<#local nowVers = error.getAdditionalData()[4]/><#t>
+       				<#else><#t>
+       					<#local nowVers = "NONE"/><#t>
+       				</#if><#t>
+       				
        				<#if first><#local first = false/><#else>, </#if><#t> 
        				<#local fid = coreUtils.getFIDOrUUID(context, linkTarget, false)/><#t>
        				'${key}'→<a href="#${fid}">${fid}</a>(<s>${storedVers}</s>→${nowVers})<#t>

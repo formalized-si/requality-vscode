@@ -57,10 +57,6 @@ public final class CoreBootstrap {
     ExtensionRegistry.setPluginXml(new File(resources, "plugin.xml"));
     seedExternalTools(settings);
 
-    // The project locks of the plug-in's ResourceStorage are taken by the RPC, UI and job threads at once: the map
-    // creates the lock of a project atomically (see ProjectLocks).
-    com.unitesk.requality.vscode.port.eclipse.core.ResourceStorage.markerProjectLocks =
-        new com.unitesk.requality.vscode.ui.resources.ProjectLocks();
     // The plug-in's constructor installs the trees tracker (Activator.initTreesTracker); the resource manager of the
     // server's workspace folder is created on it, before the API sources start.
     activator = new Activator();

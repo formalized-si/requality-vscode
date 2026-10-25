@@ -962,7 +962,7 @@ public class NodeMapper {
         if(reader.last()!='"')
           throw new IOException("Enum value needs to be started with \"");
         return new AppliedEnumValue(reader.readString(), addParams!=null?(String)addParams.get("comment"):null, 
-          addParams!=null?AttributeType.valueOf((String)addParams.get("elements_type")):lt!=null?lt:AttributeType.STRING, enumKey);
+          addParams!=null&&addParams.get("elements_type")!=null?AttributeType.valueOf((String)addParams.get("elements_type")):lt!=null?lt:AttributeType.STRING, enumKey);
       }  //return readNumber(tp, reader);//TODO test
       case LIST:{
         char last = (char)reader.last();

@@ -46,6 +46,7 @@ import com.unitesk.requality.core.attribute.valueprovider.TempFolderFilesProvide
 import com.unitesk.requality.core.exception.NodeNotFoundException;
 import com.unitesk.requality.core.log.RLogger;
 import com.unitesk.requality.core.model.NodeDesc;
+import com.unitesk.requality.core.model.Pair;
 import com.unitesk.requality.core.model.TreeDB;
 import com.unitesk.requality.core.model.TreeNode;
 import com.unitesk.requality.core.storage.OFlag;
@@ -60,10 +61,13 @@ public class OldMarkupProcessor extends SAXDocumentProcessor {
   private int charCnt;
   private StringBuilder testBuffer = new StringBuilder();
   //Map<Integer, Requirement> startedTags = new HashMap<Integer, Requirement>();
-  private LinkedList<String> started = new LinkedList<>();
+  private LinkedList<Pair<String, Integer>> startedLocation = new LinkedList<>();
+  private LinkedList<String> startedTag = new LinkedList<>();
   private LinkedList<UUID> startedUUID = new LinkedList<>();
-  private LinkedList<String> ignoredTags = new LinkedList<>();
+  private LinkedList<Pair<String, Integer>> ignoredTags = new LinkedList<>();
   private LinkedList<Integer> startedIndex = new LinkedList<>();
+  private Set<UUID> alreadyDescriptionLocation = new HashSet<>(),
+                    wasSeenLocation = new HashSet<>();
   private boolean bodyStarted = false;
   public boolean isLocExternal = false;
   public Map<String, List<NodeDesc>> newLocations = new ConcurrentHashMap<>();
@@ -76,25 +80,40 @@ public class OldMarkupProcessor extends SAXDocumentProcessor {
   public boolean processEvent(
       XMLEvent event, XMLEventFactory eventFactory, XMLEventWriter writer, TreeNode rootNode, PrintStream ps)
       throws Exception {
+    boolean ignore = false;
+    boolean handled = false;
     if (event.isStartElement()) {
       remAttr.clear();
       StartElement se = event.asStartElement();
       String tagName = getLocalTagName(event).toLowerCase();
-      boolean ignore = false;
       if(tagName.equals("body"))
         bodyStarted = true;
       else {
         Iterator<Attribute> it = se.getAttributes();
         while(it.hasNext()) {
           Attribute a = it.next();
-
+          if(a.getName().getLocalPart().equals("id")) {
+            if(tagName.equals("a")) {
+              String val = a.getValue().toLowerCase();
+              if(val.startsWith("id_"))
+                ignore = true;
+            }
+          }
           if(a.getName().getLocalPart().equals("name")) {
             String val = a.getValue().toLowerCase();
             if(val.contains("_toc")&&tagName.equals("a"))
               ignore = true;
+            UUID uid = null;
+            try {
+              uid = UUID.fromString(val);
+            }catch(Exception e) {}
+            if(uid!=null&&tagName.equals("a"))
+              ignore = true;
           }
           if(a.getName().getLocalPart().equals("class")){
             String val = a.getValue().toLowerCase();
+            if(val.contains("requality_id"))
+              val = val.replace("requality_id", "");
             if(val.contains("requality_text")) {
               ignore = true;
               int idi = val.indexOf("id_");
@@ -102,7 +121,7 @@ public class OldMarkupProcessor extends SAXDocumentProcessor {
               String id = val.substring(idi+3, idi2);
               UUID uid = UUID.fromString(id);
               startedUUID.addLast(uid);
-              started.addLast(tagName);
+              startedLocation.addLast(new Pair<>(tagName, startedTag.size()+1));
               startedIndex.addLast(charCnt);
               if(locationMarkup == null)
                 locationMarkup = new StringBuilder();
@@ -113,7 +132,7 @@ public class OldMarkupProcessor extends SAXDocumentProcessor {
                 ignore = true;
               else {
                 val = val.replace("requality_node", "");
-                int pos = val.indexOf("id_");
+                 int pos = val.indexOf("id_");
                 if(pos>-1) {
                   val = val.substring(0,pos)+val.substring(pos+39); 
                 }
@@ -130,31 +149,46 @@ public class OldMarkupProcessor extends SAXDocumentProcessor {
       if(remAttr.isEmpty()) {
         if(!ignore) {
           writer.add(event);
-        }else if(!event.isEndElement()&&(started.isEmpty()||!started.getLast().equals(tagName)))
-          ignoredTags.addLast(tagName);
+        }else {
+          ignoredTags.addLast(new Pair<>(tagName, startedTag.size()+1));
+        }
       }else {
         List<Attribute> attrs = new LinkedList<>();
         Iterator<Attribute> it = se.getAttributes();
-        while(it.hasNext()) {
-          Attribute a = it.next();
-          if(!remAttr.contains(a.getName().getLocalPart()))
-            attrs.add(a);
+        if(!ignore) {
+          boolean added = false;
+          while(it.hasNext()) {
+            Attribute a = it.next();
+            if(!remAttr.contains(a.getName().getLocalPart())) {
+              attrs.add(a);
+              added = true;
+            }
+          }
+          if(!added && (tagName.equals("span") || tagName.equals("a")))
+            ignore = true;
         }
-        writer.add(eventFactory.createStartElement(se.getName(), attrs.iterator(), null));
+        if(!ignore) {
+          writer.add(eventFactory.createStartElement(se.getName(), attrs.iterator(), null));
+        }else {
+          ignoredTags.addLast(new Pair<>(tagName, startedTag.size()+1));
+        }
       }
       if(!ignore)
         if(locationMarkup!=null)
           toString(event,locationMarkup);
-    } else if (event.isEndElement()) {
-      boolean ignore = false;
+      startedTag.addLast(se.asStartElement().getName().toString());
+      handled = true;
+    }
+    if (event.isEndElement()) {
       EndElement ee = event.asEndElement();
       String tagName = ee.getName().getLocalPart().toLowerCase();
       if(tagName.equals("body"))
       {
         bodyStarted = false;
       }else {
-        if(!started.isEmpty() && started.getLast().equals(tagName)) {
-          started.removeLast();
+        Pair<String, Integer> locRecord = startedLocation.isEmpty()?null:startedLocation.getLast();
+        if(locRecord!=null && locRecord.getSecond() == startedTag.size() && locRecord.getFirst().equals(tagName)) {
+          startedLocation.removeLast();
           ignore = true;
           UUID locId = startedUUID.removeLast();
           Integer start = startedIndex.removeLast();
@@ -165,20 +199,36 @@ public class OldMarkupProcessor extends SAXDocumentProcessor {
           }
           if(loc == null)
             loc = (Location) doc.findWorkChild(locId.toString());//some old formats can have locs with uuid!=id
+          boolean ignoreDescription = false;
+          if(loc!=null) {
+            if(!wasSeenLocation.contains(loc.getUUId())) {
+              wasSeenLocation.add(loc.getUUId());
+              String desc = loc.getDescription();
+              if(desc!=null && desc.length()>0){
+                alreadyDescriptionLocation.add(loc.getUUId());
+                ignoreDescription = true;
+              }
+            }else
+            {
+              if(alreadyDescriptionLocation.contains(loc.getUUId()))
+                ignoreDescription = true;
+            }
+          }
           NodeDesc altLoc = null;
-          
           
           String suid = loc == null ? null : loc.getSUUId();
           String newDesc = "";
-          if(loc!=null && remDesc.contains(suid)) {
-            AttributeDefinition ad = loc.attrs().getWorkAttributeDefinition(TreeNode.ATTR_DESCRIPTION);
-            if(ad!=null && ad.getRawValue()!=null && ad.getRawValue().getValue()!=null) {
-              newDesc = (String)ad.getRawValue().getValue();
+          if(!ignoreDescription){
+            if(loc!=null && !remDesc.contains(suid)) {
+              AttributeDefinition ad = loc.attrs().getWorkAttributeDefinition(TreeNode.ATTR_DESCRIPTION);
+              if(ad!=null && ad.getRawValue()!=null && ad.getRawValue().getValue()!=null) {
+                newDesc = (String)ad.getRawValue().getValue();
+              }
             }
-          }
-          if(locationMarkup != null){
-            newDesc = newDesc+CoreUtils.htmlEncapsulate(locationMarkup.toString());
-            locationMarkup.setLength(0);
+            if(locationMarkup != null){
+              newDesc = newDesc+CoreUtils.htmlEncapsulate(locationMarkup.toString());
+              locationMarkup = null;
+            }
           }
           if(loc==null)
           {
@@ -222,7 +272,8 @@ public class OldMarkupProcessor extends SAXDocumentProcessor {
           if(loc != null) {
             if(!remDesc.contains(suid))
               remDesc.add(suid);
-            loc.attrs().setConstAttribute(TreeNode.ATTR_DESCRIPTION, newDesc, OFlag.NONE);
+            if(!ignoreDescription)
+              loc.attrs().setConstAttribute(TreeNode.ATTR_DESCRIPTION, newDesc, OFlag.NONE);
             //setLocDescription(loc, (Document) loc.getWorkParent(), newDesc);
             AttributeDefinition ad = loc.attrs().getWorkAttributeDefinition(Location.ATTR_MARKUP);
             if(ad != null && ad.getType()==AttributeType.LIST)
@@ -259,7 +310,7 @@ public class OldMarkupProcessor extends SAXDocumentProcessor {
           }
           if(!notappend)
             vals.add(start+SEPARATOR+(charCnt));
-          
+          vals.sort(Location.FRAGMENT_SORTER);//TODO unneded?
           if(loc!=null) {
             loc.attrs().setConstAttribute(Location.ATTR_MARKUP,new ListValue(AttributeType.STRING, vals),Flag.HIDDEN);
             //TODO revert back to setD?
@@ -275,17 +326,19 @@ public class OldMarkupProcessor extends SAXDocumentProcessor {
                     Location.ATTR_MARKUP,
                     new ConstValueProvider(AttributeType.LIST,
                         new ListValue(AttributeType.STRING,vals))));
-        }else
-          if(ignoredTags.size()!=0 && ignoredTags.getLast().equals(tagName)){
-            ignoredTags.removeLast();
-            ignore = true;
-          }
+        }
+        Pair<String, Integer> lastIgnored = ignoredTags.isEmpty()?null:ignoredTags.getLast();
+        if(lastIgnored!=null && lastIgnored.getFirst().equals(tagName) && lastIgnored.getSecond() == startedTag.size()){
+          ignoredTags.removeLast();
+          ignore = true;
+        }
       }
       if(!ignore) {
         writer.add(event);
         if(locationMarkup!=null)
           toString(event,locationMarkup);
       }
+      startedTag.removeLast();
     } else if (event.isCharacters()) {
       String content = event.asCharacters().getData();
       if(bodyStarted) {
@@ -303,9 +356,11 @@ public class OldMarkupProcessor extends SAXDocumentProcessor {
       }
       writer.add(event);
     } else {
-      writer.add(event);
-      if(locationMarkup!=null)
-        toString(event,locationMarkup);
+      if(!ignore && !handled) {
+        writer.add(event);
+        if(locationMarkup!=null)
+          toString(event,locationMarkup);
+      }
     }
     return true;
   }
@@ -319,7 +374,7 @@ public class OldMarkupProcessor extends SAXDocumentProcessor {
   }
   private static String INCORRECT_XMLNS="xmlns=";
   private String replaceStrangePS(String description) {
-	  //will not work on ns 
+    //will not work on ns 
     if(description == null)
       return description;
     String lower = description.toLowerCase();
@@ -341,7 +396,7 @@ public class OldMarkupProcessor extends SAXDocumentProcessor {
       pos = lower.indexOf("xmlns=", pos+1);
     }
     sb.append(description.substring(last));
-	return sb.toString(); 
+    return sb.toString(); 
   }
 
   private void toString(XMLEvent event, StringBuilder sb) {
@@ -377,7 +432,10 @@ public class OldMarkupProcessor extends SAXDocumentProcessor {
       newLocations.clear();
     bodyStarted = false;
     charCnt = 0;
-    started.clear();
+    startedLocation.clear();
+    startedTag.clear();
+    alreadyDescriptionLocation.clear();
+    wasSeenLocation.clear();
     lastSpace = false;
     remDesc.clear();
     startedUUID.clear();

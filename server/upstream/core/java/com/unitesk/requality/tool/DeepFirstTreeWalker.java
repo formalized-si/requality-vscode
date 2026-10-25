@@ -19,6 +19,7 @@ package com.unitesk.requality.tool;
 import java.util.Iterator;
 import java.util.LinkedList;
 import java.util.List;
+
 import com.unitesk.requality.core.model.TreeNode;
 import com.unitesk.requality.nodetype.VirtualNode;
 
@@ -70,7 +71,7 @@ public class DeepFirstTreeWalker extends TreeWalker {
       @Override
       public TreeNode next() {
         TreeNode result = stack.removeFirst();
-        while (result != null && result.isDisposed() && !stack.isEmpty()) {
+        while ((result == null || result.isDisposed()) && !stack.isEmpty()) {
           result = stack.removeFirst();
         }
         if (result == null || result.getType() == null) return null;

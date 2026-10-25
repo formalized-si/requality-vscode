@@ -109,13 +109,14 @@ import com.unitesk.requality.vscode.port.eclipse.handlers.copypaste.EclipsePaste
 import com.unitesk.requality.vscode.port.eclipse.ui.cnf.RequalityCNF;
 import com.unitesk.requality.vscode.port.eclipse.ui.cnf.SelectionFromSource;
 import com.unitesk.requality.vscode.port.eclipse.ui.editors.IEditorWithId;
+import com.unitesk.requality.vscode.port.eclipse.ui.editors.ISearchProvider;
 import com.unitesk.requality.nodetype.Document;
 import com.unitesk.requality.nodetype.Location;
 import com.unitesk.requality.nodetype.Requirement;
 import com.unitesk.requality.tool.CoreUtils;
 
 public class ReqMarker extends EditorPart implements ITabbedPropertySheetPageContributor, ISelectionProvider,
-    ITreeDBProvider, IFSIdProvider, ISelectionAdapter, IEditorWithId {
+    ITreeDBProvider, IFSIdProvider, ISelectionAdapter, IEditorWithId/*, ISearchProvider*/ {
   private Location initLoc = null;
   private static TreeNode[] NO_NODES = new TreeNode[0];
   private static final String DEFAULT_BASE_ENCODING = "UTF-8";
@@ -900,4 +901,11 @@ public class ReqMarker extends EditorPart implements ITabbedPropertySheetPageCon
   public boolean isSelectionSource() {
     return true;
   }
+  /*
+  @Override
+  public String getSelectionText() {
+    if (browser == null || browser.docservice == null || browser.docservice.resourceNodeToSocks == null)
+      return "";
+    return (String) browser.getWebBrowser().evaluate("return window.getSelection().toString()", true);
+  }*/
 }

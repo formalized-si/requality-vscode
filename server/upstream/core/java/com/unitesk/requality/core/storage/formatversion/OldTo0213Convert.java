@@ -13,6 +13,7 @@ import java.util.HashMap;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
+import java.util.Map.Entry;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentLinkedQueue;
@@ -39,15 +40,23 @@ public abstract class OldTo0213Convert {
   static String NODE_GROUP = "com.unitesk.nodegroup.requality";
   private HashMap<String, Object> processedFiles = new HashMap<>();
 
-  abstract Map<String, AttributeDefinition> reworkAttrs(UUID uid, Map<String, AttributeDefinition> ad,
-      Pair<Map<Path, UUID>, Map<UUID, Path>> uuidMaps, String version, boolean isRoot);
+  abstract void reworkAttrs(UUID uid, Path resFile, ConcurrentHashMap<String, AttributeDefinition> ad,
+      Pair<Map<Path, UUID>, Map<UUID, Path>> uuidMaps, String version, boolean isRoot,
+      ConcurrentHashMap<UUID, ConcurrentHashMap<String, AttributeDefinition>> processed);
 
   public String convert(Path proj, String version) throws Exception {
     // TODO Auto-generated method stub
     try {
       // List<String> vers = new ArrayList<String>();
       Pair<Map<Path, UUID>, Map<UUID, Path>> uuidMaps = gatherUUIDMaps(proj, version, true);
-      processContainer(proj, "", version, uuidMaps, true);
+
+      ConcurrentHashMap<UUID, ConcurrentHashMap<String, AttributeDefinition>> processedJsonMap = 
+        new ConcurrentHashMap<UUID, ConcurrentHashMap<String,AttributeDefinition>>();
+      processContainer(proj, "", version, uuidMaps, processedJsonMap, true);
+      for(Entry<UUID, ConcurrentHashMap<String, AttributeDefinition>> en: processedJsonMap.entrySet()) {
+        UUID uid = en.getKey();
+        saveAttributes(uid, uuidMaps.getSecond().get(uid), en.getValue());
+      }
       // proj.refreshLocal(IResource.DEPTH_INFINITE, null);
     } catch (Exception e) {
       RLogger.logError(e);
@@ -141,7 +150,7 @@ public abstract class OldTo0213Convert {
   private ReentrantLock filesLock = new ReentrantLock();
   private List<Path> handledFiles = new LinkedList<>(); 
   void processContainer(Path container, String path, String version, Pair<Map<Path, UUID>, Map<UUID, Path>> uuidMaps,
-      boolean isRoot) throws IOException {
+     ConcurrentHashMap<UUID, ConcurrentHashMap<String, AttributeDefinition>> processedDefs, boolean isRoot) throws IOException {
     List<Path> allMembers = null;
     try (Stream<Path> members = Files.list(container)) {//TODO rewrite ?
       if(members == null)
@@ -172,7 +181,7 @@ public abstract class OldTo0213Convert {
             if (name.endsWith("json")) {
               
               try {
-                handleFile(path + "/" + name, member, version, uuidMaps, isRoot);
+                handleFile(path + "/" + name, member, version, uuidMaps, processedDefs, isRoot);
               } catch (IOException e) {
                 e.printStackTrace();
               }
@@ -207,7 +216,7 @@ public abstract class OldTo0213Convert {
               return;
             }
             try {
-              processContainer(member, path + "/" + name, version, uuidMaps, false);
+              processContainer(member, path + "/" + name, version, uuidMaps, processedDefs, false);
             } catch (IOException e) {
               RLogger.logError(e);
             }
@@ -238,14 +247,16 @@ public abstract class OldTo0213Convert {
   }
 
   protected void handleFile(String path, Path f, String version, Pair<Map<Path, UUID>, Map<UUID, Path>> uuidMaps,
-      boolean isRoot) throws IOException {
+      ConcurrentHashMap<UUID, ConcurrentHashMap<String, AttributeDefinition>> processedAttributes, boolean isRoot) throws IOException {
     UUID uid = uuidMaps.getFirst().get(f);
     // try to load initial info for json file
     String absPath = f.toAbsolutePath().toString();
+    String id = f.getFileName().toString();
+    id = id.substring(0, id.length()-5);
     if (uid != null) {
       // InputStream file = null;
       try {
-        Map<String, AttributeDefinition> map = loadDeclarativeAttributes(uid, f, version);
+        Map<String, AttributeDefinition> storedMap = loadDeclarativeAttributes(uid, f, version);
 //          String filex = null;
 //          try {
 //            filex = new String(Files.readAllBytes(f.toPath()));
@@ -254,74 +265,91 @@ public abstract class OldTo0213Convert {
 //            e1.printStackTrace();
 //          }
 
-        if (map == null || map.isEmpty())
-          throw new RuntimeException("Empty attributes set for " + absPath);
-        map = reworkAttrs(uid, map, uuidMaps, version, isRoot);
-        if (map.isEmpty() || map.values().isEmpty())
+        ConcurrentHashMap<String, AttributeDefinition> map = null;
+        if ((storedMap == null || storedMap.isEmpty())) {
+          ReadLock rl = processFilesLock.readLock();
+          try {
+            rl.lock();
+            if(!processedFiles.containsKey(absPath))//only exception for non-processed files?
+              throw new RuntimeException("Empty attributes set for " + absPath);
+            else
+              return;//already processed earlier
+          }finally {
+            rl.unlock();
+          }
+        }else
+          map = new ConcurrentHashMap<>(storedMap);
+        reworkAttrs(uid, f.getParent().resolve(id+ResManager.RESOURCES_SUFFIX), map, uuidMaps, version, isRoot, processedAttributes);
+        Map<String, AttributeDefinition>toSave = processedAttributes.get(uid);
+        if (toSave == null || toSave.isEmpty() || toSave.values().isEmpty())
           throw new RuntimeException("Empty attributes set after rework for " + absPath);
-        String val = null;
-        try {
-          val = NodeMapper.toJSON(uid, map.values(), true).toString(4);
-        } catch (com.unitesk.jsonclone.JSONException e) {
-          RLogger.logError(e);
-        }
-        if (Files.exists(f) && val != null) {
-          ByteArrayInputStream in = null;
-          try {
-            in = new ByteArrayInputStream(val.getBytes("UTF-8"));
-            try {
-              Files.copy(in, f, StandardCopyOption.REPLACE_EXISTING);
-              WriteLock wl = processFilesLock.writeLock();
-              wl.lock();
-              try {
-                processedFiles.put(absPath, f);
-              } finally {
-                wl.unlock();
-              }
-            } catch (IOException e) {
-              RLogger.logError(e);
-              throw e;
-            }
-//              f.refreshLocal(0, null);
-//              f.setContents(in, true, true, null);
-          } finally {
-            if (in != null)
-              try {
-                in.close();
-              } catch (IOException e) {
-                // TODO Auto-generated catch block
-                e.printStackTrace();
-              }
-          }
-        } else if (val != null) {
-          ByteArrayInputStream in = null;
-          try {
-            in = new ByteArrayInputStream(val.getBytes("UTF-8"));
-            Files.copy(in, f, StandardCopyOption.REPLACE_EXISTING);
-          } catch (IOException re) {
-            try {
-              in = new ByteArrayInputStream(val.getBytes("UTF-8"));
-              Files.copy(in, f, StandardCopyOption.REPLACE_EXISTING);
-            } catch (IOException re2) {
-              re2.printStackTrace();
-            }
-          } finally {
-            if (in != null)
-              try {
-                in.close();
-              } catch (IOException e) {
-                // TODO Auto-generated catch block
-                e.printStackTrace();
-              }
-          }
-        }
+        
       } catch (JSONException e) {
         // TODO Auto-generated catch block
         e.printStackTrace();
-      } catch (UnsupportedEncodingException e) {
-        // TODO Auto-generated catch block
-        e.printStackTrace();
       } finally {
+      }
+    }
+  }
+  
+  public void saveAttributes(UUID uid, Path f,Map<String, AttributeDefinition> map) throws IOException {
+    String val = null;
+    String absPath = f.toAbsolutePath().toString();
+    try {
+      val = NodeMapper.toJSON(uid, map.values(), true).toString(4);
+    } catch (com.unitesk.jsonclone.JSONException e) {
+      RLogger.logError(e);
+    }
+    if (Files.exists(f) && val != null) {
+      ByteArrayInputStream in = null;
+      try {
+        in = new ByteArrayInputStream(val.getBytes("UTF-8"));
+        try {
+          Files.copy(in, f, StandardCopyOption.REPLACE_EXISTING);
+          WriteLock wl = processFilesLock.writeLock();
+          wl.lock();
+          try {
+            processedFiles.put(absPath, f);
+          } finally {
+            wl.unlock();
+          }
+        } catch (IOException e) {
+          RLogger.logError(e);
+          throw e;
+        }
+//              f.refreshLocal(0, null);
+//              f.setContents(in, true, true, null);
+      } catch (UnsupportedEncodingException e1) {
+        e1.printStackTrace();
+      } finally {
+        if (in != null)
+          try {
+            in.close();
+          } catch (IOException e) {
+            // TODO Auto-generated catch block
+            e.printStackTrace();
+          }
+      }
+    } else if (val != null) {
+      ByteArrayInputStream in = null;
+      try {
+        in = new ByteArrayInputStream(val.getBytes("UTF-8"));
+        Files.copy(in, f, StandardCopyOption.REPLACE_EXISTING);
+      } catch (IOException re) {
+        try {
+          in = new ByteArrayInputStream(val.getBytes("UTF-8"));
+          Files.copy(in, f, StandardCopyOption.REPLACE_EXISTING);
+        } catch (IOException re2) {
+          re2.printStackTrace();
+        }
+      } finally {
+        if (in != null)
+          try {
+            in.close();
+          } catch (IOException e) {
+            // TODO Auto-generated catch block
+            e.printStackTrace();
+          }
       }
     }
   }
@@ -361,7 +389,7 @@ public abstract class OldTo0213Convert {
       } finally {
         // file.reset();
       }
-    if (mret == null || mret.isEmpty()) {
+    if (!wasProcessed && (mret == null || mret.isEmpty())) {
       if (!resInited) {
         resFile = getResFile(f);
         resInited = true;

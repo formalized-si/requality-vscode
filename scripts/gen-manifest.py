@@ -730,9 +730,7 @@ main_edit = [
     dict(command='requality.edit.copy', group='2_edit@1'),
     dict(command='requality.edit.paste', group='2_edit@2'),
     dict(command='requality.delete', group='2_edit@3'),
-    # plugin.xml menu:org.eclipse.ui.main.menu: Edit > Find Next / Find Previous, visibleWhen activeEditorId is ReqMarker
-    dict(command='requality.findNext', when='activeWebviewPanelId == requality.markup', group='3_find@1'),
-    dict(command='requality.findPrevious', when='activeWebviewPanelId == requality.markup', group='3_find@2'),
+    # No Edit > Find Next / Find Previous: the plugin.xml menu contribution is commented out upstream (#13947)
     dict(command='requality.addBookmark', group='4_additions@1'),
     dict(command='requality.addTask', group='4_additions@2'),
 ]

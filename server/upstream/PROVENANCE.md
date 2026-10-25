@@ -6,9 +6,9 @@ distributed under the Apache License 2.0 (`LICENSE.txt`).
 | Item | Value |
 | --- | --- |
 | Repository | `https://forge.ispras.ru/git/reqdb.git` |
-| Branch | `release_1_4` |
-| Commit | `58e3d525c` (2026-06-10, "fixes read-only flag override") |
-| CKEditor | `https://forge.ispras.ru/repo/ckeditor/zips/ckeditor-4.16.zip`, SHA-256 `619dedb80e91bd378cc7fbf31e525ed7f016c6db79342f64eb951c99a4ba5580`, extracted over `jstools/` at build time exactly like the upstream `extractCkEditor` Gradle task |
+| Branch | `unstable` |
+| Commit | `e3f807bd4` (2026-10-23, "fix checkers to be called on project close") |
+| CKEditor | `https://repono.ispras.ru/repo/ckeditor/zips/ckeditor-4.16.zip`, SHA-256 `619dedb80e91bd378cc7fbf31e525ed7f016c6db79342f64eb951c99a4ba5580`, extracted over `jstools/` at build time exactly like the upstream `extractCkEditor` Gradle task |
 
 ## Layout
 
@@ -31,3 +31,4 @@ Every change to upstream code is marked with a `VSCODE-PATCH` comment and listed
 | `core/java/com/unitesk/requality/core/storage/FilesTracker.java` | Null guard in `open(Object)` | `dbsa` is null while a project is reopened during storage-format conversion (upstream NPE, reproduced on the public ETSI TS103096 catalog). |
 | `core/java/com/unitesk/requality/core/service/EditorsSocketService.java` | `nodeReferenceUUID` for `loadNodeByUUID` / `loadNodeTreeByUUID` | The UniEditor page of a requirement whose location addresses a document element by its path (`/Documents/<doc>/<uuid>`, catalogs converted from an older format) asked for that node; `UUID.fromString` threw, the message was lost and the page never initialized (reproduced on the public ETSI TS103096 catalog). |
 | `core/java/com/unitesk/requality/core/tree/TreeLogic.java` | `canBeDeleted` returns false for a node without a work parent | The explorer's selection record of a selected project is its root node (RequalityCNF); while a part with a node selection is active, the node delete handler (DeleteSelection) asks `canBeDeleted` about it, which dereferenced the missing parent of the root (upstream NPE, logged; the root cannot be deleted). |
+| `core/java/com/unitesk/requality/core/attribute/AttributeStorage.java` | `getAD` keeps the stored attribute when its origin node is missing | Old catalogs have attributes copied from nodes that are not in the catalog (22 `_type` attributes in the public ETSI TS103096 catalog). `getAD` removed such an attribute from the map that the storage caches. Since `unstable` the core loads a node without a type, the format conversion then failed with an NPE in `ResourceStorage.saveStorageAttributes` (shown in the conversion message), and a save would remove `_type` from the file. |

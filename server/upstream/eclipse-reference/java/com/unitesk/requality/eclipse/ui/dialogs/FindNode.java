@@ -859,7 +859,7 @@ public class FindNode extends Dialog implements IFSIdProvider {
   private void setSel(int pos2) {
     if (found == null || pos2 >= found.length || pos2 < 0)
       return;
-    TreeNode nd = found[pos2];
+    TreeNode nd = found[pos2] == null ? null : found[pos2];
     saveNewParamsAndUpdateOp(nd != null ? nd.getTreeDB() : db);
     if (nd != null) {
       SelectionManager sman = SelectionManager.getOne();
@@ -960,13 +960,15 @@ public class FindNode extends Dialog implements IFSIdProvider {
           
           nsh.execute(node);
           java.util.List<TreeNode> fnd = new LinkedList<>();
-          fnd.addAll(nsh.getMatches());
-  
-          TreeNode[] searchFound = fnd.toArray(new TreeNode[0]);
-          found = searchFound;
+          List<Pair<? extends TreeNode, List<String>>> matches = nsh.getMatches();
+          TreeNode [] onlyNodes = new TreeNode[matches.size()];
+          int i = 0;
+          for(Pair<? extends TreeNode, List<String>> pair: matches)
+            onlyNodes[i++] = pair.getFirst();
+          found = onlyNodes;
           Comparator<TreeNode> comp = TreeNodeComparator.getGComparator(SortingSettings.init(SortingMethod.BY_INDEX, false));
-          if(searchFound!=null)
-            Arrays.sort(searchFound,
+          if(onlyNodes!=null)
+            Arrays.sort(onlyNodes,
               comp);
   
           EclipseAPI.getDisplay().asyncExec(new Runnable() {

@@ -104,7 +104,7 @@ public abstract class AbstractResTracker implements IResTracker, ICacheStoragePr
          TreeState state) {
         CheckerContainer cc = db.getMetaObject(CheckerContainer.META_CONTAINER_NAME);
         if(cc!=null)
-          cc.stopOldThread();
+          cc.stopOldThread(false);
       }
     });
   }
@@ -271,6 +271,8 @@ public abstract class AbstractResTracker implements IResTracker, ICacheStoragePr
     String s = getLocation(db, true);//noCache tends to be quite better
     return s!=null;
   }
+  private static TreeState [] DISPOSED_STATE = new TreeState[] {TreeState.HALTED};
+  private static int CLOSE_WAIT_TIME = 60000;
   public OperationResult updateVersions(File f, AtomicReference<TreeDB> dba, RevisionInfo ri, boolean ignoreVers, IProgressMonitor mon) {
     byte l = 1;
     String lname = null;
@@ -342,10 +344,15 @@ public abstract class AbstractResTracker implements IResTracker, ICacheStoragePr
               public void run() {
                 TreeStateManager tsm = TreeStateManager.getOne(AbstractResTracker.this);
                 tsm.setState(flname, fpname, dba.get(), ri, TreeState.RESTART, true);
+                boolean setDisposed = false;
                 try {
                   if(isOpen(uri)) {
-                    tsm.setDisposed(flname, fpname, dba.get(), ri);//TODO test
-                    close(uri);
+                    close(dba.get());
+                    tsm.waitState(flname, ri, DISPOSED_STATE, CLOSE_WAIT_TIME);
+                    TreeState state = tsm.getState(flname, ri);
+                    if(state!= TreeState.HALTED && state != TreeState.RESTART && state!= TreeState.CANCELED) 
+                      tsm.setDisposed(flname, fpname, dba.get(), ri);//TODO test
+                   
                   }
                   
                   setProjectLoadingState(f.toURI(), pname, ProjectLoadingState.VERSION_UPDATE);
@@ -356,6 +363,7 @@ public abstract class AbstractResTracker implements IResTracker, ICacheStoragePr
                       RLogger.logError(msg);
                     else
                       RMessages.openBigInfo("Project Loading","loading error!"+msg, false);
+                    setDisposed = true;
                   }else{
                     String res = err.result;
                     String msg = "Conversion of '"
@@ -390,31 +398,24 @@ public abstract class AbstractResTracker implements IResTracker, ICacheStoragePr
 //                        RLogger.logError("tree loading resulted parallel after version update");
 //                        return;
 //                      }
-                    }
+                    }else
+                      setDisposed = true;
                    // tsm.setState(f.getName(), ri, TreeState.READY_NO_CACHE);
                     //trackTreeDB(f,f.getName(),null, false, db);
                   }else{
+                    setDisposed = true;
+                  }
+                } catch (Exception e) {
+                  RLogger.logError(e);
+                  setDisposed = true;
+                } finally {
+                  if(setDisposed) {
                     if(!isOpen(uri))
                       open(uri);
                     tsm.setDisposed(flname,fpname, dba.get(), ri);//TODO test
                     markNonLoadable(uri);
                     setProjectLoadingState(uri, pname, ProjectLoadingState.NOT_LOADING);
                   }
-                } catch (Exception e) {
-                  RLogger.logError(e);
-                  if(!isOpen(uri))
-                    open(uri);
-                  tsm.setDisposed(flname,fpname, dba.get(), ri);
-                  markNonLoadable(uri);
-                } finally {
-//                  if(tsm.getState(flname, ri) == TreeState.RESTART)
-//                  {
-//                    setProjectLoadingState(uri, pname, ProjectLoadingState.NOT_LOADING);
-//                    tsm.setState(flname, fpname, dba.get(), ri, TreeState.CANCELED, true);//if we still in restart then it is an error
-////                  if(isInNewHandling(uri)) {
-////                    removeNewHandling(uri);
-////                  }
-//                  }
                 }
               }
             };
@@ -789,6 +790,8 @@ public abstract class AbstractResTracker implements IResTracker, ICacheStoragePr
 //    }));
 //  }
   public abstract void bindTreeToProject(Object proj, TreeDB db, RevisionInfo ri, String lname, File ch);
+  public abstract void unbindBaseFromProject(Object project, TreeDB db, boolean delete, File ch);
+  
   public abstract void registerNames(TreeDB db, String lname, String pname);
   
   @Override
@@ -849,6 +852,7 @@ public abstract class AbstractResTracker implements IResTracker, ICacheStoragePr
     CacheStorage cs = db.get().getCacheStorage();
     CacheTransactionDescription st = cs.startCacheTransaction(pname, CacheStorage.COMMIT_ALL);
     try {
+      bindTreeToProject(obj, db.get(), db.get().revision, lname, null);
       OperationResult or = versionUpdatesCheck(obj, db, null, false);
       if(ignoreVersion || or == OperationResult.SUCEEDED) {
         int it = 0;
@@ -874,6 +878,7 @@ public abstract class AbstractResTracker implements IResTracker, ICacheStoragePr
         }
         if(or == OperationResult.UNSUCEEDED) {
           CacheStorage.closeRecConnection(new File(loc));
+          unbindBaseFromProject(obj, dbb, initCache, null);
         }
         return or;
       }

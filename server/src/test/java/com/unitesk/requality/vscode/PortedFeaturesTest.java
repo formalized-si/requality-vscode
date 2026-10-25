@@ -620,4 +620,51 @@ class PortedFeaturesTest {
     h.call("properties/pin", p);
     h.await("the project in Properties", v -> !(propertiesInput() instanceof com.unitesk.requality.core.model.TreeNode));
   }
+
+  /** The check box Ignore of the name field of the Main section (NameEditPanel, branch unstable of the plug-in). */
+  static com.unitesk.requality.vscode.ui.swt.widgets.Button ignoreCheckBox() {
+    return Display.getDefault().syncCall(() -> {
+      com.unitesk.requality.vscode.ui.tabbed.TabContents tab = PropertiesService.page().getCurrentTab();
+      if (tab == null || !"requality.propertyTab.main".equals(tab.getId()))
+        return null;
+      for (com.unitesk.requality.vscode.ui.tabbed.ISection s : tab.getSections())
+        if (s instanceof com.unitesk.requality.vscode.port.eclipse.views.properties.MainPropertySection)
+          try {
+            java.lang.reflect.Field name = s.getClass().getDeclaredField("textName");
+            name.setAccessible(true);
+            Object panel = name.get(s);
+            java.lang.reflect.Field check = panel.getClass().getDeclaredField("check");
+            check.setAccessible(true);
+            return (com.unitesk.requality.vscode.ui.swt.widgets.Button) check.get(panel);
+          } catch (ReflectiveOperationException e) {
+            throw new IllegalStateException(e);
+          }
+      return null;
+    });
+  }
+
+  /**
+   * The name field of the Main section has the check box Ignore (NameEditPanel of the branch unstable): a selection sets
+   * the attribute ignoreName of the node in a transaction, a second selection removes it.
+   */
+  @Test
+  @Order(101)
+  void theIgnoreCheckBoxOfTheNameFieldSetsIgnoreName() throws Exception {
+    h.call("properties/open", null);
+    select(requirement);
+    h.await("the requirement in Properties", v -> propertiesInput() instanceof com.unitesk.requality.core.model.TreeNode);
+    com.unitesk.requality.core.model.TreeNode node = (com.unitesk.requality.core.model.TreeNode) propertiesInput();
+    com.unitesk.requality.vscode.ui.swt.widgets.Button ignore = h.await2("the Ignore check box", PortedFeaturesTest::ignoreCheckBox);
+    assertEquals("Ignore", Display.getDefault().syncCall(ignore::getText));
+    assertFalse(Display.getDefault().syncCall(ignore::getSelection));
+    for (boolean on : new boolean[] {true, false}) {
+      Display.getDefault().syncExec(() -> {
+        ignore.setSelection(on);
+        ignore.notifyListeners(com.unitesk.requality.vscode.ui.swt.SWT.Selection, new com.unitesk.requality.vscode.ui.swt.widgets.Event());
+      });
+      h.await("ignoreName " + on, v -> node.attrs().getBooleanAttributeValue(com.unitesk.requality.core.model.TreeNode.ATTR_IGNORE_NAME, false) == on);
+      if (!on)
+        assertEquals(null, node.attrs().getAttribute(com.unitesk.requality.core.model.TreeNode.ATTR_IGNORE_NAME));
+    }
+  }
 }

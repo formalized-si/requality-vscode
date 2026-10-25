@@ -185,6 +185,8 @@ public class EclipseCheckerContainer extends CheckerContainer {
     return sb.toString();
   }
   
+  private Map<String, IMark[]> oldMarks = new HashMap<>();
+  
   private boolean updateMarks(TreeNode node, IMark[] marks, boolean strictLock) {
     IResource r = null;
     try{
@@ -196,7 +198,7 @@ public class EclipseCheckerContainer extends CheckerContainer {
     }
     if(r!=null&&r.exists()){
       //TODO remove locks?
-      synchronized (ResourceStorage.getLockObject(r.getProject())) {
+      synchronized (ResourceStorage.getLockObject(r.getProject(),node.getUUId())) {
        if(!r.exists())
          return true;//project was deleted
        return addToMarksUpdate(node, r, marks);
@@ -212,6 +214,17 @@ public class EclipseCheckerContainer extends CheckerContainer {
     public IMark[] marks;
   }
   private boolean addToMarksUpdate(TreeNode node, IResource r, IMark[] marks) {
+    String path = r.getFullPath().toString();
+    IMark[] marksNow = oldMarks.get(path);
+    if(marks == null || marks.length == 0) {
+      if(marksNow == null || marksNow.length == 0) {
+        oldMarks.put(path, marks);
+        return false;
+      }
+    }
+    if(marksNow== null && marks==null || marksNow!=null && marksNow.equals(marks)) {
+      return false;//no chnages?
+    }
     MarkUpdateCall muc = new MarkUpdateCall();
     muc.node = node;
     muc.r = r;
@@ -284,11 +297,13 @@ public class EclipseCheckerContainer extends CheckerContainer {
                       catch(Exception e){
                         RLogger.logError(e);
                       }
-                    } else RLogger.logInfo("non ex. marker");
+                    } else
+                      RLogger.logInfo("non ex. marker");
                   } catch (CoreException e) {
                     RLogger.logError(e);
                   }
                 }
+              oldMarks.put(muc.r.getFullPath().toString(), muc.marks);
             }
             synchronized (calls) {
               rwm = null;
@@ -401,8 +416,8 @@ public class EclipseCheckerContainer extends CheckerContainer {
   }
 
   @Override
-  public void stopOldThread() {
-    halted = true;
+  public void stopOldThread(boolean haltedState) {
+    halted = haltedState || halted;
     Object foldcheckthread;
     long oldid = -1;
     IStoppable st = null;
@@ -430,7 +445,7 @@ public class EclipseCheckerContainer extends CheckerContainer {
     WorkspaceJob wd = null;
     synchronized (EclipseCheckerContainer.this) {
       if(checkthread != null || checkthreadid != -1)
-        stopOldThread();
+        stopOldThread(false);
       if(halted)
         return;
       halted = false;
@@ -455,25 +470,31 @@ public class EclipseCheckerContainer extends CheckerContainer {
              emp = nodesTo.isEmpty();
            }
            boolean halt = false;
+           boolean treeLoading = false;
            while(!monitor.isCanceled() && !emp && (baseDB == curDB && curDB!=null && !curDB.isDisposed()) && !halt){
+             canRun = CoreUtils.getWorkspaceOperation().isEmpty();
              synchronized (EclipseCheckerContainer.this) {
                if(checkthread == null || !(checkthread instanceof WorkspaceJob) || checkthread!=this || baseDB!=curDB)
                  break;
              }
-             canRun = CoreUtils.getWorkspaceOperation().isEmpty();
              if(canRun){
                synchronized (nodesTo) {
-                 emp = nodesTo.isEmpty();
-               }
-               canRun = (!emp && canCheck(curDB));
+                  emp = nodesTo.isEmpty();
+                }
+               treeLoading = !canCheck(curDB);
+               canRun = (!emp && !treeLoading);
              }
+             if(canRun)
+               canRun = CoreUtils.getWorkspaceOperation().isEmpty();
              if(monitor.isCanceled())
                return Status.CANCEL_STATUS;
-             if(canRun&&checkthread == this)
-               halt = !runCheckerThreadActions(true) || curDB.getStorage().getMonitor().isCanceled();
+             if(canRun&&checkthread == this) {
+               com.unitesk.requality.core.operation.IProgressMonitor coreMon = new EclipseProgressMonitor(monitor);
+               halt = !runCheckerThreadActions(true, coreMon) || curDB.getStorage().getMonitor().isCanceled();
+             }
              else
               try {
-                Thread.currentThread().join(2000);
+                Thread.currentThread().join(treeLoading?10000:2000);
               } catch (InterruptedException e1) {
                 RLogger.logError(e1);
               }
@@ -484,7 +505,8 @@ public class EclipseCheckerContainer extends CheckerContainer {
             synchronized (nodesTo) {
               emp = nodesTo.isEmpty();
             }
-            canRun = (!emp && canCheck(curDB));
+            treeLoading = !canCheck(curDB);
+            canRun = (!emp && !treeLoading);
             if(emp)
               try {
                 Thread.currentThread().join(2000);
@@ -499,7 +521,7 @@ public class EclipseCheckerContainer extends CheckerContainer {
             canRun = (!emp && canCheck(curDB));
           }
           if(checkthread == this){
-            stopOldThread();
+            stopOldThread(false);
           }
         }finally {
           Global.unRegisterStoppable(ist);
@@ -518,7 +540,7 @@ public class EclipseCheckerContainer extends CheckerContainer {
         public void stop() {
           Global.unRegisterStoppable(this);
           if(checkthread instanceof WorkspaceJob && checkthread == wj){
-            stopOldThread();
+            stopOldThread(false);
           }
           if(wj!=null) {
             wj.cancel();

@@ -35,6 +35,7 @@ import com.unitesk.requality.core.api.IMonitorManager;
 import com.unitesk.requality.core.attribute.Attribute;
 import com.unitesk.requality.core.attribute.AttributeDefinition;
 import com.unitesk.requality.core.attribute.Version;
+import com.unitesk.requality.core.checker.IMark;
 import com.unitesk.requality.core.events.Moment;
 import com.unitesk.requality.core.instancer.TreeInstancer;
 import com.unitesk.requality.core.lock.LockIsBusy;
@@ -1037,6 +1038,11 @@ public class TransactionStorage extends AbstractTreeStorage {
     if(storage!=null)
       return storage.getMonitor();
     return monitor;
+  }
+
+  @Override
+  public Collection<IMark> getStorageNodeProblems(UUID uid){
+    return storage.getStorageNodeProblems(uid);//TODO add more problems?
   }
 
 

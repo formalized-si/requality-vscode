@@ -4,6 +4,8 @@ import java.io.IOException;
 import java.net.BindException;
 import java.net.URI;
 import java.net.URISyntaxException;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.util.HashSet;
 import java.util.LinkedList;
 import java.util.List;
@@ -23,9 +25,12 @@ import org.eclipse.jetty.servlet.ServletContextHandler;
 import org.eclipse.jetty.servlet.ServletHolder;
 import org.eclipse.jetty.util.thread.QueuedThreadPool;
 
+import com.unitesk.requality.core.attribute.valueprovider.IRelatedFilesProvider;
+import com.unitesk.requality.core.attribute.valueprovider.TempFolderFilesProvider;
 import com.unitesk.requality.core.jobs.JobManager;
 import com.unitesk.requality.core.jobs.RunnableWithMonitor;
 import com.unitesk.requality.core.log.RLogger;
+import com.unitesk.requality.core.model.Pair;
 import com.unitesk.requality.core.model.TreeDB;
 import com.unitesk.requality.core.model.TreeNode;
 import com.unitesk.requality.core.operation.IProgressMonitor;
@@ -34,6 +39,7 @@ import com.unitesk.requality.nodetype.Document;
 import com.unitesk.requality.nodetype.ReportData;
 import com.unitesk.requality.tool.CoreUtils;
 import com.unitesk.requality.tool.cli.CommandLineArgsProvider;
+import com.unitesk.requality.tool.cli.RequalityCLI;
 
 public class ResourcesProvider implements IPortStatusProvider {
   public static String KEY = UUID.randomUUID().toString();
@@ -49,6 +55,7 @@ public class ResourcesProvider implements IPortStatusProvider {
   private PortStatus portState = PortStatus.NOT_INITED;
   private ServerConnector connector;
   public boolean initiated = false;
+  protected Path imagesFolder = null;
   private static String generateRandom() {
     StringBuilder sb = new StringBuilder();
     Random r = new Random();
@@ -374,6 +381,25 @@ public class ResourcesProvider implements IPortStatusProvider {
 	return null;
 		
   }
+  public void initTempImagesPath(Path pth) { 
+    imagesFolder = pth;
+  }
+  public URI formTempImagePath(String name) {
+	StringBuilder pathBuilder = new StringBuilder();
+	pathBuilder.append("/");
+	pathBuilder.append(RANDOM_STRING);
+	pathBuilder.append("/");
+	pathBuilder.append(ResourcesServlet.IMAGES);
+	pathBuilder.append("/");
+	pathBuilder.append(name);
+	try {
+		return new URI("http",null, "127.0.0.1",port, pathBuilder.toString(),null,null);
+	} catch (URISyntaxException e) {
+		// TODO Auto-generated catch block
+		e.printStackTrace();
+	}
+	return null;
+  }
   public PortStatus getPortState() {
     return portState;
   }
@@ -389,4 +415,35 @@ public class ResourcesProvider implements IPortStatusProvider {
   public String serverDump() {
     return server.dump();
   }
+  private static java.nio.file.Path imFolder = null;
+  private static IRelatedFilesProvider tempImageProvider = null;
+  protected static Pair<String, String> loadImageToTempFolder(TreeDB db, String path) {
+    if(imFolder == null || !Files.exists(imFolder)) {
+      try {
+        imFolder = Files.createTempDirectory(CoreUtils.getCacheDir(db.getTracker().getGlobalCacheLocation()), "images");
+        imFolder.toFile().deleteOnExit();
+        RLogger.logDebug("temporary folder for upload images loaded to "+imFolder.toString());
+        tempImageProvider = TempFolderFilesProvider.getOne(imFolder.toFile(), false);
+        ResourcesProvider.getOne().initTempImagesPath(imFolder);
+      } catch (IOException e) {
+        RLogger.logError(e);
+      }
+    }
+    String retPath = null, error = null;
+    try {
+      retPath = RequalityCLI.handleImage(null, path, null, tempImageProvider, false);
+      if(retPath!=null) {
+         String namePart = retPath;
+         int lastSl = namePart.lastIndexOf("/");
+         namePart = namePart.substring(lastSl+1);
+         retPath = ResourcesProvider.getOne().formTempImagePath(namePart).toString();
+         imFolder.resolve(namePart).toFile().deleteOnExit();
+      }
+    }catch(Exception e) {
+      error = e.toString();
+    }
+    return new Pair<>(retPath, error);
+  }
+
+
 }

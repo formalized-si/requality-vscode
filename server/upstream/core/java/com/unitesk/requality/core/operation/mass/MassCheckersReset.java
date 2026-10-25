@@ -36,7 +36,7 @@ public class MassCheckersReset extends AbstractMassOperation {
     CheckerContainer cc = null;
     try {
       cc = root.getTreeDB().getCheckerContainer();
-      cc.stopOldThread();
+      cc.stopOldThread(false);
       return super.execute(root);
     }finally {
       if(cc!=null)

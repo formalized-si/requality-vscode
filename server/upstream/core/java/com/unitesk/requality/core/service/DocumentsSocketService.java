@@ -872,6 +872,7 @@ public class DocumentsSocketService extends GenericSocketService {
     if(!(d instanceof Document))
       throw new RuntimeException("Cannot create location on non-document node "+d.getUserVisibleName());
     Location loca = ((Document)d).createLocation(null);
+    frags.sort(Location.FRAGMENT_SORTER);
     loca.attrs().setConstAttribute(Location.ATTR_MARKUP, new ListValue(AttributeType.STRING, frags), Flag.HIDDEN);
         //undo = (String) jsData[1];
         //final String undof = undo;

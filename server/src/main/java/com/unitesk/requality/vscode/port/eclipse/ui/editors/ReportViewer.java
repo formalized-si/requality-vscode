@@ -595,7 +595,7 @@ public class ReportViewer extends EditorPart
   protected boolean isServerRelated(String location) {
     URI uri = (toSafeURI(location)).normalize();
     String pathPart = uri.getPath();
-    if (pathPart.startsWith("/" + ResourcesProvider.RANDOM_STRING)) return true;
+    if (pathPart!=null && pathPart.startsWith("/" + ResourcesProvider.RANDOM_STRING)) return true;
     return false;
   }
   private static final Pattern URI_INVALID_CHARS = Pattern.compile("[^A-Za-z0-9\\-._~:/?#\\[\\]@!$&'()*+,;=]");

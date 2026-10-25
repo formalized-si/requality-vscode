@@ -1,10 +1,12 @@
 handlers = [];
+
 window.readOnlyChanged = function(newState){
   var info = document.getElementById("readOnlyInfo");
   if(info){
     info.className=!newState?"hiddenPoint":"";
   }
 }	
+
 handlers["init"] = function(op, current_instance, msg){
 	loadTemplates();
 	var editorName = msg['editorName'];
@@ -29,6 +31,11 @@ handlers["readOnlyChange"] = function(op, current_instance,msg){
     window.readOnly = true;
   window.readOnlyChanged(window.readOnly);
 };
+handlers["sendImageLoaded"] = function (op, current_instance, msg){
+  if(typeof window.imageUploaded !== "undefined"){
+    window.imageUploaded(msg['path'], msg['error']);
+  }
+}
 handlers["sendLoadNodeByUUIDResult"]=function(op, current_instance, msg){
 	var uuid = msg['node'];
 	var data = msg['data'];

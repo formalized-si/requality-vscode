@@ -9,6 +9,8 @@ const path = require('path');
 
 const ROOT = path.join(__dirname, '..');
 const { version } = require('../package.json');
+// VS Code convention: an odd minor version is a pre-release (1.5.x), an even one a release (1.4.x, 1.6.x)
+const PRE_RELEASE = Number(version.split('.')[1]) % 2 === 1 ? ['--pre-release'] : [];
 const JAVA = 21;
 /** The VS Code targets and the operating systems and architectures of Adoptium. */
 const TARGETS = {
@@ -96,14 +98,15 @@ async function main() {
       const pkg = await jrePackage(...TARGETS[target]);
       console.log(`${target}: ${pkg.name} (${pkg.release})`);
       unpack(await download(pkg));
-      run('npx', ['--no-install', 'vsce', 'package', '--target', target, '--githubBranch', 'main',
+      run('npx', ['--no-install', 'vsce', 'package', '--target', target, '--githubBranch', 'main', ...PRE_RELEASE,
         '--out', path.join(OUT, `requality-vscode-${version}-${target}.vsix`)], env);
     }
   } finally {
     fs.rmSync(JRE, { recursive: true, force: true });
   }
   if (!only.length) {
-    run('npx', ['--no-install', 'vsce', 'package', '--githubBranch', 'main', '--out', path.join(OUT, `requality-vscode-${version}.vsix`)], env);
+    run('npx', ['--no-install', 'vsce', 'package', '--githubBranch', 'main', ...PRE_RELEASE,
+      '--out', path.join(OUT, `requality-vscode-${version}.vsix`)], env);
   }
 }
 

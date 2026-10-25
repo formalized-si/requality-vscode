@@ -42,6 +42,7 @@ import java.util.concurrent.locks.ReentrantReadWriteLock;
 import com.unitesk.requality.core.attribute.Attribute;
 import com.unitesk.requality.core.attribute.AttributeDefinition;
 import com.unitesk.requality.core.attribute.AttributeStorage;
+import com.unitesk.requality.core.checker.IMark;
 import com.unitesk.requality.core.events.Moment;
 import com.unitesk.requality.core.lock.LockType;
 import com.unitesk.requality.core.log.RLogger;
@@ -442,6 +443,11 @@ public class MemoryStorage extends AbstractTreeStorage {
       locks.put(uid, rl); 
     }
     return rl;
+  }
+
+  @Override
+  public Collection<IMark> getStorageNodeProblems(UUID uid){
+    return Collections.emptyList();
   }
 
 }

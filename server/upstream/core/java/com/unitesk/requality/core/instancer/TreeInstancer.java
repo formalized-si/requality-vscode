@@ -44,6 +44,7 @@ import com.unitesk.requality.core.attribute.Version;
 import com.unitesk.requality.core.attribute.reference.RelManager;
 import com.unitesk.requality.core.attribute.valueprovider.ConstValueProvider;
 import com.unitesk.requality.core.attribute.valueprovider.ReferenceValueProvider;
+import com.unitesk.requality.core.checker.IMark;
 import com.unitesk.requality.core.lock.LockIsBusy;
 import com.unitesk.requality.core.lock.LockType;
 import com.unitesk.requality.core.log.RLogger;
@@ -769,7 +770,7 @@ public class TreeInstancer extends AbstractTreeStorage {
   }
 
   public boolean isVirtual(UUID uid, String id, Map<String, AttributeDefinition> attrs, boolean week) {
-    if (uid.equals(cloneuid)) return true; // can load root
+    if (uid.equals(getRootNode())) return true; // can load root
     String vmark = getVMark(uid, attrs);
     if (vmark != null) return week || vmark.equals(getRootNode().toString());
     return false;
@@ -784,7 +785,7 @@ public class TreeInstancer extends AbstractTreeStorage {
     // if(oldti.canLoad(uuid))
     // return true;
     // }
-    if (cloneuid!=null && cloneuid.equals(uuid)) return true;
+    if (getRootNode()!=null && getRootNode().equals(uuid)) return true;
     // if(parentReplace.containsKey(uuid)&&
     // cloneid.equals(parentReplace.get(uuid)))
     // return true;
@@ -996,6 +997,12 @@ public class TreeInstancer extends AbstractTreeStorage {
     if(getBaseStorage() instanceof ICacheStorageProvider)
       return ((ICacheStorageProvider)getBaseStorage()).getCPCacheStorage(dbfrom);
     return null;
+  }
+
+
+  @Override
+  public Collection<IMark> getStorageNodeProblems(UUID uid){
+    return getBaseStorage().getStorageNodeProblems(uid);//TODO mode problems?
   }
 
 }

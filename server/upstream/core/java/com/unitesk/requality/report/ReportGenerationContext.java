@@ -276,9 +276,6 @@ public class ReportGenerationContext {
         if(rgc.reportData == null)
           rgc.reportData = rootRData;
       }
-      if(handler.lastReport == null)
-        handler.lastReport = rgc.reportData;
-      
     }finally{
       monitor.doneTask();      
     }
@@ -523,7 +520,7 @@ public class ReportGenerationContext {
     }else
     {
       ReportGenerationContext cont = relatedContexts.get(db.getLocalName());
-      if(cont!=null)
+      if(cont!=null && cont!=this)
         ret = cont.getMultipartRoots(db);
       else
         ret = db.getMultipartSettings().getMultipartRoots(null, (Requirement) db.getNode(Requirement.getTypeRootQId()), false);

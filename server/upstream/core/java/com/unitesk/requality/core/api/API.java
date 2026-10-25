@@ -54,6 +54,7 @@ import com.unitesk.requality.core.operation.IProgressMonitor;
 import com.unitesk.requality.core.operation.create.CreateElementOperation;
 import com.unitesk.requality.core.propagator.AttributePropagatorComparator;
 import com.unitesk.requality.core.storage.ISectionModel;
+import com.unitesk.requality.core.storage.ResManager;
 import com.unitesk.requality.core.storage.cache.CacheManipulator;
 import com.unitesk.requality.core.storage.cache.SettingsManipulator;
 import com.unitesk.requality.repo.ICVSClient;
@@ -512,6 +513,8 @@ public class API {
     if(project == null)
       return null;
     project = Instantiator.getRootTree(project);
+    if(ResManager.isMarkedAsDeleting(project))
+      return null;
     for (IAPIRepoSource api : apiRepo) {
       try{
         Collection<IRepoMapper> t = api.getRepositoryMappers();

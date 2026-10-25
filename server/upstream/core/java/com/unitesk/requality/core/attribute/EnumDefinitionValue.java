@@ -15,7 +15,7 @@ public class EnumDefinitionValue implements Iterable<EnumValue>, Cloneable {
   }
 
   public AttributeType getType() {
-    return type;
+    return type!=null?type:AttributeType.STRING;//adds default
   }
 
   public List<EnumValue> getValues() {

@@ -40,32 +40,36 @@ public class UVIdProjectChecker implements ITreeChecker{
       return false;
     // null type is an error
     {
-      Map<String, TreeNode[]> unid = new HashMap<>();
+      Map<String, UUID[]> unid = new HashMap<>();
       NamesCacheMan ncm = db.getCMM().getLinkManipulator().getNCM();
       Map<String, Set<UUID>> map = ncm.getAllNamesRecords();
       
       List<TreeNode> notignored = new LinkedList<>();
       List<TreeNode> checkedIgnoredParents = new LinkedList<>();
       
-      Set<TreeNode> sameParentDuplication = new HashSet<>();
-      Set<TreeNode> sameNameDuplication = new HashSet<>();
+      Set<UUID> sameParentDuplication = new HashSet<>();
+      Set<UUID> sameNameDuplication = new HashSet<>();
       Map<String, String> notIgnoredSimilar = new HashMap<>();
       Map<String, TreeNode[]> notIgnoredSimilarNodes = new HashMap<>();
-      Map<TreeNode, String> sameParentSimilar = new HashMap<>();
-      Map<TreeNode, TreeNode[]> sameParentSimilarNodes = new HashMap<>();
-      
+      Map<UUID, String> sameParentSimilar = new HashMap<>();
+      Map<UUID, TreeNode[]> sameParentSimilarNodes = new HashMap<>();
+
+      Map<UUID, String> nodeLabel = new HashMap<>();
       Map<String, List<TreeNode>> ipChildren = new HashMap<>();
+      //TODO not work for cloned clones
       for(Entry<String, Set<UUID>> en:map.entrySet()) {
         if(en.getValue()!=null && en.getValue().size()>1) {
           notignored.clear();
           for(UUID uid: en.getValue()) {
             TreeNode node = db.getNode(uid);
             if(node!=null) {
-              if(!node.attrs().getBooleanAttributeValue(TreeNode.ATTR_IGNORE_NAME,false))
+              if(!node.attrs().getBooleanAttributeValue(TreeNode.ATTR_IGNORE_NAME,false)) {
                 notignored.add(node);
-              else {
+                nodeLabel.put(uid, node.getQualifiedId());
+              }else {
                 TreeNode par = node.getShownParent();
                 if(par!=null && !checkedIgnoredParents.contains(par)) {
+                  UUID parUid = par.getUUId(); 
                   ipChildren.clear();
                   checkedIgnoredParents.add(par);
                   for(TreeNode chi: par.getShownChildren()) {
@@ -75,6 +79,7 @@ public class UVIdProjectChecker implements ITreeChecker{
                       nds = new LinkedList<>();
                       ipChildren.put(nid, nds);
                     }
+                    nodeLabel.put(chi.getUUId(), chi.getQualifiedId());
                     nds.add(chi);
                   }
                   for(Entry<String, List<TreeNode>> ent:ipChildren.entrySet()) {
@@ -86,10 +91,10 @@ public class UVIdProjectChecker implements ITreeChecker{
                         sb.append("'");
                         sb.append(chi.getQualifiedId()); //updates problem-related list
                         sb.append("'");
-                        sameParentDuplication.add(chi);
+                        sameParentDuplication.add(chi.getUUId());
                       }
-                      sameParentSimilar.put(par, sb.toString());
-                      sameParentSimilarNodes.put(par, 
+                      sameParentSimilar.put(parUid, sb.toString());
+                      sameParentSimilarNodes.put(parUid, 
                     		  ent.getValue().toArray(new TreeNode[ent.getValue().size()]));
                     }
                   }
@@ -105,21 +110,24 @@ public class UVIdProjectChecker implements ITreeChecker{
                 sb.append(ni.getQualifiedId()); //updates problem-related list 
                 sb.append("'");
                 
-                sameNameDuplication.add(ni); //add to nodes with problems
+                sameNameDuplication.add(ni.getUUId()); //add to nodes with problems
               }
               notIgnoredSimilar.put(en.getKey(), sb.toString());
               notIgnoredSimilarNodes.put(en.getKey(),
-            		  notignored.toArray(new TreeNode[notignored.size()]));
+                 notignored.toArray(new TreeNode[notignored.size()]));
             }
           }
         }
       }
-      Set<TreeNode> allNodes = new HashSet<>(sameNameDuplication);
+      Set<UUID> allNodes = new HashSet<>(sameNameDuplication);
       allNodes.addAll(sameParentDuplication);
       
       final String projectName = db.getVisibleName();
       
-      allNodes.parallelStream().forEach(node->{
+      allNodes.parallelStream().forEach(uid->{
+        TreeNode node = db.getNode(uid);
+        if(node.isVirtual())
+          return;
         List<IMark> marks = new LinkedList<>();
         ReentrantLock rl = node.getTreeCheckersLock();
         try {
@@ -127,10 +135,12 @@ public class UVIdProjectChecker implements ITreeChecker{
           marks.addAll(Arrays.asList(node.getTreeCheckerProblems()));
           String nodeName = node.getName();
           boolean changed = false;
-          if(sameNameDuplication.contains(node)) {
+          if(sameNameDuplication.contains(uid)) {
             String sameList = notIgnoredSimilar.get(nodeName);
             TreeNode[] addNodes = notIgnoredSimilarNodes.get(nodeName);
             changed = true;
+            if(addNodes == null)
+              return;//clones of clones seems to made it
             String[] data = new String[addNodes.length+2];
             data[0] = nodeName;
             data[1] = sameList;
@@ -138,19 +148,20 @@ public class UVIdProjectChecker implements ITreeChecker{
             for(TreeNode chi: addNodes)
               data[i++] = chi.getQualifiedId();
             marks.add(new UVIdCheckerProblem(node,"problem_name_duplicated", "The name '%s' is duplicated on nodes: %s",
-            		data, addNodes));
+                 data, addNodes));
           }
-          if(sameParentDuplication.contains(node)) {
+          if(sameParentDuplication.contains(uid)) {
             TreeNode sp = node.getShownParent();
+            UUID spuid = sp.getUUId();
             nodeName = node.getNameOrId();
-            String sameList = sameParentSimilar.get(sp);
-            TreeNode[] addNodes = sameParentSimilarNodes.get(sp);
+            String sameList = sameParentSimilar.get(spuid);
+            TreeNode[] addNodes = sameParentSimilarNodes.get(spuid);
             changed = true;
             String[] data = new String[addNodes.length+2];
             data[0] = nodeName;
             data[1] = sameList;
             int i = 2;
-            for(TreeNode chi: allNodes)
+            for(TreeNode chi: addNodes)
               data[i] = chi.getQualifiedId();
             marks.add(new UVIdCheckerProblem(node, "problem_name_not_unique_on_parent", "The nameOrId '%s' is not unique for children of the same parent: %s", 
             		data, addNodes));

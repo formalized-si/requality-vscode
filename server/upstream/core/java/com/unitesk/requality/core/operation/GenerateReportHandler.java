@@ -34,6 +34,7 @@ import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.UUID;
 import java.util.concurrent.atomic.AtomicReference;
 
 import com.unitesk.requality.core.api.API;
@@ -86,7 +87,7 @@ public class GenerateReportHandler implements IGenerateReportHandler {
     return baseprovider;
   }
   public static String ATTR_RELATED = "relatedSettings";
-  public ReportData lastReport = null;
+  //public ReportData lastReport = null;
   private String lastError = null;
   @Override
   public Object execute(boolean lockWorkspace, Collection<ReportSettings> nodes, Map<?, ?> par, IProgressMonitor monitor, boolean openAfter) throws Exception {
@@ -166,7 +167,7 @@ public class GenerateReportHandler implements IGenerateReportHandler {
         TreeNode old = par.findWorkChild(n.report.getId());
         if(old!=null)
           old.delete();
-        TreeNode repNode = n.report.createNode(targDB, n.reportParent, true);
+        TreeNode repNode = n.report.createNode(targDB, n.reportParent, true, true);
         ret[i] = new ReportGenResult<TreeNode>(n.href, n.reportParent, repNode, n.savePath);
         repNode.attrs().setConstAttribute("generationOver", ReportSettings.dataFormat.format(new Date()), 0);
         repNode.commitAttributes();
@@ -251,8 +252,6 @@ public class GenerateReportHandler implements IGenerateReportHandler {
       }
       Map<String, ReportGenerationContext> contexts = new HashMap<>();
       try {
-        lastReport = null;
-        
         TreeDB db = reportS.getTreeDB();
         String dbname = db.getProjectName();
         AtomicReference<RelationsTreeContext> related = new AtomicReference<>();
@@ -366,7 +365,9 @@ public class GenerateReportHandler implements IGenerateReportHandler {
             }
           }
           //TODO more contexts?
-          return new Pair<>(contexts, new ReportGenResult<NodeDesc>(rootC.href, rdata.getWorkParentUUID(), NodeDesc.fromNode(rdata,true), rootC.savePath));
+          String nextUid = rdata.attrs().getStringAttributeValue(ReportData.NEXT_REPORT_UUID, UUID.randomUUID().toString());
+          NodeDesc nd = NodeDesc.fromNode(rdata, UUID.fromString(nextUid), true);
+          return new Pair<>(contexts, new ReportGenResult<NodeDesc>(rootC.href, rdata.getWorkParentUUID(), nd, rootC.savePath));
         }else {
           return null;
         }
@@ -511,10 +512,5 @@ public class GenerateReportHandler implements IGenerateReportHandler {
   @Override
   public String getLastError() {
     return lastError;
-  }
-
-  @Override
-  public ReportData getLastReport() {
-    return lastReport;
   }
 }

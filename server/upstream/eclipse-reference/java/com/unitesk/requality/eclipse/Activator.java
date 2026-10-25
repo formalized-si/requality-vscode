@@ -234,7 +234,15 @@ public class Activator extends AbstractUIPlugin {
           for(java.nio.file.Path child:toRemove)
             recBareDelete(child);
         }
-        Files.delete(p);
+        try {
+          Files.delete(p);
+        }catch(IOException e) {
+          java.nio.file.Path moved = Files.move(p, p.getParent().resolve(p.getFileName()+"__renamed"));
+          if(moved!=null)
+            Files.delete(moved);
+          else
+            throw e;
+        }
       }
       @Override
       public boolean delete(File f, boolean force, boolean clearcache, int depth) {
@@ -1424,7 +1432,7 @@ public class Activator extends AbstractUIPlugin {
   private static void initTracker(Activator a) throws CoreException {
     LinkedList<URI> reqProjects = new LinkedList<>();
     for (IProject changedProject : ResourcesPlugin.getWorkspace().getRoot().getProjects()) {
-      RLogger.logDebug("found project "+changedProject.getName(),5);
+      RLogger.logDebug("found project "+changedProject.getName(),5);//local name by fact
       reqProjects.add(changedProject.getLocationURI());
     }
     IResTracker tracker = getTracker();

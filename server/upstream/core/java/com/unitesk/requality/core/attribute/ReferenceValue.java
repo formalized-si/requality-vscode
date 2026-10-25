@@ -9,6 +9,7 @@ import java.util.Map;
 import java.util.TreeMap;
 import java.util.UUID;
 import java.util.concurrent.CopyOnWriteArrayList;
+
 import com.unitesk.requality.core.attribute.reference.IReferenceVersionRule;
 import com.unitesk.requality.core.attribute.valueprovider.ReferenceValueProvider;
 import com.unitesk.requality.core.checker.IMark;
@@ -155,7 +156,7 @@ public class ReferenceValue implements IContextStringProvider, IStringParamConsu
           }
           if(lvars.size() == 0){
             if(persist){
-              stringValue = ReferenceValueProvider.MISSING_MESSAGE.replace("{val}", raw.toString()).replace("{key}", key);
+              stringValue = ReferenceValueProvider.MISSING_MESSAGE.replace("{val}", raw.toString()).replace("{key}", key==null?"UNKNOWN":key);
               isError = true;
             }
             return null;

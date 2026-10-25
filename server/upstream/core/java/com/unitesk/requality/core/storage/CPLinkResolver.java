@@ -1038,8 +1038,12 @@ public class CPLinkResolver extends CacheManipulator<TreeDB> implements IStoppab
                   dba = node.getTreeDB();//TODO mb bad
                 }
                 for(Entry<String, List<LateResolveRequest>> nodeLinks:lrrs.get(node).entrySet()) {
-                  lrr.removeAll(nodeLinks.getValue());
-                  revertlates.get(nodeLinks.getKey()).removeAll(nodeLinks.getValue());
+                  List<LateResolveRequest> list = nodeLinks.getValue();
+                  if(list != null) {
+                    lrr.removeAll(list);
+                    revertlates.get(nodeLinks.getKey()).removeAll(list);
+                  }else
+                    RLogger.logError("Problem during late links hanling - list for "+nodeLinks.getKey()+" is null");
                 }
                 directLatesMap.clear();
                 dba.getTracker().getCPLinkResolver(dba).handleLinksAttributesChanges(

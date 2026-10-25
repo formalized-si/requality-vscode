@@ -6,6 +6,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.SortedMap;
 import java.util.TreeMap;
+
 import org.eclipse.jface.dialogs.Dialog;
 import org.eclipse.jface.dialogs.MessageDialog;
 import org.eclipse.jface.viewers.CellEditor;
@@ -41,6 +42,7 @@ import org.eclipse.swt.widgets.Table;
 import org.eclipse.swt.widgets.TableItem;
 import org.eclipse.ui.ISharedImages;
 import org.eclipse.ui.PlatformUI;
+
 import com.unitesk.requality.core.attribute.Attribute;
 import com.unitesk.requality.core.attribute.AttributeType;
 import com.unitesk.requality.core.attribute.ListValue;
@@ -602,6 +604,7 @@ public class ListValueEditor extends DialogCellEditor {
 
     protected CellEditor getEditor(TreeNode node, AttributeType lasttype, Composite t, int style) {
       if (lasttype == AttributeType.STRING) return new TextCellEditor(t, style);
+      if (lasttype == AttributeType.HTML) return new TextCellEditor(t, style);
       if (lasttype == AttributeType.LIST) return new ListValueEditor(node, t, style, false);
       if (lasttype == AttributeType.INT) return new IntValueEditor(t, style);
       if (lasttype == AttributeType.BOOL) return new BoolValueEditor(t, style);

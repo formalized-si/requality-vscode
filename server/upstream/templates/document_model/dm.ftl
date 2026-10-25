@@ -344,6 +344,12 @@ ${dc?html}
 </#if><#t>
 <style type="text/css"><#t>
 
+<#if fitImages?? >
+  img,object{
+    max-width: 100%;
+    object-fit: contain;
+  }
+</#if>
 .fragment{
 	background: #FFFFBB;
 }

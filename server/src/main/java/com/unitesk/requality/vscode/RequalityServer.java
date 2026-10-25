@@ -18,7 +18,7 @@ import com.unitesk.requality.vscode.services.Services;
  * their RPC methods in {@link Services}.
  */
 public final class RequalityServer {
-  public static final String VERSION = "1.4.0";
+  public static final String VERSION = "1.5.0";
 
   private final JsonRpcConnection rpc;
   private final Main.ServerOptions options;
@@ -91,7 +91,7 @@ public final class RequalityServer {
     com.unitesk.requality.vscode.services.ViewsService.createInitialLayout();
     JsonObject result = new JsonObject();
     result.addProperty("version", VERSION);
-    result.addProperty("upstream", "release_1_4@58e3d525c");
+    result.addProperty("upstream", "unstable@e3f807bd4");
     return result;
   }
 
