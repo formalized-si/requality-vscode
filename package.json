@@ -3274,6 +3274,8 @@
     "package": "vsce package --githubBranch main --out requality-vscode-1.5.0.vsix",
     "check": "tsc -p . --noEmit",
     "package:platforms": "node scripts/package-platforms.js",
+    "package:mcp": "node scripts/package-mcp.js",
+    "test:mcp": "node test/mcp/smoke.js",
     "media": "npm run compile && node out/test/media/run.js"
   },
   "dependencies": {

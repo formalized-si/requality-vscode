@@ -71,6 +71,8 @@ public final class Workspace {
   }
 
   private final RequalityServer server;
+  /** The catalogs this server loads are locked for it (one server per catalog, see CatalogLocks). */
+  private final CatalogLocks locks = CatalogLocks.forUser();
   /** The workspace folders (replaced as a whole when they change). */
   private volatile List<File> folders = new ArrayList<>();
   /** One discovery at a time: a scan and the application of its result are not interleaved with another scan. */
@@ -492,6 +494,7 @@ public final class Workspace {
     for (Project p : projects())
       if (!p.closed)
         unload(p);
+    locks.releaseAll();
   }
 
   /** (Re)loads the workspace project in a folder (on the loader thread); false when the folder is not a project. */
@@ -528,6 +531,16 @@ public final class Workspace {
         changed();
         return;
       }
+    }
+    try {
+      if (!locks.acquire(p.dir)) {
+        p.error = "The catalog is open in another Requality process (VS Code or requality-mcp): " + p.dir;
+        changed();
+        return;
+      }
+    } catch (IOException e) {
+      // no lock directory (read-only home): the catalog loads without the lock
+      RLogger.logError(e);
     }
     p.loading = true;
     changed();
@@ -570,6 +583,7 @@ public final class Workspace {
         RLogger.logError(e instanceof Exception ? (Exception) e : new RuntimeException(e));
       }
     }
+    locks.release(p.dir);
   }
 
   public synchronized Project project(String localName) {

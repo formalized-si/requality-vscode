@@ -30,6 +30,7 @@ The extension uses the original Requality core and the original user interface c
 - The Properties, Outline, Links Explorer, Bookmarks, Tasks, History, Synchronize, Problems and Progress views
   are the Eclipse views.
 - The packages for Windows, Linux and macOS contain a Java runtime. You do not have to install Java.
+- An AI agent can use Requality without a window. Refer to [Requality without a window (MCP server)](#requality-without-a-window-mcp-server).
 
 ## How the port works
 
@@ -74,6 +75,25 @@ To install a VSIX file (for example, from the GitHub releases):
 
 The extension starts the Requality server.
 The **Requality** side bar and the **Requality** panel show the views of the Requality perspective.
+
+## Requality without a window (MCP server)
+
+The Requality MCP server is Requality without a window, for AI agents on your computer (Claude Code, Codex, Cursor
+and others). The agent starts the server and uses its tools through the Model Context Protocol. The tools read
+the catalogs, find nodes, create and change requirements, links and document locations, import documents, run the
+checkers and generate reports.
+
+- The GitHub releases have the archives `requality-mcp-<version>-<platform>`. They contain a Java runtime.
+- The VS Code extension contains the same server: `dist/server/bin/requality-mcp`.
+
+To connect Claude Code:
+
+```
+claude mcp add requality -- /path/to/requality-mcp/bin/requality-mcp /path/to/catalogs
+```
+
+Only one Requality process can open a catalog at a time. Close the catalog in VS Code before the agent uses it.
+Refer to [docs/MCP.md](docs/MCP.md) for the other agents, the tools and the options.
 
 ## Eclipse views in VS Code
 
@@ -263,6 +283,8 @@ The status bar shows the current perspective. Click it to open the **Open Perspe
 5. Run `npm run package`. This command makes the file `requality-vscode-1.5.0.vsix` without a Java runtime.
 6. To make the packages of a release, run `npm run package:platforms`.
    This command makes one VSIX file for each platform with a Java runtime, and one without, in `release/`.
+7. To make the archives of the MCP server, run `npm run package:mcp`.
+   This command makes one archive for each platform with a Java runtime, and one without, in `release/`.
 
 The workflow `.github/workflows/release.yml` makes a release for a tag `v<version>`.
 It publishes the packages to the Visual Studio Marketplace (secret `VSCE_PAT`) and to Open VSX (secret `OVSX_PAT`).
@@ -275,6 +297,7 @@ If the minor number of the version is odd, the packages and the GitHub release a
 | `npm run test:server` | The Java tests of the server. |
 | `npm run test:unit` | The unit tests of the renderer and of the extension. |
 | `npm run test:integration` | The tests of the extension in a VS Code that the test downloads. |
+| `npm run test:mcp` | The test of `dist/server/bin/requality-mcp`: an agent creates a catalog and a requirement. |
 | `npm test` | All the tests above. |
 
 - The server tests download the public ETSI TS 103 096 catalog into `server/build/test-catalogs`.
@@ -315,8 +338,9 @@ The Requality core does not load these nodes. The catalog data causes these mess
 | `server/src/main/java/.../vscode/port/` | The ported Eclipse plug-in classes. |
 | `server/src/main/java/.../vscode/ui/` | The compatibility layer: SWT, JFace, workbench and the other Eclipse APIs. |
 | `server/src/main/java/.../vscode/services/` | The JSON-RPC services of the server. |
+| `server/src/main/java/.../vscode/mcp/` | The headless server and its MCP server (tools for AI agents). |
 | `scripts/` | The tools for the port, and the generators of the manifest and of the parity report. |
-| `docs/` | `PARITY.md` (generated), `PORTING-GUIDE.md` and `command-map.json`. |
+| `docs/` | `MCP.md`, `PARITY.md` (generated), `PORTING-GUIDE.md` and `command-map.json`. |
 
 ## License
 

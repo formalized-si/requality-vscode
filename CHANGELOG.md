@@ -5,6 +5,13 @@
 The port now uses the branch `unstable` of Requality (commit `e3f807bd4`, 2026-10-23).
 Release 1.4 does not get changes after 2026-06-10. The upstream developers make all changes in `unstable`.
 
+New: the Requality MCP server, Requality without a window for AI agents (`requality-mcp`, refer to `docs/MCP.md`).
+An agent reads the catalogs, finds nodes, creates and changes requirements, links and document locations,
+imports documents, runs the checkers and generates reports. The GitHub release has archives with a Java runtime.
+The VS Code extension contains the same server.
+
+- Only one Requality process opens a catalog: a catalog that VS Code shows is not open in the MCP server, and the
+  opposite.
 - The name field of the Properties view has the experimental check box **Ignore**.
 - The Requality Explorer sorts the projects by the project names in `.project` files, not by the folder names.
 - The **Edit** menu does not have **Find Next** and **Find Previous**. These items do not operate in Requality (#13947).

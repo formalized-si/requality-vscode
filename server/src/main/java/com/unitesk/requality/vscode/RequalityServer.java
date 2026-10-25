@@ -60,7 +60,7 @@ public final class RequalityServer {
       throw new RpcException(RpcException.NOT_READY, "Requality server is not initialized");
   }
 
-  void registerServices() {
+  public void registerServices() {
     rpc.onRequest("initialize", this::initialize);
     rpc.onRequest("shutdown", p -> {
       shutdownQuietly();

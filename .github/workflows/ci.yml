@@ -27,6 +27,8 @@ jobs:
       - run: npm run build
       - run: npm run test:server
       - run: npm run test:unit
+      # the launcher of the MCP server (bin/requality-mcp) in an empty folder
+      - run: npm run test:mcp
       - run: xvfb-run -a npm run test:integration
         env:
           VSCODE_TEST_VERSION: ${{ matrix.vscode }}
@@ -64,6 +66,7 @@ jobs:
       - run: npm run build
       - run: npm run test:server
       - run: npm run test:unit
+      - run: npm run test:mcp
       - run: npm run test:integration
         env:
           VSCODE_TEST_VERSION: stable

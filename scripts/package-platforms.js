@@ -64,9 +64,9 @@ async function download(pkg) {
   return file;
 }
 
-/** Unpacks a runtime into jre/, with bin/java directly in it (the macOS archive has the runtime in Contents/Home). */
-function unpack(archive) {
-  fs.rmSync(JRE, { recursive: true, force: true });
+/** Unpacks a runtime into a folder (default jre/), with bin/java directly in it (the macOS archive has it in Contents/Home). */
+function unpack(archive, dest = JRE) {
+  fs.rmSync(dest, { recursive: true, force: true });
   const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'requality-jre-'));
   if (archive.endsWith('.zip') && process.platform === 'linux') {
     execFileSync('unzip', ['-q', archive, '-d', tmp]);
@@ -75,7 +75,8 @@ function unpack(archive) {
   }
   const [top] = fs.readdirSync(tmp).filter(f => !f.startsWith('.'));
   const home = fs.existsSync(path.join(tmp, top, 'Contents', 'Home')) ? path.join(tmp, top, 'Contents', 'Home') : path.join(tmp, top);
-  fs.renameSync(home, JRE);
+  fs.mkdirSync(path.dirname(dest), { recursive: true });
+  fs.renameSync(home, dest);
   fs.rmSync(tmp, { recursive: true, force: true });
 }
 
@@ -110,7 +111,11 @@ async function main() {
   }
 }
 
-main().catch(e => {
-  console.error(e instanceof Error ? e.message : e);
-  process.exit(1);
-});
+module.exports = { TARGETS, jrePackage, download, unpack, run };
+
+if (require.main === module) {
+  main().catch(e => {
+    console.error(e instanceof Error ? e.message : e);
+    process.exit(1);
+  });
+}
