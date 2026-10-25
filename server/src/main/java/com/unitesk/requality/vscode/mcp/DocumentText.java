@@ -88,6 +88,9 @@ final class DocumentText {
         throw new ToolError(doc.getQualifiedId() + " has no content");
       html = new String(in.readAllBytes(), StandardCharsets.UTF_8);
     }
+    // XML and HTML parsers (the SAX text of the core, the DOM of the Document Editor) read CR LF and CR as LF: the same
+    // offsets on Windows, where the imported documents have CR LF
+    html = html.replace("\r\n", "\n").replace('\r', '\n');
     org.jsoup.nodes.Document d = Jsoup.parse(html);
     StringBuilder all = new StringBuilder();
     List<int[]> runs = new ArrayList<>();

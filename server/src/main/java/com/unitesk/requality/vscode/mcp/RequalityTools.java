@@ -54,6 +54,8 @@ final class RequalityTools {
 
   private static final String PROJECT = "Project name (see list_projects).";
   private static final String NODE = "Node: its UUID or its path in the project, for example /Requirements/A/B.";
+  /** get_node lists at most this many children (get_tree pages larger ones). */
+  private static final int MAX_CHILDREN = 100;
 
   static void register(McpServer mcp, HeadlessClient headless) {
     Core core = new Core(headless);
@@ -76,24 +78,32 @@ final class RequalityTools {
               o.add("error", p.get("error"));
             out.add(o);
           }
-          return obj("projects", out);
+          JsonObject res = obj("projects", out);
+          if (out.isEmpty())
+            res.addProperty("hint", "No Requality catalog in the folders of the server. Create one with create_project, or "
+                + "start requality-mcp with the folder that contains the catalogs.");
+          return res;
         }));
 
     mcp.add(new Tool("get_tree", "Get tree",
-        "The subtree of a node: the children (UUID, path, type, id, name, number of children) to the given depth. "
-            + "The top folders of a project are /Requirements, /Documents, /Reports, /Types and /Templates.",
+        "The subtree of a node: the children (id, name, type, number of children; the locations of a document as a "
+            + "number) to the given depth. The path of a child is the path of its parent, \"/\" and its id. The top "
+            + "folders of a project are /Requirements, /Documents, /Reports, /Types and /Templates.",
         Schema.object().prop("project", "string", PROJECT, true).prop("node", "string", NODE + " Default: the project root.", false)
             .prop("depth", "integer", "Levels of children (1 to 10, default 2).", false)
-            .prop("max_nodes", "integer", "At most this many nodes (default 500).", false).build(),
+            .prop("max_nodes", "integer", "At most this many nodes (default 200).", false).build(),
         true, false, a -> {
           TreeDB db = core.db(Core.str(a, "project"));
           TreeNode root = Core.node(db, Core.optStr(a, "node", "/"));
           int depth = Math.max(1, Math.min(10, Core.optInt(a, "depth", 2)));
-          int[] budget = { Core.optInt(a, "max_nodes", 500) };
+          int[] budget = { Core.optInt(a, "max_nodes", 200) };
           JsonObject o = Core.briefWithChildren(root);
           o.add("nodes", subtree(root, depth, budget));
-          if (budget[0] < 0)
+          if (budget[0] < 0) {
             o.addProperty("truncated", true);
+            o.addProperty("hint", "More nodes than max_nodes: ask for a subtree (node), a smaller depth, or use search_nodes "
+                + "and trace_coverage.");
+          }
           return o;
         }));
 
@@ -130,7 +140,9 @@ final class RequalityTools {
         Schema.object().prop("project", "string", PROJECT, true).prop("document", "string", "The document: " + NODE, true)
             .prop("from", "integer", "First paragraph number (default 0).", false)
             .prop("count", "integer", "Number of paragraphs (default 200).", false)
-            .prop("filter", enumSchema("Which paragraphs (default all).", "all", "uncovered", "partial", "covered"), false).build(),
+            .prop("filter", enumSchema("Which paragraphs (default all).", "all", "uncovered", "partial", "covered"), false)
+            .prop("ranges", "boolean", "Give the character range of each paragraph (for locate with start and end; default false).", false)
+            .build(),
         true, false, a -> readDocument(core, a)));
 
     mcp.add(new Tool("apply_changes", "Apply changes",
@@ -196,13 +208,18 @@ final class RequalityTools {
         }));
 
     mcp.add(new Tool("update_document_version", "Update document version",
-        "A new version of a specification: moves the requirement locations of the old document to the new document "
-            + "(the Update Document processor of Requality) and tells for each requirement whether its marked text is "
-            + "unchanged, changed or lost; lost and changed ones come first, to review. Give the new version as a file "
-            + "(it is imported next to the old document) or as a document already imported.",
+        "A new version of a specification. Call it first: its result is the list of what to fix. It moves the "
+            + "requirement locations of the old document to the new document, "
+            + "sentence by sentence, in one undo step. For each requirement: unchanged (its text is in the new version), "
+            + "changed (moved to the most similar sentence; old and new text, similarity, the new location UUID to unlocate "
+            + "when wrong) or lost (with suggestions). Lost and changed come first, to review. Also lists the statements of "
+            + "the new version that no requirement marks (uncovered_statements). The old document and its locations stay. "
+            + "Give the new version as a file (imported next to the old document) or as a document already imported.",
         Schema.object().prop("project", "string", PROJECT, true).prop("document", "string", "The old document: " + NODE, true)
             .prop("file", "string", "Absolute path of the new version.", false)
-            .prop("new_document", "string", "The new version, already imported: " + NODE, false).build(),
+            .prop("new_document", "string", "The new version, already imported: " + NODE, false)
+            .prop("detach_old", "boolean", "Remove the locations of the old document from the requirements, so that they "
+                + "trace to the new version only (the old document stays as the history; default false).", false).build(),
         false, false, a -> {
           TreeDB db = core.db(Core.str(a, "project"));
           Document oldDoc = DocumentText.document(Core.node(db, Core.str(a, "document")));
@@ -221,15 +238,33 @@ final class RequalityTools {
           } else {
             throw new InvalidParams("Give 'file' or 'new_document'");
           }
-          JsonObject r = SpecUpdate.run(db, oldDoc, newDoc);
+          JsonObject r = SpecUpdate.run(db, oldDoc, newDoc, Core.optBool(a, "detach_old", false));
           JsonArray ops = new JsonArray();
           JsonObject op = new JsonObject();
           op.addProperty("op", "update_version");
           op.addProperty("old_document", oldDoc.getQualifiedId());
           op.addProperty("new_document", newDoc.getQualifiedId());
           op.add("summary", r.get("summary"));
+          JsonArray created = new JsonArray();
+          for (JsonElement q : r.getAsJsonArray("requirements"))
+            for (JsonElement l : q.getAsJsonObject().getAsJsonArray("locations"))
+              if (l.getAsJsonObject().has("new_location") && !created.contains(l.getAsJsonObject().get("new_location")))
+                created.add(l.getAsJsonObject().get("new_location"));
+          op.add("new_locations", created);
+          if (Core.optBool(a, "detach_old", false)) {
+            // the requirements and the old locations they lost: a revert attaches them again
+            JsonArray detached = new JsonArray();
+            for (JsonElement q : r.getAsJsonArray("requirements"))
+              for (JsonElement l : q.getAsJsonObject().getAsJsonArray("locations")) {
+                JsonArray pair = new JsonArray();
+                pair.add(q.getAsJsonObject().get("uuid"));
+                pair.add(l.getAsJsonObject().get("old_location"));
+                detached.add(pair);
+              }
+            op.add("detached", detached);
+          }
           ops.add(op);
-          r.addProperty("change", journal.add(db.getSemiProjectName(), "update_document_version", "Document Processor", null, ops).get("change").getAsInt());
+          r.addProperty("change", journal.add(db.getSemiProjectName(), "update_document_version", "Update document version", null, ops).get("change").getAsInt());
           return r;
         }));
 
@@ -251,9 +286,9 @@ final class RequalityTools {
         }));
 
     mcp.add(new Tool("review_changes", "Review changes",
-        "What the agent changed in this session, newest first: each change (apply_changes, import_document, "
-            + "update_document_version) with its summary, its operations, the values before and after, and its state "
-            + "(done or undone). undo reverts the newest change that is done.",
+        "What the agent changed, newest first, also in earlier sessions: each change (apply_changes, import_document, "
+            + "update_document_version) with its time, summary, operations, the values before and after, and its state "
+            + "(done or undone). undo reverts the newest change of this session that is done.",
         Schema.object().prop("project", "string", "Only the changes of this project.", false)
             .prop("last", "integer", "At most this many changes (default 20).", false).build(),
         true, false, a -> {
@@ -263,9 +298,34 @@ final class RequalityTools {
           JsonArray out = new JsonArray();
           for (int i = all.size() - 1; i >= 0 && out.size() < last; i--)
             if (project == null || project.equals(all.get(i).get("project").getAsString()))
-              out.add(all.get(i));
+              out.add(withoutRaw(all.get(i).deepCopy()));
           JsonObject r = obj("changes", out);
           r.addProperty("total", all.size());
+          return r;
+        }));
+
+    mcp.add(new Tool("revert_change", "Revert change",
+        "Reverts a change of review_changes by its number, also a change of an earlier session (undo knows only the "
+            + "changes of this session): the inverse of its operations, in one step. Deleted nodes come back with new "
+            + "UUIDs. The result tells for each operation whether it was reverted.",
+        Schema.object().prop("change", "integer", "The change number (see review_changes).", true).build(), false, true, a -> {
+          int n = a.get("change").getAsInt();
+          JsonObject e = journal.entry(n);
+          if (e == null)
+            throw new ToolError("No change " + n + " (see review_changes)");
+          String state = e.get("state").getAsString();
+          if (!"done".equals(state))
+            throw new ToolError("Change " + n + " is " + state + " already");
+          TreeDB db = core.db(e.get("project").getAsString());
+          String label = "Revert change " + n;
+          JsonArray notes = Changes.revert(db, e.getAsJsonArray("operations"), label);
+          JsonObject entry = journal.add(db.getSemiProjectName(), "revert_change", label, "Revert of change " + n, notes);
+          entry.addProperty("reverts", n);
+          journal.setState(n, "reverted");
+          JsonObject r = new JsonObject();
+          r.addProperty("change", entry.get("change").getAsInt());
+          r.addProperty("reverted_change", n);
+          r.add("operations", notes);
           return r;
         }));
 
@@ -346,9 +406,25 @@ final class RequalityTools {
           headless.messages().forEach(out::add);
           return obj("messages", out);
         }));
+
+    RequalityPrompts.register(mcp);
   }
 
   // ---- helpers
+
+  /** An entry of the journal without the saved values for a revert ("raw"). */
+  static JsonElement withoutRaw(JsonElement e) {
+    if (e.isJsonObject()) {
+      JsonObject o = e.getAsJsonObject();
+      o.remove("raw");
+      for (String k : new ArrayList<>(o.keySet()))
+        withoutRaw(o.get(k));
+    } else if (e.isJsonArray()) {
+      for (JsonElement x : e.getAsJsonArray())
+        withoutRaw(x);
+    }
+    return e;
+  }
 
   static JsonObject obj(String key, JsonElement value) {
     JsonObject o = new JsonObject();
@@ -408,11 +484,14 @@ final class RequalityTools {
   private static JsonArray subtree(TreeNode n, int depth, int[] budget) {
     JsonArray arr = new JsonArray();
     for (TreeNode c : n.getSortedWorkChildren()) {
-      if (c == null || c.isDisposed())
+      if (c == null || c.isDisposed() || c instanceof Location)
         continue;
       if (--budget[0] < 0)
         break;
+      // the path and the UUID follow from the parent and are left out: a tree of many nodes stays short
       JsonObject o = Core.briefWithChildren(c);
+      o.remove("uuid");
+      o.remove("path");
       if (depth > 1 && o.get("children").getAsInt() > 0)
         o.add("nodes", subtree(c, depth - 1, budget));
       arr.add(o);
@@ -457,11 +536,25 @@ final class RequalityTools {
       for (IMark m : marks)
         problems.add(Core.problem(m, n));
     o.add("problems", problems);
+    // the locations of a document are its children: read_document shows them with their text
     JsonArray children = new JsonArray();
-    for (TreeNode c : n.getSortedWorkChildren())
-      if (c != null && !c.isDisposed())
+    int total = 0;
+    int locations = 0;
+    for (TreeNode c : n.getSortedWorkChildren()) {
+      if (c == null || c.isDisposed())
+        continue;
+      if (c instanceof Location) {
+        locations++;
+        continue;
+      }
+      if (++total <= MAX_CHILDREN)
         children.add(Core.briefWithChildren(c));
+    }
     o.add("children", children);
+    if (total > MAX_CHILDREN)
+      o.addProperty("children_total", total);
+    if (locations > 0)
+      o.addProperty("locations_count", locations);
     JsonArray types = new JsonArray();
     // the types apply_changes creates (documents come with import_document)
     for (String t : new String[] { Requirement.TYPE_NAME, TestPurpose.TYPE_NAME, "Comment", "TextNode", "DocFolder", "ReportFolder" })
@@ -479,6 +572,7 @@ final class RequalityTools {
       throw new InvalidParams("filter: all, uncovered, partial or covered");
     int from = Math.max(0, Core.optInt(a, "from", 0));
     int count = Math.max(1, Core.optInt(a, "count", 200));
+    boolean ranges = Core.optBool(a, "ranges", false);
     JsonArray ps = new JsonArray();
     Integer next = null;
     for (int i = from; i < dt.paragraphs.size(); i++) {
@@ -492,7 +586,12 @@ final class RequalityTools {
         next = i;
         break;
       }
-      ps.add(dt.paragraph(p));
+      JsonObject pj = dt.paragraph(p);
+      if (!ranges) {
+        pj.remove("start");
+        pj.remove("end");
+      }
+      ps.add(pj);
     }
     JsonObject r = Core.brief(dt.doc);
     r.addProperty("paragraphs_total", dt.paragraphs.size());

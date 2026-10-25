@@ -50,6 +50,41 @@ public final class McpServer {
     Object call(JsonObject arguments) throws Exception;
   }
 
+  /** A prompt: a ready-made request for a job of the user (a slash command in Claude Code). */
+  public static final class Prompt {
+    final String name;
+    final String title;
+    final String description;
+    /** name, description and required (true/false) of each argument. */
+    final String[][] arguments;
+    final java.util.function.Function<JsonObject, String> text;
+
+    public Prompt(String name, String title, String description, String[][] arguments, java.util.function.Function<JsonObject, String> text) {
+      this.name = name;
+      this.title = title;
+      this.description = description;
+      this.arguments = arguments;
+      this.text = text;
+    }
+
+    JsonObject describe() {
+      JsonObject p = new JsonObject();
+      p.addProperty("name", name);
+      p.addProperty("title", title);
+      p.addProperty("description", description);
+      JsonArray args = new JsonArray();
+      for (String[] a : arguments) {
+        JsonObject o = new JsonObject();
+        o.addProperty("name", a[0]);
+        o.addProperty("description", a[1]);
+        o.addProperty("required", Boolean.parseBoolean(a[2]));
+        args.add(o);
+      }
+      p.add("arguments", args);
+      return p;
+    }
+  }
+
   /** A tool: its name, description, JSON schema of the arguments, hints and handler. */
   public static final class Tool {
     final String name;
@@ -93,6 +128,7 @@ public final class McpServer {
   private final String version;
   private final String instructions;
   private final Map<String, Tool> tools = new LinkedHashMap<>();
+  private final Map<String, Prompt> prompts = new LinkedHashMap<>();
 
   public McpServer(InputStream in, OutputStream out, ExecutorService workers, String version, String instructions) {
     this.in = in;
@@ -104,6 +140,10 @@ public final class McpServer {
 
   public void add(Tool tool) {
     tools.put(tool.name, tool);
+  }
+
+  public void add(Prompt prompt) {
+    prompts.put(prompt.name, prompt);
   }
 
   /** Reads messages until the input ends. */
@@ -164,6 +204,9 @@ public final class McpServer {
         JsonObject t = new JsonObject();
         t.addProperty("listChanged", false);
         caps.add("tools", t);
+        JsonObject pc = new JsonObject();
+        pc.addProperty("listChanged", false);
+        caps.add("prompts", pc);
         r.add("capabilities", caps);
         JsonObject info = new JsonObject();
         info.addProperty("name", "requality");
@@ -185,6 +228,37 @@ public final class McpServer {
       }
       case "tools/call":
         return callTool(params);
+      case "prompts/list": {
+        JsonArray list = new JsonArray();
+        for (Prompt p : prompts.values())
+          list.add(p.describe());
+        JsonObject r = new JsonObject();
+        r.add("prompts", list);
+        return r;
+      }
+      case "prompts/get": {
+        String name = params.has("name") ? params.get("name").getAsString() : null;
+        Prompt p = name == null ? null : prompts.get(name);
+        if (p == null)
+          throw new InvalidParams("Unknown prompt: " + name);
+        JsonObject args = params.has("arguments") && params.get("arguments").isJsonObject() ? params.getAsJsonObject("arguments")
+            : new JsonObject();
+        for (String[] a : p.arguments)
+          if (Boolean.parseBoolean(a[2]) && (!args.has(a[0]) || args.get(a[0]).getAsString().isBlank()))
+            throw new InvalidParams("Missing argument " + a[0]);
+        JsonObject content = new JsonObject();
+        content.addProperty("type", "text");
+        content.addProperty("text", p.text.apply(args));
+        JsonObject msg = new JsonObject();
+        msg.addProperty("role", "user");
+        msg.add("content", content);
+        JsonArray msgs = new JsonArray();
+        msgs.add(msg);
+        JsonObject r = new JsonObject();
+        r.addProperty("description", p.description);
+        r.add("messages", msgs);
+        return r;
+      }
       default:
         throw new UnsupportedOperationException(method);
     }
@@ -202,14 +276,14 @@ public final class McpServer {
     JsonObject text = new JsonObject();
     text.addProperty("type", "text");
     try {
+      checkArguments(tool, args);
       Object value = tool.handler.call(args);
       JsonElement json = JsonRpcConnection.toJson(value);
       // compact JSON text (no structuredContent: the tools declare no output schema, a client would pass both)
       text.addProperty("text", json.isJsonPrimitive() ? json.getAsString() : JsonRpcConnection.GSON.toJson(json));
       r.addProperty("isError", false);
-    } catch (InvalidParams e) {
-      throw e;
-    } catch (ToolError e) {
+    } catch (InvalidParams | ToolError e) {
+      // invalid arguments too are a result of the tool: the model reads the message and corrects the call
       text.addProperty("text", e.getMessage());
       r.addProperty("isError", true);
     } catch (Exception e) {
@@ -220,6 +294,31 @@ public final class McpServer {
     content.add(text);
     r.add("content", content);
     return r;
+  }
+
+  /**
+   * The arguments against the schema of the tool: an unknown name or a missing required argument is an error that names
+   * the arguments the tool takes (an agent that guessed a name corrects it with the next call).
+   */
+  static void checkArguments(Tool tool, JsonObject args) {
+    JsonObject props = tool.inputSchema.has("properties") ? tool.inputSchema.getAsJsonObject("properties") : new JsonObject();
+    List<String> unknown = new java.util.ArrayList<>();
+    for (String k : args.keySet())
+      if (!props.has(k))
+        unknown.add(k);
+    String takes = props.size() == 0 ? "no arguments" : "the arguments " + String.join(", ", props.keySet());
+    if (!unknown.isEmpty())
+      throw new InvalidParams("Unknown argument" + (unknown.size() > 1 ? "s " : " ") + String.join(", ", unknown) + "; "
+          + tool.name + " takes " + takes);
+    if (tool.inputSchema.has("required"))
+      for (JsonElement e : tool.inputSchema.getAsJsonArray("required")) {
+        String k = e.getAsString();
+        if (!args.has(k) || args.get(k).isJsonNull()) {
+          JsonObject p = props.has(k) ? props.getAsJsonObject(k) : null;
+          String d = p != null && p.has("description") ? " (" + p.get("description").getAsString() + ")" : "";
+          throw new InvalidParams("Missing argument " + k + d + "; " + tool.name + " takes " + takes);
+        }
+      }
   }
 
   private static JsonObject result(JsonElement id, JsonElement result) {

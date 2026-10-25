@@ -27,10 +27,15 @@ public final class McpMain {
   private McpMain() {
   }
 
-  static final String INSTRUCTIONS = "Requality is a requirements management tool. A project (catalog) is a tree of nodes: "
-      + "requirements, documents with requirement locations, test purposes, folders. Address a node by its UUID or by "
-      + "its path in a project (\"/Requirements/A/B\", the qualified id) together with the project name. "
-      + "Call list_projects first; a project must be ready before its nodes can be read or changed.";
+  static final String INSTRUCTIONS = "Requality is a requirements management tool. A project (catalog) has a tree of "
+      + "requirements (/Requirements), specification documents (/Documents) whose marked text are the locations of the "
+      + "requirements, test purposes under the requirements, and reports. Jobs and their tools: requirements from a "
+      + "specification: import_document, read_document (filter uncovered), apply_changes (create, then locate with the exact "
+      + "sentence as quote); a new version of a specification: update_document_version first (its result is the list of what "
+      + "to fix), then apply_changes; traceability: trace_coverage; review of your changes: review_changes, undo, "
+      + "revert_change. Make related changes in one apply_changes call with a "
+      + "summary: it is one step for the review and for undo. Address a node by its path (/Requirements/A/B) or UUID and "
+      + "give the project name (list_projects) with each call; a project must be ready before its nodes can be used.";
 
   public static void main(String[] args) throws Exception {
     // Before any Requality class is loaded: RLogger captures System.out in its static initializer.

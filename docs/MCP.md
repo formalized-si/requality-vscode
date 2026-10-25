@@ -9,6 +9,24 @@ It opens catalogs of all formats. It converts a catalog in an old format to the 
 
 ## Install
 
+On macOS and Linux:
+
+```
+curl -fsSL https://raw.githubusercontent.com/formalized-si/requality-vscode/main/scripts/install-mcp.sh | sh
+```
+
+On Windows (PowerShell):
+
+```
+irm https://raw.githubusercontent.com/formalized-si/requality-vscode/main/scripts/install-mcp.ps1 | iex
+```
+
+The script downloads the archive for your platform from the newest GitHub release and examines its SHA-256.
+It installs the server in `~/.requality-mcp` and makes the command `~/.local/bin/requality-mcp`
+(Windows: `%USERPROFILE%\.requality-mcp\requality-mcp.cmd`). It then shows the command to connect Claude Code.
+
+To install by hand:
+
 1. Download the archive for your platform from the GitHub releases:
    `requality-mcp-<version>-<platform>`.
    The archive contains a Java runtime.
@@ -79,10 +97,11 @@ The tools follow the jobs of a requirements engineer.
 | `import_document` | Imports an HTML, XHTML, DOC, DOCX, ODT or PDF file as a document. |
 | `read_document` | Shows a document paragraph by paragraph, with the coverage of each paragraph by requirements. The filter `uncovered` shows only the text that no requirement covers. |
 | `apply_changes` | Makes a list of changes in one step: create, update, delete, move, link, unlink, locate (mark document text for a requirement), unlocate and resolve (close a review item). All changes are made, or none. `dry_run` checks the changes and makes none. |
-| `update_document_version` | Moves the requirement locations of a document to its new version. Tells for each requirement if its text is unchanged, changed or lost. |
+| `update_document_version` | Moves the requirement locations of a document to its new version, sentence by sentence, in one step. Tells for each requirement if its text is unchanged, changed (with the old and the new text) or lost. Lists the new statements that no requirement covers. With `detach_old`, the requirements keep no locations in the old document. |
 | `trace_coverage` | Shows the traceability: requirements without locations or test purposes, broken links, checker problems, document coverage and open review items. |
-| `review_changes` | Shows the changes of the agent in this session, with the values before and after. |
-| `undo`, `redo` | Undoes or redoes the last change. |
+| `review_changes` | Shows the changes of the agent, also of earlier sessions, with the values before and after. |
+| `undo`, `redo` | Undoes or redoes the last change of this session. |
+| `revert_change` | Reverts a change of `review_changes` by its number, also a change of an earlier session. |
 | `list_report_templates`, `generate_report` | Generate a report from a template into a folder. |
 | `create_project`, `open_project` | Create an empty catalog, or open a closed catalog. |
 | `server_messages` | Shows the messages of the Requality core (for example, the result of a format conversion). |
@@ -96,11 +115,25 @@ Give the project name with each call. `list_projects` gives the names.
   The agent writes the requirements with `apply_changes` (operations `create` and `locate`).
   It repeats until `read_document` shows no uncovered paragraph that contains a requirement.
 - **A new version of a specification.** `update_document_version` with the old document and the new file.
-  The agent examines the requirements with changed or lost text and corrects them with `apply_changes`.
-  It closes the review items of the update with the operation `resolve`.
+  The agent examines the requirements with changed or lost text and the new statements.
+  It corrects the requirements with `apply_changes`.
+  The operation `resolve` closes the review items of an update that a person made in the Eclipse or VS Code interface.
 - **Traceability questions.** `trace_coverage` tells which requirements have no test purposes or no document text.
-- **Review.** `review_changes` shows each change of the agent. `undo` reverts the last change.
+- **Review.** `review_changes` shows each change of the agent, also the changes of earlier sessions.
+  `undo` reverts the last change of this session. `revert_change` reverts any change by its number.
   The journal is also in `<storage>/mcp-journal.jsonl`.
+
+## Prompts
+
+The server also gives prompts: requests for the typical jobs.
+Claude Code shows them as commands, for example `/mcp__requality__requirements_from_document`.
+
+| Prompt | Job |
+| --- | --- |
+| `requirements_from_document` | Make requirements from a specification file or document. |
+| `update_specification` | Bring the requirements up to date with a new version of a specification. |
+| `coverage_audit` | Find the traceability gaps and propose fixes, without changes. |
+| `review_agent_changes` | Show the changes of the agent and how to revert them. |
 
 ## One process for each catalog
 

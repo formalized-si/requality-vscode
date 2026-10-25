@@ -83,14 +83,14 @@ and others). The agent starts the server and uses its tools through the Model Co
 engineer: turn a specification into requirements with document locations, move the traceability to a new version of a
 specification, tell the coverage, and show the changes of the agent for a review (with undo).
 
-- The GitHub releases have the archives `requality-mcp-<version>-<platform>`. They contain a Java runtime.
-- The VS Code extension contains the same server: `dist/server/bin/requality-mcp`.
-
-To connect Claude Code:
+To install it on macOS or Linux (the script downloads the archive with a Java runtime from the GitHub releases):
 
 ```
-claude mcp add requality -- /path/to/requality-mcp/bin/requality-mcp /path/to/catalogs
+curl -fsSL https://raw.githubusercontent.com/formalized-si/requality-vscode/main/scripts/install-mcp.sh | sh
+claude mcp add requality -- ~/.local/bin/requality-mcp /path/to/catalogs
 ```
+
+On Windows, use `scripts/install-mcp.ps1`. The VS Code extension contains the same server: `dist/server/bin/requality-mcp`.
 
 Only one Requality process can open a catalog at a time. Close the catalog in VS Code before the agent uses it.
 Refer to [docs/MCP.md](docs/MCP.md) for the other agents, the tools and the options.

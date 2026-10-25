@@ -27,8 +27,13 @@ jobs:
       - run: npm run build
       - run: npm run test:server
       - run: npm run test:unit
-      # the launcher of the MCP server (bin/requality-mcp) in an empty folder
+      # the launcher of the MCP server (bin/requality-mcp) in an empty folder, and its installer
       - run: npm run test:mcp
+      - run: |
+          node scripts/package-mcp.js --no-build --no-runtime
+          REQUALITY_MCP_HOME=$RUNNER_TEMP/requality-mcp REQUALITY_MCP_BIN=$RUNNER_TEMP/bin \
+            REQUALITY_MCP_ARCHIVE=$(ls release/requality-mcp-*.zip | head -n 1) sh scripts/install-mcp.sh
+          node test/mcp/smoke.js $RUNNER_TEMP/requality-mcp/current
       - run: xvfb-run -a npm run test:integration
         env:
           VSCODE_TEST_VERSION: ${{ matrix.vscode }}
@@ -67,6 +72,14 @@ jobs:
       - run: npm run test:server
       - run: npm run test:unit
       - run: npm run test:mcp
+      # the installer of the MCP server with the archive without a Java runtime (the Java of the job runs it)
+      - run: node scripts/package-mcp.js --no-build --no-runtime
+      - shell: pwsh
+        run: |
+          $env:REQUALITY_MCP_HOME = "$env:RUNNER_TEMP\requality-mcp"
+          $env:REQUALITY_MCP_ARCHIVE = (Get-ChildItem release\requality-mcp-*.zip | Select-Object -First 1).FullName
+          ./scripts/install-mcp.ps1
+          node test/mcp/smoke.js (Get-ChildItem -Directory "$env:REQUALITY_MCP_HOME\requality-mcp-*" | Select-Object -First 1).FullName
       - run: npm run test:integration
         env:
           VSCODE_TEST_VERSION: stable

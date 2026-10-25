@@ -50,7 +50,9 @@ function archive(dir, zip) {
 
 async function main() {
   const only = process.argv.slice(2).filter(a => !a.startsWith('--'));
-  const targets = only.length ? only : Object.keys(TARGETS);
+  // --no-runtime: only the archive without a Java runtime (quick, for tests)
+  const noRuntime = process.argv.includes('--no-runtime');
+  const targets = noRuntime ? [] : only.length ? only : Object.keys(TARGETS);
   for (const t of targets) {
     if (!TARGETS[t]) {
       throw new Error(`unknown target ${t}: ${Object.keys(TARGETS).join(', ')}`);
@@ -68,7 +70,7 @@ async function main() {
       unpack(await download(pkg), path.join(dir, 'jre'));
       archive(dir, target.startsWith('win32'));
     }
-    if (!only.length) {
+    if (!only.length || noRuntime) {
       archive(stage(`requality-mcp-${version}`), true);
     }
   } finally {

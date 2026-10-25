@@ -224,9 +224,22 @@ final class Core {
     return o;
   }
 
+  /** {@link #brief} with the number of children; the locations of a document are counted apart (read_document shows them). */
   static JsonObject briefWithChildren(TreeNode n) {
     JsonObject o = brief(n);
-    o.addProperty("children", n.getWorkChildrenUUIDs().size());
+    if (n instanceof com.unitesk.requality.nodetype.Document) {
+      int locations = 0;
+      int others = 0;
+      for (TreeNode c : n.getWorkChildren())
+        if (c instanceof com.unitesk.requality.nodetype.Location)
+          locations++;
+        else if (c != null)
+          others++;
+      o.addProperty("children", others);
+      o.addProperty("locations", locations);
+    } else {
+      o.addProperty("children", n.getWorkChildrenUUIDs().size());
+    }
     return o;
   }
 

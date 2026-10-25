@@ -159,6 +159,17 @@ class McpServerTest {
     return r;
   }
 
+  /** The paths of the children in a get_tree result (the parent path, "/" and the id). */
+  static List<String> childPaths(JsonObject tree) {
+    String base = tree.get("path").getAsString();
+    List<String> r = new ArrayList<>();
+    for (JsonElement e : tree.getAsJsonArray("nodes")) {
+      assertFalse(e.getAsJsonObject().has("uuid"), "a nested node has no uuid: " + e);
+      r.add((base.equals("/") ? "" : base) + "/" + e.getAsJsonObject().get("id").getAsString());
+    }
+    return r;
+  }
+
   static JsonArray ops(String json) {
     return JsonParser.parseString(json).getAsJsonArray();
   }
@@ -191,8 +202,30 @@ class McpServerTest {
       assertTrue(o.getAsJsonObject("annotations").has("readOnlyHint"), o.toString());
     }
     assertEquals(List.of("list_projects", "get_tree", "get_node", "search_nodes", "read_document", "apply_changes", "import_document",
-        "update_document_version", "trace_coverage", "review_changes", "undo", "redo", "list_report_templates", "generate_report",
+        "update_document_version", "trace_coverage", "review_changes", "revert_change", "undo", "redo", "list_report_templates", "generate_report",
         "open_project", "create_project", "server_messages"), names);
+    // the prompts: the jobs of the person as ready-made requests
+    List<String> prompts = new ArrayList<>();
+    for (JsonElement e : rpc("prompts/list", null).getAsJsonObject("result").getAsJsonArray("prompts"))
+      prompts.add(e.getAsJsonObject().get("name").getAsString());
+    assertEquals(List.of("requirements_from_document", "update_specification", "coverage_audit", "review_agent_changes"), prompts);
+    JsonObject pg = new JsonObject();
+    pg.addProperty("name", "requirements_from_document");
+    JsonObject pa = new JsonObject();
+    pa.addProperty("project", P);
+    pa.addProperty("document", "/tmp/spec.docx");
+    pg.add("arguments", pa);
+    String text = rpc("prompts/get", pg).getAsJsonObject("result").getAsJsonArray("messages").get(0).getAsJsonObject()
+        .getAsJsonObject("content").get("text").getAsString();
+    assertTrue(text.contains(P) && text.contains("/tmp/spec.docx") && text.contains("read_document"), text);
+    pa.remove("document");
+    assertEquals(-32602, rpc("prompts/get", pg).getAsJsonObject("error").get("code").getAsInt());
+    // a wrong argument name: the error names the arguments of the tool, so the agent corrects the call
+    JsonObject wrong = callError("read_document", "project", P, "node", "/Documents/x.xhtml");
+    assertTrue(wrong.get("error").getAsString().startsWith("Unknown argument node; read_document takes the arguments project, document"),
+        wrong.toString());
+    JsonObject absent = callError("read_document", "project", P);
+    assertTrue(absent.get("error").getAsString().startsWith("Missing argument document (The document: "), absent.toString());
     JsonObject unknown = new JsonObject();
     unknown.addProperty("name", "no_such_tool");
     assertEquals(-32602, rpc("tools/call", unknown).getAsJsonObject("error").get("code").getAsInt());
@@ -205,7 +238,7 @@ class McpServerTest {
     JsonArray projects = call("list_projects").getAsJsonArray("projects");
     assertEquals(P, projects.get(0).getAsJsonObject().get("name").getAsString(), projects.toString());
     JsonObject tree = call("get_tree", "project", P, "depth", 1);
-    assertTrue(paths(tree.getAsJsonArray("nodes")).containsAll(List.of("/Documents", "/Requirements", "/Reports")), tree.toString());
+    assertTrue(childPaths(tree).containsAll(List.of("/Documents", "/Requirements", "/Reports")), tree.toString());
     // the old catalog format was converted when it opened (the message the core showed is kept)
     assertTrue(call("server_messages").toString().contains("Conversion of"), "conversion message");
     JsonObject r12 = call("get_node", "project", P, "node", R12);
@@ -213,6 +246,14 @@ class McpServerTest {
     assertEquals(2, r12.getAsJsonArray("locations").size(), r12.toString());
     JsonObject found = call("search_nodes", "project", P, "text", "AID-SSP", "type", "Requirement");
     assertTrue(paths(found.getAsJsonArray("matches")).contains(R12), found.toString());
+    // a document lists its locations as a count: read_document shows them with their text
+    JsonObject docNode = call("get_node", "project", P, "node", "/Documents/ts_103097v010201p.xhtml");
+    assertEquals(131, docNode.get("locations_count").getAsInt(), docNode.toString());
+    assertEquals(0, docNode.getAsJsonArray("children").size(), docNode.toString());
+    JsonObject docs = call("get_tree", "project", P, "node", "/Documents", "depth", 3);
+    JsonObject etsiDoc = docs.getAsJsonArray("nodes").get(0).getAsJsonObject();
+    assertEquals(131, etsiDoc.get("locations").getAsInt(), docs.toString());
+    assertFalse(etsiDoc.has("nodes"), "the locations of a document are a number: " + docs);
     JsonObject missing = callError("get_node", "project", P, "node", "/Requirements/NoSuchNode");
     assertTrue(missing.get("error").getAsString().startsWith("No node"), missing.toString());
     // the paragraphs of the ETSI document: the existing locations cover the text they mark
@@ -305,6 +346,50 @@ class McpServerTest {
 
   @Test
   @Order(5)
+  void anyChangeCanBeRevertedLater() throws Exception {
+    call("apply_changes", "project", P, "summary", "Revert fixture", "operations", ops("["
+        + "{\"op\":\"create\",\"parent\":\"/Requirements\",\"id\":\"REV\",\"as\":\"rev\"},"
+        + "{\"op\":\"create\",\"parent\":\"$rev\",\"id\":\"A\",\"name\":\"Alpha\",\"attributes\":{\"status\":\"draft\"}},"
+        + "{\"op\":\"create\",\"parent\":\"$rev\",\"id\":\"B\",\"name\":\"Beta\"},"
+        + "{\"op\":\"create\",\"parent\":\"$rev\",\"id\":\"C\",\"name\":\"Gamma\",\"description\":\"Gamma text.\",\"attributes\":{\"priority\":3},\"as\":\"c\"},"
+        + "{\"op\":\"create\",\"parent\":\"$c\",\"type\":\"TestPurpose\",\"id\":\"C_T1\",\"name\":\"Check gamma\"}]"));
+    JsonObject change = call("apply_changes", "project", P, "summary", "Changes to revert", "operations", ops("["
+        + "{\"op\":\"update\",\"node\":\"/Requirements/REV/A\",\"name\":\"Alpha 2\",\"attributes\":{\"status\":\"approved\",\"owner\":\"QA\"}},"
+        + "{\"op\":\"move\",\"node\":\"/Requirements/REV/B\",\"parent\":\"/Requirements/SEC_ITSS\"},"
+        + "{\"op\":\"link\",\"from\":\"/Requirements/REV/A\",\"to\":\"" + R12 + "\"},"
+        + "{\"op\":\"locate\",\"requirement\":\"/Requirements/REV/A\",\"document\":\"/Documents/spec.xhtml\",\"quote\":\"keep logs for one year\"},"
+        + "{\"op\":\"delete\",\"node\":\"/Requirements/REV/C\"},"
+        + "{\"op\":\"create\",\"parent\":\"/Requirements/REV\",\"id\":\"D\"}]"));
+    int n = change.get("change").getAsInt();
+    // the saved values for a revert are not part of the review
+    assertFalse(call("review_changes", "project", P, "last", 1).toString().contains("\"raw\""));
+    JsonObject rev = call("revert_change", "change", n);
+    for (JsonElement e : rev.getAsJsonArray("operations"))
+      assertTrue(e.getAsJsonObject().get("reverted").getAsBoolean(), rev.toString());
+    JsonObject a = call("get_node", "project", P, "node", "/Requirements/REV/A");
+    assertEquals("Alpha", a.get("name").getAsString());
+    assertEquals("draft", a.getAsJsonObject("attributes").getAsJsonObject("status").get("value").getAsString());
+    assertFalse(a.getAsJsonObject("attributes").has("owner"), a.toString());
+    assertEquals(0, a.getAsJsonArray("locations").size(), a.toString());
+    assertFalse(a.getAsJsonObject("links").has("elaborates"), a.toString());
+    JsonObject c = call("get_node", "project", P, "node", "/Requirements/REV/C");
+    assertEquals("Gamma text.", c.get("description").getAsString());
+    assertEquals(3, c.getAsJsonObject("attributes").getAsJsonObject("priority").get("value").getAsInt());
+    assertEquals("C_T1", c.getAsJsonArray("children").get(0).getAsJsonObject().get("id").getAsString());
+    JsonObject group = call("get_node", "project", P, "node", "/Requirements/REV");
+    List<String> order = new ArrayList<>();
+    for (JsonElement e : group.getAsJsonArray("children"))
+      order.add(e.getAsJsonObject().get("id").getAsString());
+    assertEquals(List.of("A", "B", "C"), order);
+    JsonObject review = call("review_changes", "project", P, "last", 2);
+    assertEquals("reverted", review.getAsJsonArray("changes").get(1).getAsJsonObject().get("state").getAsString(), review.toString());
+    JsonObject again = callError("revert_change", "change", n);
+    assertTrue(again.get("error").getAsString().contains("reverted already"), again.toString());
+    call("apply_changes", "project", P, "operations", ops("[{\"op\":\"delete\",\"node\":\"/Requirements/REV\"}]"));
+  }
+
+  @Test
+  @Order(6)
   void theCoverageIsData() throws Exception {
     JsonObject cov = call("trace_coverage", "project", P, "under", "/Requirements/SPEC", "refresh", true);
     JsonObject reqs = cov.getAsJsonObject("requirements");
@@ -321,38 +406,66 @@ class McpServerTest {
   }
 
   @Test
-  @Order(6)
+  @Order(7)
   void aNewSpecificationVersionKeepsTheTraceability() throws Exception {
     File v2 = new File(root, "spec_v2.html");
     Files.writeString(v2.toPath(), "<html><body><h1>Spec</h1><p>The system shall log every access.</p>"
-        + "<p>The system shall keep logs for two years.</p></body></html>");
-    JsonObject up = call("update_document_version", "project", P, "document", "/Documents/spec.xhtml", "file", v2.getAbsolutePath());
+        + "<p>The system shall encrypt all stored data with AES.</p><p>The system shall keep logs for two years.</p>"
+        + "<p>The system must alert the operator.</p></body></html>");
+    JsonObject up = call("update_document_version", "project", P, "document", "/Documents/spec.xhtml", "file", v2.getAbsolutePath(),
+        "detach_old", true);
     assertEquals("/Documents/spec_v2.xhtml", up.get("new_document").getAsString(), up.toString());
-    Map<String, String> status = new java.util.HashMap<>();
+    Map<String, JsonObject> byReq = new java.util.HashMap<>();
     for (JsonElement e : up.getAsJsonArray("requirements"))
-      status.put(e.getAsJsonObject().get("requirement").getAsString(), e.getAsJsonObject().get("status").getAsString());
-    assertEquals("unchanged", status.get("/Requirements/SPEC/LOG"), up.toString());
-    // the sentence of ENC is gone: the processor keeps the text the versions share, the result shows it for a review
-    assertTrue(List.of("changed", "lost").contains(status.get("/Requirements/SPEC/ENC")), up.toString());
-    JsonObject enc = up.getAsJsonArray("requirements").get(0).getAsJsonObject();
-    assertEquals("/Requirements/SPEC/ENC", enc.get("requirement").getAsString(), "the ones to review come first: " + up);
-    assertEquals("The system shall encrypt stored data.", enc.getAsJsonArray("old_text").get(0).getAsString(), up.toString());
-    // the review items of the update are resolved like Complete of the To-Do List view
-    JsonArray items = up.getAsJsonArray("review_items");
-    assertFalse(items.isEmpty(), up.toString());
-    int open = call("trace_coverage", "project", P, "documents", false).getAsJsonObject("review_items").get("total").getAsInt();
-    String item = items.get(0).getAsJsonObject().get("path").getAsString();
-    call("apply_changes", "project", P, "operations", ops("[{\"op\":\"resolve\",\"item\":\"" + item + "\"}]"));
-    JsonObject after = call("trace_coverage", "project", P, "documents", false).getAsJsonObject("review_items");
-    assertEquals(open - 1, after.get("total").getAsInt(), after.toString());
-    assertEquals(1, after.get("completed").getAsInt(), after.toString());
+      byReq.put(e.getAsJsonObject().get("requirement").getAsString(), e.getAsJsonObject());
+    assertEquals("unchanged", byReq.get("/Requirements/SPEC/LOG").get("status").getAsString(), up.toString());
+    // the sentence of ENC changed: its location moves to the most similar sentence, whole, with the old text to compare
+    JsonObject enc = byReq.get("/Requirements/SPEC/ENC");
+    assertEquals("changed", enc.get("status").getAsString(), up.toString());
+    assertEquals("/Requirements/SPEC/ENC", up.getAsJsonArray("requirements").get(0).getAsJsonObject().get("requirement").getAsString(),
+        "the ones to review come first: " + up);
+    JsonObject loc = enc.getAsJsonArray("locations").get(0).getAsJsonObject();
+    assertEquals("The system shall encrypt stored data.", loc.getAsJsonArray("old_text").get(0).getAsString(), up.toString());
+    assertEquals("", enc.get("description").getAsString(), "ENC has no own description: " + up);
+    assertEquals("The system shall encrypt all stored data with AES.", loc.get("new_text").getAsString(), up.toString());
+    assertTrue(loc.get("similarity").getAsDouble() >= 0.6, up.toString());
+    // the new statements no requirement marks
+    JsonArray fresh = up.getAsJsonArray("uncovered_statements");
+    List<String> quotes = new ArrayList<>();
+    for (JsonElement e : fresh)
+      quotes.add(e.getAsJsonObject().get("quote").getAsString());
+    assertEquals(List.of("The system shall keep logs for two years.", "The system must alert the operator."), quotes);
     JsonObject newDoc = call("read_document", "project", P, "document", "/Documents/spec_v2.xhtml");
     assertTrue(paragraph(newDoc, "log every access").getAsJsonArray("requirements").toString().contains("/Requirements/SPEC/LOG"),
         newDoc.toString());
+    assertEquals("full", paragraph(newDoc, "encrypt all stored").get("coverage").getAsString(), newDoc.toString());
+    // detach_old: the requirements trace to the new version only; the old document stays
+    JsonArray logLocs = call("get_node", "project", P, "node", "/Requirements/SPEC/LOG").getAsJsonArray("locations");
+    assertEquals(1, logLocs.size(), logLocs.toString());
+    assertEquals("/Documents/spec_v2.xhtml", logLocs.get(0).getAsJsonObject().get("document").getAsString());
+    call("get_node", "project", P, "node", "/Documents/spec.xhtml");
+    // the update is one undo step
+    String undone = call("undo").get("undone").getAsString();
+    assertEquals("Update document version", undone);
+    assertEquals(0, call("read_document", "project", P, "document", "/Documents/spec_v2.xhtml").get("locations").getAsInt());
+    call("redo");
+    // a revert of the update (as in a later session): the new locations go, the old ones come back
+    JsonObject rev = call("revert_change", "change", up.get("change").getAsInt());
+    assertTrue(rev.getAsJsonArray("operations").get(0).getAsJsonObject().get("reverted").getAsBoolean(), rev.toString());
+    JsonArray back = call("get_node", "project", P, "node", "/Requirements/SPEC/LOG").getAsJsonArray("locations");
+    assertEquals("/Documents/spec.xhtml", back.get(0).getAsJsonObject().get("document").getAsString(), back.toString());
+    assertEquals(0, call("read_document", "project", P, "document", "/Documents/spec_v2.xhtml").get("locations").getAsInt());
+    // the undo of the revert brings the two new locations back (LOG and ENC)
+    call("undo");
+    assertEquals(2, call("read_document", "project", P, "document", "/Documents/spec_v2.xhtml").get("locations").getAsInt());
+    // a review item of an update made in the GUI is resolved like Complete of the To-Do List view
+    JsonObject item = callError("apply_changes", "project", P, "operations",
+        ops("[{\"op\":\"resolve\",\"item\":\"/Requirements/SPEC/LOG\"}]"));
+    assertTrue(item.get("error").getAsString().contains("not a review item"), item.toString());
   }
 
   @Test
-  @Order(7)
+  @Order(8)
   void reportsAndProjects() throws Exception {
     JsonArray templates = call("list_report_templates", "project", P).getAsJsonArray("templates");
     assertTrue(templates.toString().contains("com.unitesk.requality.reports.tableview"), templates.toString());
