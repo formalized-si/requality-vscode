@@ -53,6 +53,11 @@ final class Core {
     return headless.server().workspace();
   }
 
+  /** The storage folder of the server. */
+  File storage() {
+    return headless.server().options().storage;
+  }
+
   // ---- arguments
 
   static String str(JsonObject a, String key) {
@@ -142,7 +147,9 @@ final class Core {
     if (headless.conversionAllowed(p.localName) || headless.converted(p.localName))
       return false;
     try {
-      return p.closed && !com.unitesk.requality.core.storage.IResTracker.storedVersionCorrect(p.dir.toURI());
+      // closed by the cancelled question, or not loaded yet (the question comes during the load)
+      boolean loaded = Nodes.findDB(p.localName) != null && !p.loading;
+      return (p.closed || !loaded) && !com.unitesk.requality.core.storage.IResTracker.storedVersionCorrect(p.dir.toURI());
     } catch (RuntimeException e) {
       return false;
     }
@@ -185,11 +192,8 @@ final class Core {
   void releaseIdle(long idleMs, long wantedMs) {
     for (Workspace.Project p : idle(idleMs, wantedMs)) {
       System.err.println("[mcp] releases the idle catalog " + p.dir);
+      // marked released at once (a call loads it again after the release on the loader thread)
       workspace().releaseProject(p.dir);
-      // the release runs on the loader thread: it ends before a tool can start
-      long end = System.currentTimeMillis() + LOAD_WAIT_MS;
-      while (!p.released && System.currentTimeMillis() < end)
-        sleep(50);
     }
   }
 
@@ -211,17 +215,24 @@ final class Core {
     // no change runs while the files are compared with the tree
     boolean outdated = mcp.shared(() -> {
       TreeDB db = Nodes.findDB(p.localName);
-      return db != null && !p.loading && !p.closed && p.error == null && Nodes.isReady(db) && disk.outdated(p.dir, db);
+      return db != null && !p.loading && !p.closed && !p.released && p.error == null && Nodes.isReady(db)
+          && disk.outdated(p.dir, db, p.loadedAt);
     });
     if (!outdated)
       return null;
     System.err.println("[mcp] the catalog " + p.dir + " changed on disk: the project loads again");
     mcp.exclusive(() -> {
-      workspace().reloadProject(p.dir);
+      // the load looks at the files again when it ends
       disk.forget(p.dir);
+      workspace().reloadProject(p.dir);
     });
     return "The catalog changed on disk (git pull or another editor): the server loaded the project again before this "
         + "call. Undo and redo of the earlier changes end here; revert_change still works.";
+  }
+
+  /** The files of a project that was loaded now: a later change on disk is seen before the next call. */
+  void loaded(Workspace.Project p) {
+    disk.loaded(p.dir);
   }
 
   /** The projects whose files of an interrupted import were looked for. */
@@ -307,7 +318,7 @@ final class Core {
       if (error != null)
         throw new ToolError("Project " + projectName + " cannot be loaded: " + error);
       TreeDB db = Nodes.findDB(p.localName);
-      if (!p.closed && db != null && !p.loading && Nodes.isReady(db)) {
+      if (!p.closed && !p.released && db != null && !p.loading && Nodes.isReady(db)) {
         recoverImport(p, db);
         return db;
       }
@@ -346,38 +357,64 @@ final class Core {
    * id alone when one node of the project has it.
    */
   static TreeNode node(TreeDB db, String ref) {
-    TreeNode n = null;
     try {
-      n = db.getNode(UUID.fromString(ref));
+      TreeNode n = db.getNode(UUID.fromString(ref));
+      if (n == null || n.isDisposed())
+        throw new ToolError("No node " + ref + " in project " + db.getSemiProjectName());
+      return n;
     } catch (IllegalArgumentException e) {
-      String path = ref.isEmpty() || ref.equals("/") ? "/" : ref;
-      n = db.getNode(path, Path.QID | Path.UV | Path.UUID);
+      // not a UUID
     }
-    if ((n == null || n.isDisposed()) && !ref.isEmpty() && !ref.contains("/")) {
-      // an id alone (LIM_04): the node when the id is unique
-      com.unitesk.requality.core.operation.mass.NodeSearch s = new com.unitesk.requality.core.operation.mass.NodeSearch(
-          new com.unitesk.requality.core.search.AttributeRequest(TreeNode.ATTR_ID,
-              com.unitesk.requality.core.search.AttributeOperator.EQUALS, ref, false));
-      s.execute(db.getRootNode());
-      List<TreeNode> found = new ArrayList<>();
-      for (com.unitesk.requality.core.model.Pair<? extends TreeNode, List<String>> m : s.getMatches())
-        if (m.getFirst() != null && !m.getFirst().isDisposed() && !m.getFirst().isVirtual())
-          found.add(m.getFirst());
-      if (found.size() == 1)
-        return db.getNode(found.get(0).getUUId());
-      if (found.size() > 1) {
-        List<String> paths = new ArrayList<>();
-        for (TreeNode f : found.subList(0, Math.min(10, found.size())))
-          paths.add(f.getQualifiedId());
-        throw new ToolError("Several nodes have the id " + ref + ": " + paths + (found.size() > 10 ? " and more" : "")
-            + "; give the path");
-      }
+    if (ref.isEmpty() || ref.equals("/") || ref.contains("/")) {
+      TreeNode n = db.getNode(ref.isEmpty() ? "/" : ref, Path.QID | Path.UV | Path.UUID);
+      if (n == null || n.isDisposed())
+        throw new ToolError("No node " + ref + " in project " + db.getSemiProjectName()
+            + " (give a path such as /Requirements/A/B, a UUID, or an id that one node has)");
+      return n;
     }
+    // no path: an id that one node has (LIM_04); two nodes with the id are an error, whatever else could match
+    TreeNode byId = byId(db, ref);
+    if (byId != null)
+      return byId;
+    // the user-visible id with the id prefix of the project (PROJ-LIM_04): the id after the prefix
+    String prefix = com.unitesk.requality.core.model.IDMechanics.getShownIdPrefix(db);
+    if (prefix != null && !prefix.isEmpty() && ref.length() > prefix.length() + 1 && ref.startsWith(prefix)
+        && "-_.: ".indexOf(ref.charAt(prefix.length())) >= 0) {
+      TreeNode n = byId(db, ref.substring(prefix.length() + 1));
+      if (n != null)
+        return n;
+    }
+    // a user-visible id of another form
+    TreeNode n = db.getNode(ref, Path.UV);
     if (n == null || n.isDisposed())
       throw new ToolError("No node " + ref + " in project " + db.getSemiProjectName()
           + " (give a path such as /Requirements/A/B, a UUID, or an id that one node has)");
     return n;
   }
+
+  /** The node with this id when one node has it; null when none; an error when several have it. */
+  private static TreeNode byId(TreeDB db, String id) {
+    com.unitesk.requality.core.operation.mass.NodeSearch s = new com.unitesk.requality.core.operation.mass.NodeSearch(
+        new com.unitesk.requality.core.search.AttributeRequest(TreeNode.ATTR_ID,
+            com.unitesk.requality.core.search.AttributeOperator.EQUALS, id, false));
+    s.execute(db.getRootNode());
+    List<TreeNode> found = new ArrayList<>();
+    java.util.Set<UUID> seen = new java.util.HashSet<>();
+    for (com.unitesk.requality.core.model.Pair<? extends TreeNode, List<String>> m : s.getMatches())
+      if (m.getFirst() != null && !m.getFirst().isDisposed() && !m.getFirst().isVirtual() && id.equals(m.getFirst().getId())
+          && seen.add(m.getFirst().getUUId()))
+        found.add(m.getFirst());
+    if (found.isEmpty())
+      return null;
+    if (found.size() == 1)
+      return db.getNode(found.get(0).getUUId());
+    List<String> paths = new ArrayList<>();
+    for (TreeNode f : found.subList(0, Math.min(10, found.size())))
+      paths.add(f.getQualifiedId());
+    throw new ToolError("Several nodes have the id " + id + ": " + paths + (found.size() > 10 ? " and more" : "")
+        + "; give the path");
+  }
+
 
   TreeNode node(JsonObject a, String projectKey, String nodeKey) {
     return node(db(str(a, projectKey)), str(a, nodeKey));
@@ -442,8 +479,8 @@ final class Core {
    */
   private static void rollback(TreeDB db) {
     java.util.Set<UUID> touched = java.util.Collections.emptySet();
-    // The rollback of the core writes the inverse of each operation to the files: the state the server loaded. A file
-    // that changed on disk meanwhile (git pull, another editor) is kept as it is.
+    // The rollback of the core writes the inverse of each operation to the files, as the server formats them (its line
+    // ends, its order): each file of a touched node gets its bytes back, also one that changed on disk meanwhile.
     Map<java.io.File, byte[]> external = new java.util.HashMap<>();
     List<java.io.File> missing = new ArrayList<>();
     if (db.getStorage() instanceof com.unitesk.requality.core.transaction.TransactionStorage) {
@@ -454,7 +491,7 @@ final class Core {
       for (UUID u : touched)
         try {
           JsonObject st = History.state(base, u, null);
-          if (st == null || History.onDisk(base, u, st))
+          if (st == null)
             continue;
           java.io.File f = base.getJSONResource(u, com.unitesk.requality.core.lock.LockType.NO_LOCK);
           if (f == null)
@@ -462,7 +499,7 @@ final class Core {
           if (f.isFile())
             external.put(f, java.nio.file.Files.readAllBytes(f.toPath()));
           else
-            missing.add(f);
+            missing.add(f); // deleted on disk: it stays deleted
         } catch (Exception e) {
           e.printStackTrace(System.err);
         }
@@ -476,7 +513,9 @@ final class Core {
     } finally {
       for (Map.Entry<java.io.File, byte[]> e : external.entrySet())
         try {
-          java.nio.file.Files.write(e.getKey().toPath(), e.getValue());
+          java.nio.file.Path f = e.getKey().toPath();
+          if (!java.nio.file.Files.isRegularFile(f) || !java.util.Arrays.equals(java.nio.file.Files.readAllBytes(f), e.getValue()))
+            java.nio.file.Files.write(f, e.getValue());
         } catch (java.io.IOException x) {
           x.printStackTrace(System.err);
         }

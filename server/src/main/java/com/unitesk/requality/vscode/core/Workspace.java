@@ -62,6 +62,8 @@ public final class Workspace {
     public volatile boolean released;
     /** Why the catalog loaded without its lock (no folder for the lock files), or null when this process holds it. */
     public volatile String unlocked;
+    /** When the last load of the tree started (the files read by it are not newer). */
+    public volatile long loadedAt;
 
     Project(File dir) {
       this(dir, true);
@@ -506,6 +508,13 @@ public final class Workspace {
     locks.releaseAll();
   }
 
+  private final List<java.util.function.Consumer<Project>> loadListeners = new java.util.concurrent.CopyOnWriteArrayList<>();
+
+  /** Calls the listener on the loader thread when a project was loaded (the MCP server looks at its files then). */
+  public void onLoaded(java.util.function.Consumer<Project> l) {
+    loadListeners.add(l);
+  }
+
   /** The projects whose catalog lock a thread waits for. */
   private final java.util.Set<String> lockWaits = java.util.concurrent.ConcurrentHashMap.newKeySet();
 
@@ -555,6 +564,28 @@ public final class Workspace {
     return locks.folder();
   }
 
+  /** The file systems whose locks need not exclude the processes of other computers or of other systems. */
+  private static final java.util.Set<String> NETWORK = java.util.Set.of("nfs", "nfs4", "smbfs", "cifs", "smb", "smb2", "smb3",
+      "afpfs", "webdav", "davfs", "fuse.sshfs", "sshfs", "9p", "v9fs", "drvfs", "fuse", "autofs");
+
+  /**
+   * A warning when the folder of the lock files is on a network file system (NFS, SMB, WSL drives): its locks may not
+   * exclude another process, so two processes could write one catalog; null when it is a local disk.
+   */
+  public String lockFolderWarning() {
+    try {
+      File dir = locks.folder();
+      dir.mkdirs();
+      String type = java.nio.file.Files.getFileStore(dir.toPath()).type().toLowerCase(java.util.Locale.ROOT);
+      if (NETWORK.contains(type) || type.startsWith("fuse.") || type.startsWith("nfs"))
+        return "The folder of the catalog locks " + dir + " is on a network file system (" + type + "): its locks may not "
+            + "keep another process from writing a catalog. Give a folder on a local disk with --locks";
+    } catch (IOException | RuntimeException e) {
+      // unknown: no warning
+    }
+    return null;
+  }
+
   /**
    * Takes the lock of a catalog this server is about to create: the tracker loads a catalog it creates itself, without
    * {@link #load}. False when another process holds it.
@@ -601,9 +632,10 @@ public final class Workspace {
     Project p = byDir(dir);
     if (p == null || p.closed || !p.requality)
       return;
+    // released from now on: no caller takes the tree that the loader thread stops next (a load after it clears the mark)
+    p.released = true;
     run(() -> {
       unload(p);
-      p.released = true;
       changed();
     });
   }
@@ -652,6 +684,7 @@ public final class Workspace {
       }
     }
     p.loading = true;
+    p.loadedAt = System.currentTimeMillis();
     changed();
     try {
       t.handleNewProject(p.dir.toURI(), p.localName, false, false);
@@ -672,6 +705,13 @@ public final class Workspace {
     // a project that failed to load, or that was closed while it loaded (and not opened again), releases its catalog
     if (p.closed || p.error != null)
       releaseUnloaded(p);
+    else
+      for (java.util.function.Consumer<Project> l : loadListeners)
+        try {
+          l.accept(p);
+        } catch (RuntimeException e) {
+          RLogger.logError(e);
+        }
     // The tree may have come ready without an open notification (after a version update): the explorer shows it.
     com.unitesk.requality.vscode.services.ExplorerService.refreshAllNodes();
     changed();

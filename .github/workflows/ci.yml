@@ -57,6 +57,14 @@ jobs:
           for i in $(seq 100); do [ -s "$FAKE_PORT_FILE" ] && break; sleep 0.1; done
           api="http://127.0.0.1:$(cat "$FAKE_PORT_FILE")"
           export REQUALITY_MCP_HOME="$dl/mcp home" REQUALITY_MCP_BIN="$dl/bin"
+          # without a check of the build provenance attestation (gh is not signed in here) the install stops
+          if REQUALITY_MCP_RELEASES_URL="$api/good/releases" sh scripts/install-mcp.sh 2> "$dl/err"; then
+            echo "An archive was installed without its attestation"
+            exit 1
+          fi
+          grep -q "REQUALITY_MCP_UNVERIFIED=1" "$dl/err"
+          # the archives of the fake releases have no attestation
+          export REQUALITY_MCP_UNVERIFIED=1
           REQUALITY_MCP_RELEASES_URL="$api/good/releases" sh scripts/install-mcp.sh
           node test/mcp/smoke.js --command "$REQUALITY_MCP_BIN/requality-mcp"
           find "$REQUALITY_MCP_HOME" | sort > "$dl/before"
@@ -177,6 +185,8 @@ jobs:
             $env:REQUALITY_MCP_HOME = Join-Path $dl 'mcp home'
             $cmd = Join-Path $env:REQUALITY_MCP_HOME requality-mcp.cmd
             $env:REQUALITY_MCP_RELEASES_URL = "$api/good/releases"
+            # the archives of the fake releases have no attestation
+            $env:REQUALITY_MCP_UNVERIFIED = '1'
             # as "irm ... | iex" runs it: its settings and variables must not stay in the session
             $progress = $ProgressPreference
             Get-Content -Raw scripts\install-mcp.ps1 | Invoke-Expression
@@ -211,6 +221,8 @@ jobs:
             $env:REQUALITY_MCP_HOME = Join-Path $dl 'mcp home'
             $cmd = Join-Path $env:REQUALITY_MCP_HOME requality-mcp.cmd
             $env:REQUALITY_MCP_RELEASES_URL = "$api/good/releases"
+            # the archives of the fake releases have no attestation
+            $env:REQUALITY_MCP_UNVERIFIED = '1'
             # as "irm ... | iex" runs it: its settings and variables must not stay in the session
             $progress = $ProgressPreference
             Get-Content -Raw scripts\install-mcp.ps1 | Invoke-Expression

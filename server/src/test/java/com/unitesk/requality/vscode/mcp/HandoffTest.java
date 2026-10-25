@@ -132,6 +132,9 @@ class HandoffTest {
         String back = a.call("get_node", "project", "Shared", "node", "/Requirements/R1");
         assertTrue(back.contains("\"name\":\"First\""), back);
         assertEquals("released", b.await("Shared", 10_000, "released"));
+        // the undo steps of a ended with the load: the error names the change to revert
+        String undo = a.call("undo");
+        assertTrue(undo.startsWith("ERROR: ") && undo.contains("revert_change"), undo);
       }
     }
   }

@@ -106,6 +106,8 @@ sh install-mcp.sh
 claude mcp add requality -- ~/.local/bin/requality-mcp /path/to/catalogs
 ```
 
+The script verifies the build provenance attestation of the archive with the GitHub CLI (`gh auth login`); without
+`gh`, set `REQUALITY_MCP_UNVERIFIED=1` to install with the SHA-256 check only.
 On Windows, use `scripts/install-mcp.ps1`. Before version 1.5.0 is released, build the server from the source code
 (refer to [docs/MCP.md](docs/MCP.md#install)). From version 1.5.0, the VS Code extension contains the same server:
 `dist/server/bin/requality-mcp`.

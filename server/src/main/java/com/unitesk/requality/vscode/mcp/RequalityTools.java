@@ -71,12 +71,24 @@ final class RequalityTools {
   static Core register(McpServer mcp, HeadlessClient headless, Policy policy) {
     Core core = new Core(headless);
     Session session = new Session(core, headless.server().options().storage);
-    // a catalog changed on disk loads again before a call reads it
+    // a catalog changed on disk loads again before a call reads it (the files are looked at when a load ends)
     mcp.beforeCall((tool, args) -> core.checkDisk(mcp, args));
+    core.workspace().onLoaded(core::loaded);
+    // the importer of HTML reads the files of the folders of the server, and no URL
+    com.unitesk.requality.tool.dom.XHTMLResourceCollector.guard = target -> {
+      if (!(target instanceof File))
+        return false;
+      try {
+        policy.allowed(((File) target).getAbsolutePath(), "The reference", false);
+        return true;
+      } catch (ToolError e) {
+        return false;
+      }
+    };
     // a file outside the folders of the server: the user of the client may allow its folder (elicitation)
-    policy.asker((folder, reason) -> mcp.askUser("The agent asks Requality to use " + reason + ", which is outside the "
-        + "folders the server may use. Allow requality-mcp to read and write files in " + folder + " until it stops?",
-        "Allow " + folder, 300_000));
+    policy.asker((folder, reason) -> !mcp.canAskUser() ? null : mcp.askUser("The agent asks Requality to use " + reason
+        + ", which is outside the folders the server may use. Allow requality-mcp to read and write files in " + folder
+        + " until it stops?", "Allow " + folder, 300_000));
 
     // ---- orientation
 
@@ -106,6 +118,9 @@ final class RequalityTools {
             out.add(o);
           }
           JsonObject res = obj("projects", out);
+          String locks = core.workspace().lockFolderWarning();
+          if (locks != null)
+            res.addProperty("warning", locks);
           if (out.isEmpty())
             res.addProperty("hint", "No Requality catalog in the folders of the server. Create one with create_project, or "
                 + "start requality-mcp with the folder that contains the catalogs.");
@@ -162,7 +177,8 @@ final class RequalityTools {
 
     mcp.add(new Tool("read_document", "Read document",
         "Reads a document of the project (a node under /Documents) paragraph by paragraph. Each paragraph has its "
-            + "number 'p', its heading level (h1 to h6, when it is a heading), its text, its coverage by requirement "
+            + "number 'p', its heading level (h1 to h6, when it is a heading), its table, row and column (in a table), the "
+            + "alternative texts of its pictures (images), its text, its coverage by requirement "
             + "locations (none; partial, with the sentences no location covers in uncovered_text; full: each sentence is "
             + "covered) and the requirements that mark it. Use 'filter': 'uncovered' to see only the paragraphs with text "
             + "that no requirement covers yet: the work list when you turn a document into requirements with apply_changes "
@@ -178,32 +194,24 @@ final class RequalityTools {
     mcp.add(new Tool("apply_changes", "Apply changes",
         "Changes a project with a list of operations in one transaction: all of them or none (an error names the "
             + "operation and changes nothing), one undo step, one entry in review_changes. 'dry_run' checks the "
-            + "operations, changes nothing and reports every operation that fails. Operations ('op') and their keys:\n"
-            + "- create: parent, type (Requirement, the default; TestPurpose, Comment, TextNode, DocFolder, ReportFolder, "
-            + "VirtualNode with target, InstancesFolder, RestrictedFolder), id (default: the next free id), name, "
-            + "description, attributes, template, as\n"
-            + "- update: node, id, name, description, attributes (a value null removes the attribute), as\n"
-            + "- update_all: under, attributes, and optionally type, where_attribute, where_value: sets (or removes) "
-            + "attributes of all matching nodes of a subtree\n"
-            + "- rename_attribute: under, attribute, new_name: renames an attribute in a subtree (values stay)\n"
-            + "- delete: node, recursive (true to delete a node with nodes under it)\n"
-            + "- move: node, parent, after (a child of the new parent; default: last)\n"
-            + "- copy: node, parent, as: a copy of the node and the nodes under it (new UUIDs, the next free ids)\n"
-            + "- link / unlink: from, to (\"<project>::<path>\" for another project), attribute (default: the default link attribute)\n"
-            + "- locate: requirement, document, and 'quote' (text of the document; white space, typographic quotes, dashes "
-            + "and letter case do not matter; 'paragraph' or 'occurrence' when it occurs more than once) or 'paragraph' "
-            + "alone (all its text) or 'start' and 'end'; as\n"
-            + "- unlocate: location (its UUID), requirement (remove the location from this requirement only; default: "
-            + "delete the location)\n"
-            + "- resolve: item (a review item of trace_coverage), status (COMPLETED, the default, or CHECK)\n"
-            + "Name a node with 'as' and refer to it later in the same call as \"$name\". Descriptions are text "
-            + "(paragraphs separated by empty lines) or HTML (starts with '<'). Attribute values: string, number, boolean, "
-            + "list of strings.",
+            + "operations, changes nothing and reports every operation that fails. The operations ('op'; the schema "
+            + "gives the keys of each): create (Requirement by default; TestPurpose, Comment, TextNode, DocFolder, "
+            + "ReportFolder, VirtualNode with target, InstancesFolder, RestrictedFolder), update, update_all (many nodes "
+            + "of a subtree), rename_attribute (another name or value type in a subtree), delete (recursive for a node "
+            + "with nodes under it), move, copy, link, unlink, locate (mark the text of a document for a requirement: "
+            + "'quote', where white space, typographic quotes, dashes and letter case do not matter, or 'paragraph', or "
+            + "'start' and 'end'), unlocate, resolve (a review item of trace_coverage). Name a node with 'as' and refer to "
+            + "it later in the same call as \"$name\". Descriptions are text (paragraphs separated by empty lines) or "
+            + "HTML (starts with '<'). Attribute values: string, number, boolean, list of strings; null removes one. "
+            + "The result is short (verbose gives all); warnings name repeated texts and nodes.",
         Schema.object().prop("project", "string", PROJECT, true).prop("operations", operationsSchema(), true)
             .prop("summary", "string", "What the change does and why, for the person who reviews it.", false)
-            .prop("dry_run", "boolean", "Check the operations, change nothing (default false).", false).build(),
+            .prop("dry_run", "boolean", "Check the operations, change nothing (default false).", false)
+            .prop("verbose", "boolean", "The full result of each operation (default: short results; with more than "
+                + RESULTS + " operations the counts, the named nodes and the first results).", false).build(),
         false, true, a -> {
           TreeDB db = core.db(Core.str(a, "project"));
+          boolean verbose = Core.optBool(a, "verbose", false);
           if (!a.get("operations").isJsonArray())
             throw new InvalidParams("Argument operations must be an array of operations");
           JsonArray ops = a.getAsJsonArray("operations");
@@ -213,7 +221,7 @@ final class RequalityTools {
               : ops.size() + " operation" + (ops.size() == 1 ? "" : "s"));
           JsonObject r = new JsonObject();
           if (Core.optBool(a, "dry_run", false)) {
-            r.add("results", compact(Session.dryRun(db, label, () -> Changes.run(db, ops, true))));
+            results(r, Session.dryRun(db, label, () -> Changes.run(db, ops, true)), ops, verbose);
             r.addProperty("dry_run", true);
             r.addProperty("note", "Nothing was changed. The operations can be applied.");
             return r;
@@ -221,7 +229,7 @@ final class RequalityTools {
           JsonObject e = session.change(db, "apply_changes", label, summary, () -> Changes.run(db, ops));
           r.addProperty("change", e.get("change").getAsInt());
           // the values before and after are in the history (review_changes with the change)
-          r.add("results", compact(e.getAsJsonArray("operations")));
+          results(r, e.getAsJsonArray("operations"), ops, verbose);
           return r;
         }));
 
@@ -282,18 +290,23 @@ final class RequalityTools {
             + "Polarion and other tools) into /Requirements of a project, in one change: the structure of the "
             + "specification, ReqIF.Text as the description, ReqIF.Name or ReqIF.ChapterName as the name, the other "
             + "attributes by their names, enumerations as enumerations of the project. Pictures and OLE objects of the "
-            + "texts are left out. Import into an empty project (create_project); 'replace' imports into a project with "
-            + "requirements, and the requirements that are not in the file go (revert_change brings them back).",
+            + "texts are left out. Import into an empty project (create_project). 'replace' imports again into a project "
+            + "with requirements: the requirements that are in the file (by ReqIF.ForeignID, else by the identifier of the "
+            + "object) are updated and keep their UUIDs, test purposes and other nodes; the ones that are not in the file "
+            + "go (the result lists them; a test purpose goes only with force; revert_change brings all back).",
         Schema.object().prop("project", "string", PROJECT, true)
             .prop("file", "string", "Absolute path of the ReqIF file (in a folder of the server).", true)
             .prop("specification", "string", "The specification (its name or identifier) when the file has several.", false)
-            .prop("replace", "boolean", "Import also when /Requirements has nodes (default false).", false).build(),
+            .prop("replace", "boolean", "Import also when /Requirements has nodes (default false).", false)
+            .prop("force", "boolean", "With replace: also delete the test purposes of requirements that are not in the file "
+                + "(default false).", false).build(),
         false, true, a -> {
           TreeDB db = core.db(Core.str(a, "project"));
           File file = policy.file(Core.str(a, "file"), "ReqIF file", java.util.Set.of("reqif", "xml"));
           JsonObject[] result = { null };
           JsonObject e = session.change(db, "import_reqif", "Import ReqIF", "Import of " + file.getName(), () -> {
-            result[0] = ReqIfImport.run(db, file, Core.optStr(a, "specification", null), Core.optBool(a, "replace", false));
+            result[0] = ReqIfImport.run(db, file, Core.optStr(a, "specification", null), Core.optBool(a, "replace", false),
+                Core.optBool(a, "force", false));
             JsonObject op = result[0].deepCopy();
             op.addProperty("op", "import_reqif");
             JsonArray ops = new JsonArray();
@@ -415,12 +428,12 @@ final class RequalityTools {
             + "covers, the test failures with the requirements they violate, and the requirements of the file that the "
             + "project does not have. It changes nothing. The file: " + TestCoverage.FORMAT,
         Schema.object().prop("project", "string", PROJECT, true)
-            .prop("file", "string", "Absolute path of the coverage file (in a folder of the server).", true)
+            .prop("coverage_file", "string", "Absolute path of the coverage file (in a folder of the server).", true)
             .prop("under", "string", "Only the requirements under this node (default /Requirements).", false)
             .prop("limit", "integer", "At most this many items in each list (default 50).", false).build(),
         true, false, a -> {
           TreeDB db = core.db(Core.str(a, "project"));
-          File file = policy.file(Core.str(a, "file"), "coverage file", java.util.Set.of("xml"));
+          File file = policy.file(Core.str(a, "coverage_file"), "coverage file", java.util.Set.of("xml"));
           return TestCoverage.report(db, Core.node(db, Core.optStr(a, "under", Requirement.getTypeRootQId())), file,
               Math.max(1, Core.optInt(a, "limit", 50)));
         }));
@@ -475,11 +488,14 @@ final class RequalityTools {
             Core.optBool(a, "force", false), Core.optBool(a, "dry_run", false), Core.optBool(a, "verbose", false))));
 
     mcp.add(new Tool("undo", "Undo",
-        "Undoes the newest change of the agent in this session (in any project) and marks it undone in review_changes. "
-            + "For a change of an earlier session use revert_change.",
-        Schema.object().build(), false, true, a -> session.undoRedo(true)));
-    mcp.add(new Tool("redo", "Redo", "Redoes the newest undone change of this session.", Schema.object().build(), false, true,
-        a -> session.undoRedo(false)));
+        "Undoes the newest change of the agent in this session and marks it undone in review_changes. With project, only "
+            + "when that change is of the project (else the error names it). For a change of an earlier session, or "
+            + "after the catalog was loaded again, use revert_change.",
+        Schema.object().prop("project", "string", "Only a change of this project.", false).build(), false, true,
+        a -> session.undoRedo(true, Core.optStr(a, "project", null))));
+    mcp.add(new Tool("redo", "Redo", "Redoes the newest undone change of this session (with project: only of that project).",
+        Schema.object().prop("project", "string", "Only a change of this project.", false).build(), false, true,
+        a -> session.undoRedo(false, Core.optStr(a, "project", null))));
 
     // ---- project settings
 
@@ -499,8 +515,10 @@ final class RequalityTools {
             + "(removes an unused one); a value that nodes use cannot be removed\n"
             + "- required_attributes: node type -> [{\"attribute\", \"default\"}] or null: the nodes of the type get the "
             + "attributes they miss, with the default\n"
-            + "- checker_rules: [{\"name\", \"formula\"}] replaces the rules (JavaScript, true for a correct node; the "
-            + "formulas see attribute values, not files or programs)\n"
+            + "- checker_rules: [{\"name\", \"formula\"}] replaces the rules: JavaScript, true for a correct node. A formula "
+            + "sees the node as 'one': one.attr(name) (a user attribute, or %Name, %Id, %Description, %Type; null when absent), "
+            + "one.attrs(), one.getParent(), one.getChildren(), one.getLinked(attribute), one.getQID(). Example: "
+            + "\"one.attr('priority') != null\". A new rule is tried on a few requirements; it sees no files or programs\n"
             + "- checkers: {\"user_visible_ids\": boolean, \"defined_terms\": boolean}\n"
             + "- id_prefix, default_link_attribute: strings\n"
             + "- active_templates: node type -> template id of /Templates, or null",
@@ -604,7 +622,7 @@ final class RequalityTools {
           JsonObject r = obj("project", new JsonPrimitive(name));
           r.addProperty("state", done);
           return r;
-        }));
+        }).idempotent());
 
     mcp.add(new Tool("close_project", "Close project",
         "Closes a project: its catalog is released for VS Code or another requality-mcp. open_project opens it again.",
@@ -614,7 +632,7 @@ final class RequalityTools {
           if (!p.closed)
             core.workspace().closeProject(p.dir);
           return obj("closed", new JsonPrimitive(name));
-        }));
+        }).idempotent());
 
     mcp.add(new Tool("convert_project", "Convert project",
         "Converts a project in the catalog format of an older Requality (state needs_conversion) to the current format: "
@@ -633,6 +651,10 @@ final class RequalityTools {
           }
           if (!core.needsConversion(p))
             throw new ToolError("Project " + name + " needs no conversion");
+          // the conversion writes the whole catalog: only with its lock
+          if (p.unlocked != null)
+            throw new ToolError("The server does not convert project " + name + ": its catalog is not locked ("
+                + p.unlocked + "). Start requality-mcp with --locks <a folder it can write>");
           File backup = backup(headless.server().options().storage, p.dir);
           headless.allowConversion(p.localName);
           // the cancelled conversion closed the project (as in Eclipse): it opens again and converts
@@ -708,6 +730,69 @@ final class RequalityTools {
     return out;
   }
 
+  /** More operations than this give counts and the named nodes instead of a result for each one. */
+  static final int RESULTS = 50;
+
+  /**
+   * The results of apply_changes in a result: short ones (a location by its UUID and paragraph; the warnings together),
+   * or all of them ({@code verbose}). With more than {@link #RESULTS} operations: the counts by operation, the nodes
+   * named with "as", and the first results. The history keeps all (review_changes).
+   */
+  static void results(JsonObject r, JsonArray results, JsonArray ops, boolean verbose) {
+    if (verbose) {
+      r.add("results", compact(results));
+      return;
+    }
+    JsonArray out = new JsonArray();
+    JsonArray warnings = new JsonArray();
+    for (JsonElement x : compact(results)) {
+      JsonObject o = x.getAsJsonObject();
+      if (o.has("location") && o.get("location").isJsonObject()) {
+        JsonObject l = o.getAsJsonObject("location");
+        JsonObject s = new JsonObject();
+        for (String k : new String[] { "uuid", "p" })
+          if (l.has(k))
+            s.add(k, l.get(k));
+        o.add("location", s);
+      }
+      if (o.has("broken_links") && o.getAsJsonArray("broken_links").size() > 10) {
+        JsonArray b = o.getAsJsonArray("broken_links");
+        o.addProperty("broken_link_count", b.size());
+        o.add("broken_links", SpecUpdate.first(b, 10));
+      }
+      if (o.has("warning")) {
+        JsonObject w = new JsonObject();
+        w.add("i", o.get("i"));
+        w.add("warning", o.remove("warning"));
+        warnings.add(w);
+      }
+      out.add(o);
+    }
+    if (warnings.size() > 0)
+      r.add("warnings", warnings);
+    if (out.size() <= RESULTS) {
+      r.add("results", out);
+      return;
+    }
+    Map<String, Integer> counts = new java.util.TreeMap<>();
+    JsonObject named = new JsonObject();
+    for (int i = 0; i < out.size(); i++) {
+      JsonObject o = out.get(i).getAsJsonObject();
+      counts.merge(o.get("op").getAsString(), 1, Integer::sum);
+      JsonObject op = i < ops.size() && ops.get(i).isJsonObject() ? ops.get(i).getAsJsonObject() : null;
+      if (op != null && op.has("as") && o.has("path"))
+        named.add(op.get("as").getAsString(), o.get("path"));
+    }
+    JsonObject c = new JsonObject();
+    counts.forEach(c::addProperty);
+    r.add("counts", c);
+    if (named.size() > 0)
+      r.add("named", named);
+    r.add("results", SpecUpdate.first(out, 10));
+    r.addProperty("more_results", (out.size() - 10) + " more (verbose true lists all; review_changes with the change "
+        + "has them with the values before and after)");
+  }
+
   static JsonObject obj(String key, JsonElement value) {
     JsonObject o = new JsonObject();
     o.add(key, value);
@@ -747,6 +832,8 @@ final class RequalityTools {
 
   static JsonObject operationsSchema() {
     JsonArray variants = new JsonArray();
+    // each key is described where it comes first (the description is the same in the other operations)
+    java.util.Set<String> described = new java.util.HashSet<>();
     for (Map.Entry<String, List<String>> e : Changes.KEYS.entrySet()) {
       JsonObject item = new JsonObject();
       item.addProperty("type", "object");
@@ -772,7 +859,8 @@ final class RequalityTools {
           default:
             s.addProperty("type", "string");
         }
-        s.addProperty("description", Changes.MEANING.get(k));
+        if (described.add(k))
+          s.addProperty("description", Changes.MEANING.get(k));
         p.add(k, s);
       }
       item.add("properties", p);
@@ -830,14 +918,35 @@ final class RequalityTools {
     o.add("linked_from", Core.links(n, true));
     if (n instanceof Requirement) {
       JsonArray locs = new JsonArray();
+      Map<Document, DocumentText> texts = new HashMap<>();
       for (Location l : ((Requirement) n).getLocations(false)) {
         if (l == null || l.isDisposed())
           continue;
         JsonObject lo = new JsonObject();
         lo.addProperty("uuid", l.getSUUId());
         Document doc = l.getDocument();
-        if (doc != null)
+        if (doc != null) {
           lo.addProperty("document", doc.getQualifiedId());
+          // the paragraph of the text (for read_document), and an older version of the document
+          List<int[]> f = DocumentText.fragments(l);
+          if (!f.isEmpty())
+            try {
+              DocumentText dt = texts.computeIfAbsent(doc, x -> {
+                try {
+                  return DocumentText.of(x);
+                } catch (Exception e) {
+                  return null;
+                }
+              });
+              DocumentText.Paragraph p = dt == null ? null : dt.paragraphAt(f.get(0)[0]);
+              if (p != null)
+                lo.addProperty("p", p.index);
+            } catch (RuntimeException e) {
+              // the document cannot be read: no paragraph
+            }
+          if (Changes.linked(doc, SUPERSEDED_BY) != null)
+            lo.addProperty("superseded", true);
+        }
         String ld = l.getDescription();
         if (ld != null)
           lo.addProperty("text", Core.text(ld).replaceAll("\\s+", " "));
@@ -1169,8 +1278,15 @@ final class RequalityTools {
     List<File> files = Arrays.asList(file);
     Map<String, String> fn = new HashMap<>();
     Map<String, Document> dc = new HashMap<>();
+    com.unitesk.requality.tool.dom.XHTMLResourceCollector.REFUSED.clear();
     id.importFilesFirst(dc, fn, files, folder, NullProgressMonitor.ONE, 1);
     Document doc = id.importFilesSecond(dc, fn, files, folder, NullProgressMonitor.ONE, 1);
+    // a reference the importer was about to read outside the folders of the server (or a URL): no import
+    List<String> refused = new ArrayList<>(com.unitesk.requality.tool.dom.XHTMLResourceCollector.REFUSED);
+    if (!refused.isEmpty())
+      throw new ToolError("The document " + file.getName() + " refers to URLs or to files outside the folders of the server: "
+          + refused + ". Nothing was changed. Remove these references (or put the files next to the document) and import "
+          + "again");
     if (doc == null || !errors.isEmpty())
       throw new ToolError("Import of " + file + " failed: " + (errors.isEmpty() ? "no document was made" : errors)
           + ". Nothing was changed.");
@@ -1186,6 +1302,8 @@ final class RequalityTools {
   /** A copy of a catalog (without its caches) in {@code <storage>/backups/<name>-<time>}; older copies go. */
   static File backup(File storage, File catalog) throws IOException {
     File backups = new File(storage, "backups");
+    backups.mkdirs();
+    History.ownerOnly(backups);
     File dir = new File(backups,
         catalog.getName() + "-" + LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyyMMdd-HHmmss")));
     Path from = catalog.toPath();
@@ -1325,8 +1443,12 @@ final class RequalityTools {
     if (there != null && there.length > 0)
       throw new ToolError("The folder " + output + " is not empty: give a new or empty folder");
     String coverage = null;
-    if (a.has("coverage_file") && !a.get("coverage_file").isJsonNull())
-      coverage = policy.file(Core.str(a, "coverage_file"), "coverage file", java.util.Set.of("xml")).toURI().toString();
+    if (a.has("coverage_file") && !a.get("coverage_file").isJsonNull()) {
+      File cf = policy.file(Core.str(a, "coverage_file"), "coverage file", java.util.Set.of("xml"));
+      // the requirements by their paths, as the report reads them (the file may name them by id)
+      File withPaths = TestCoverage.withPaths(db, cf, new File(core.storage(), "tmp"));
+      coverage = (withPaths != null ? withPaths : cf).toURI().toString();
+    }
     if (saved != null)
       checkCoverage(policy, db, saved, coverage != null);
     // the parameters by their definitions: a name the template does not have is an error
@@ -1427,8 +1549,27 @@ final class RequalityTools {
     }
     // the folder was new or empty: its files are the report
     JsonArray fa = new JsonArray();
+    List<Path> made = new ArrayList<>();
     try (Stream<Path> all = Files.walk(output.toPath())) {
-      all.filter(Files::isRegularFile).sorted().forEach(p -> fa.add(p.toString()));
+      all.filter(Files::isRegularFile).sorted().forEach(p -> {
+        fa.add(p.toString());
+        made.add(p);
+      });
+    }
+    // a template that failed writes its error into the page (FreeMarker): the report is no report
+    for (Path p : made) {
+      String n = p.getFileName().toString().toLowerCase(java.util.Locale.ROOT);
+      if (!n.endsWith(".html") && !n.endsWith(".htm") && !n.endsWith(".xml"))
+        continue;
+      String page = Files.readString(p, java.nio.charset.StandardCharsets.UTF_8);
+      int at = page.indexOf("FreeMarker template error");
+      if (at < 0)
+        at = page.indexOf("freemarker.core.");
+      if (at >= 0) {
+        String error = Core.text(page.substring(at, Math.min(page.length(), at + 1500))).replaceAll("\\s+", " ");
+        throw new ToolError("The template failed: " + (error.length() > 600 ? error.substring(0, 600) + " …" : error)
+            + " (the page " + p + " shows the whole error)");
+      }
     }
     out.addProperty("output", output.getPath());
     out.add("files", fa);

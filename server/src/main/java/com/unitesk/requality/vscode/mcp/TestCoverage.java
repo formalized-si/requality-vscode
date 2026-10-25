@@ -29,7 +29,8 @@ final class TestCoverage {
   /** The format of a coverage file, for the description of the tool. */
   static final String FORMAT = "<coverage><reqcoverage qid=\"/Requirements/A/B\"><covered_by uri=\"test/path\" "
       + "label=\"Test name\" hits=\"1\"/></reqcoverage><error name=\"...\" testuri=\"test/path\"><violates "
-      + "qid=\"/Requirements/A/B\"/><description format=\"plain\">...</description></error></coverage>";
+      + "qid=\"/Requirements/A/B\"/><description format=\"plain\">...</description></error></coverage>. A qid is the path, "
+      + "the UUID, the user-visible id (with the id prefix of the project) or the id of a requirement that one node has.";
 
   static JsonObject report(TreeDB db, TreeNode under, File file, int limit) {
     CoverageFromFile src = new CoverageFromFile();
@@ -39,12 +40,23 @@ final class TestCoverage {
     String errors = src.getLastErrors();
     if (cov == null || errors != null && !errors.isEmpty())
       throw new ToolError("The coverage file " + file + " cannot be read: " + Core.text(errors == null ? "" : errors));
+    // the requirements of the file by their nodes (a path, a UUID, a user-visible id or an id that one node has); the
+    // keys that name no node of the project are unknown
+    Map<String, TreeNodeCoverageInfo> byPath = new java.util.HashMap<>();
+    List<String> unknownKeys = new ArrayList<>();
+    for (Map.Entry<String, TreeNodeCoverageInfo> e : cov.entrySet()) {
+      TreeNode n = find(db, e.getKey());
+      if (n == null)
+        unknownKeys.add(e.getKey());
+      else
+        byPath.putIfAbsent(n.getQualifiedId(), e.getValue());
+    }
     List<Requirement> leaves = new ArrayList<>();
     collect(under, leaves);
     Capped covered = new Capped(limit);
     Capped uncovered = new Capped(limit);
     for (Requirement r : leaves) {
-      TreeNodeCoverageInfo info = cov.get(r.getQualifiedId());
+      TreeNodeCoverageInfo info = byPath.get(r.getQualifiedId());
       JsonObject o = item(r);
       if (info != null && info.getTestPaths().length > 0) {
         o.addProperty("tests", info.getTestPaths().length);
@@ -65,9 +77,8 @@ final class TestCoverage {
     }
     // the requirements of the file that the project does not have (renamed or deleted since the tests ran)
     Capped unknown = new Capped(limit);
-    for (String qid : cov.keySet())
-      if (find(db, qid) == null)
-        unknown.add(new com.google.gson.JsonPrimitive(qid));
+    for (String qid : unknownKeys)
+      unknown.add(new com.google.gson.JsonPrimitive(qid));
     Capped failures = new Capped(limit);
     Map<String, TestErrorInfo[]> errs = src.getErrors();
     if (errs != null)
@@ -100,10 +111,44 @@ final class TestCoverage {
     return r;
   }
 
+  /**
+   * A copy of a coverage file (in the folder {@code dir}) whose requirements are the paths of their nodes: the reports
+   * of the core know a requirement by its path, the file can name it as the tools do. Null when the file names only
+   * paths.
+   */
+  static File withPaths(TreeDB db, File file, File dir) throws Exception {
+    javax.xml.parsers.DocumentBuilderFactory f = javax.xml.parsers.DocumentBuilderFactory.newInstance();
+    f.setFeature("http://apache.org/xml/features/disallow-doctype-decl", true);
+    f.setXIncludeAware(false);
+    f.setExpandEntityReferences(false);
+    org.w3c.dom.Document d = f.newDocumentBuilder().parse(file);
+    boolean changed = false;
+    for (String tag : new String[] { "reqcoverage", "violates" }) {
+      org.w3c.dom.NodeList l = d.getElementsByTagName(tag);
+      for (int i = 0; i < l.getLength(); i++) {
+        org.w3c.dom.Element e = (org.w3c.dom.Element) l.item(i);
+        String qid = e.getAttribute("qid");
+        TreeNode n = qid.isEmpty() ? null : find(db, qid);
+        if (n != null && !n.getQualifiedId().equals(qid)) {
+          e.setAttribute("qid", n.getQualifiedId());
+          changed = true;
+        }
+      }
+    }
+    if (!changed)
+      return null;
+    dir.mkdirs();
+    File out = File.createTempFile("coverage-", ".xml", dir);
+    out.deleteOnExit();
+    javax.xml.transform.Transformer t = javax.xml.transform.TransformerFactory.newInstance().newTransformer();
+    t.transform(new javax.xml.transform.dom.DOMSource(d), new javax.xml.transform.stream.StreamResult(out));
+    return out;
+  }
+
+  /** A requirement of a coverage file: as the tools find a node (path, UUID, user-visible id, id alone when unique). */
   private static TreeNode find(TreeDB db, String qid) {
     try {
-      TreeNode n = db.getNode(qid, Path.QID | Path.UV | Path.UUID);
-      return n == null || n.isDisposed() ? null : n;
+      return Core.node(db, qid);
     } catch (RuntimeException e) {
       return null;
     }

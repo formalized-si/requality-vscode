@@ -535,6 +535,26 @@ final class ProjectSettings {
       rules.add(new JSFormula(name, formula, crh));
     }
     crh.setRules(rules);
+    // each rule on a few nodes: a rule that throws there would throw on every node
+    int tried = 0;
+    java.util.ArrayDeque<TreeNode> q = new java.util.ArrayDeque<>();
+    q.add(db.getRootNode());
+    while (!q.isEmpty() && tried < 20) {
+      TreeNode n = q.poll();
+      if (n.getType().equals(com.unitesk.requality.nodetype.Requirement.TYPE_NAME) && n.getWorkParent() != null) {
+        tried++;
+        for (JSFormula f : rules) {
+          com.unitesk.requality.core.model.Pair<Object, Boolean> res = f.runOnNode(n);
+          if (!res.getSecond())
+            throw new InvalidParams("checker_rules: the formula of " + f.getName() + " fails on " + n.getQualifiedId() + ": "
+                + res.getFirst() + ". A formula sees the node as 'one': one.attr(name) (a user attribute, or %Name, %Id, "
+                + "%Description, %Type), one.attrs(), one.getParent(), one.getChildren(), one.getLinked(attribute)");
+        }
+      }
+      for (TreeNode c : n.getWorkChildren())
+        if (c != null && !c.isDisposed() && !c.isVirtual())
+          q.add(c);
+    }
     JsonObject op = op("checker_rules");
     op.add("checker_rules", spec);
     return op;

@@ -46,7 +46,7 @@ final class Changes {
     KEYS.put("create", Arrays.asList("parent", "type", "id", "name", "description", "attributes", "target", "template", "as"));
     KEYS.put("update", Arrays.asList("node", "id", "name", "description", "attributes", "as"));
     KEYS.put("update_all", Arrays.asList("under", "type", "where_attribute", "where_value", "attributes"));
-    KEYS.put("rename_attribute", Arrays.asList("under", "attribute", "new_name"));
+    KEYS.put("rename_attribute", Arrays.asList("under", "attribute", "new_name", "value_type"));
     KEYS.put("delete", Arrays.asList("node", "recursive"));
     KEYS.put("move", Arrays.asList("node", "parent", "after"));
     KEYS.put("copy", Arrays.asList("node", "parent", "as"));
@@ -63,7 +63,7 @@ final class Changes {
     REQUIRED.put("create", Arrays.asList("parent"));
     REQUIRED.put("update", Arrays.asList("node"));
     REQUIRED.put("update_all", Arrays.asList("under", "attributes"));
-    REQUIRED.put("rename_attribute", Arrays.asList("under", "attribute", "new_name"));
+    REQUIRED.put("rename_attribute", Arrays.asList("under", "attribute"));
     REQUIRED.put("delete", Arrays.asList("node"));
     REQUIRED.put("move", Arrays.asList("node", "parent"));
     REQUIRED.put("copy", Arrays.asList("node", "parent"));
@@ -89,7 +89,9 @@ final class Changes {
     MEANING.put("under", "The subtree root: the operation changes the nodes under it (and it).");
     MEANING.put("where_attribute", "update_all: only nodes that have this attribute (with where_value: of this value).");
     MEANING.put("where_value", "update_all: the value where_attribute must have (compared as text).");
-    MEANING.put("new_name", "The new attribute name.");
+    MEANING.put("new_name", "The new attribute name (default: the same name).");
+    MEANING.put("value_type", "rename_attribute: the new type of the values: string, integer, number or boolean (default: "
+        + "the same); a value that does not convert is an error.");
     MEANING.put("id", "The id (default for create: the next free id).");
     MEANING.put("name", "The name.");
     MEANING.put("description", "Text (paragraphs separated by empty lines) or HTML (starts with '<').");
@@ -98,7 +100,8 @@ final class Changes {
     MEANING.put("after", "A child of the new parent to put the node after (default: last).");
     MEANING.put("from", "The node the link starts at.");
     MEANING.put("to", "The target: a path, a UUID, \"$name\", or \"<project>::<path>\" in another project.");
-    MEANING.put("attribute", "The link attribute (default: the default link attribute of the project).");
+    MEANING.put("attribute", "link, unlink: the link attribute (default: the default link attribute of the project); "
+        + "rename_attribute: the attribute to rename.");
     MEANING.put("requirement", "The requirement.");
     MEANING.put("document", "The document (under /Documents).");
     MEANING.put("quote", "Text of the document to mark (white space, typographic quotes, dashes and case do not matter).");
@@ -366,17 +369,41 @@ final class Changes {
     return r;
   }
 
-  /** rename_attribute: an attribute of the nodes under a node gets another name (its value and type stay). */
+  /**
+   * rename_attribute: an attribute of the nodes under a node gets another name and/or another type of values (as the
+   * attribute type change of the mass operations of Requality).
+   */
   private JsonObject renameAttribute(JsonObject op) throws Exception {
     TreeNode under = ref(op, "under");
     String from = Core.str(op, "attribute");
-    String to = Core.str(op, "new_name");
+    String to = Core.optStr(op, "new_name", from);
+    String typeName = Core.optStr(op, "value_type", null);
+    AttributeType newType = null;
+    if (typeName != null)
+      switch (typeName.toLowerCase(java.util.Locale.ROOT)) {
+        case "string":
+          newType = AttributeType.STRING;
+          break;
+        case "integer":
+          newType = AttributeType.INT;
+          break;
+        case "number":
+          newType = AttributeType.FLOAT;
+          break;
+        case "boolean":
+          newType = AttributeType.BOOL;
+          break;
+        default:
+          throw new InvalidParams("value_type must be string, integer, number or boolean, not " + typeName);
+      }
+    if (newType == null && !op.has("new_name"))
+      throw new InvalidParams("give new_name, value_type or both");
     for (String k : new String[] { from, to })
       if (k.startsWith("_") || k.startsWith("%"))
         throw new InvalidParams("attribute " + k + ": system attributes keep their names");
     if (!Attribute.checkNameIsValid(to, false))
       throw new InvalidParams("invalid attribute name " + to);
-    if (n(from).equals(n(to)))
+    if (n(from).equals(n(to)) && newType == null)
       throw new InvalidParams("new_name is the same name");
     JsonArray names = new JsonArray();
     int n = 0;
@@ -387,14 +414,22 @@ final class Changes {
       // the attribute of the node itself, not one it inherits (its owner is renamed when it is under the node)
       if (a == null || !a.isLocal(x.getUUId()))
         continue;
-      if (x.attrs().getAttribute(to) != null && x.attrs().getAttribute(to).isLocal(x.getUUId()))
+      if (!to.equals(from) && x.attrs().getAttribute(to) != null && x.attrs().getAttribute(to).isLocal(x.getUUId()))
         throw new ToolError(x.getQualifiedId() + " has both " + from + " and " + to);
       AttributeDefinition d = a.getDefinition();
       if (RequalityTools.COVERAGE_ATTRIBUTES.contains(to) && x instanceof com.unitesk.requality.nodetype.ReportSettings)
         throw new ToolError("attribute " + to + " of report settings: give the coverage file to generate_report");
-      x.attrs().setAttribute(new AttributeDefinition(x.getUUId(), to, d.getAvailability(), d.getValueProvider(),
+      com.unitesk.requality.core.attribute.valueprovider.IValueProvider vp = d.getValueProvider();
+      if (newType != null && a.getType() != newType) {
+        Object v = convert(x, a, newType);
+        if (v == null)
+          throw new ToolError(x.getQualifiedId() + ": the value " + a.getValue() + " of " + from + " is no " + typeName);
+        vp = new com.unitesk.requality.core.attribute.valueprovider.ConstValueProvider(newType, v);
+      }
+      if (!to.equals(from))
+        x.attrs().removeAttribute(from);
+      x.attrs().setAttribute(new AttributeDefinition(x.getUUId(), to, d.getAvailability(), vp,
           AttributeDefinition.detectFlags(to)));
-      x.attrs().removeAttribute(from);
       x.commitAttributes();
       if (names.size() < NAMED)
         names.add(x.getQualifiedId());
@@ -412,6 +447,37 @@ final class Changes {
 
   private static String n(String s) {
     return s.trim();
+  }
+
+  /**
+   * The value of an attribute as a value of another type, or null when it is no value of that type (the core gives 0 or
+   * false for "abc": a value must not go so).
+   */
+  static Object convert(TreeNode x, Attribute a, AttributeType to) {
+    try {
+      Object text = Attribute.convertValue(x, a.getType(), AttributeType.STRING, a.getValue(), null);
+      if (to == AttributeType.STRING)
+        return text;
+      String t = text == null ? "" : text.toString().trim();
+      if (a.getType() == AttributeType.LIST)
+        t = t.replace("[", "").replace("]", "").trim();
+      switch (to) {
+        case INT: {
+          java.math.BigDecimal d = new java.math.BigDecimal(t);
+          return d.stripTrailingZeros().scale() <= 0 ? d.intValueExact() : null;
+        }
+        case FLOAT: {
+          double d = Double.parseDouble(t);
+          return Double.isFinite(d) ? d : null;
+        }
+        case BOOL:
+          return t.equalsIgnoreCase("true") ? Boolean.TRUE : t.equalsIgnoreCase("false") ? Boolean.FALSE : null;
+        default:
+          return null;
+      }
+    } catch (RuntimeException e) {
+      return null;
+    }
   }
 
   private JsonObject update(JsonObject op) throws Exception {
@@ -706,8 +772,14 @@ final class Changes {
     alias(op, l);
     JsonObject r = result("locate", req);
     r.add("location", dt.location(l));
+    List<String> warnings = new ArrayList<>();
     if (!others.isEmpty())
-      r.addProperty("warning", "this text is marked for " + others + " too");
+      warnings.add("this text is marked for " + others + " too");
+    TreeNode newer = linked(doc, RequalityTools.SUPERSEDED_BY);
+    if (newer != null)
+      warnings.add("the document has a newer version, " + newer.getQualifiedId() + ": locate the text there");
+    if (!warnings.isEmpty())
+      r.addProperty("warning", String.join("; ", warnings));
     return r;
   }
 

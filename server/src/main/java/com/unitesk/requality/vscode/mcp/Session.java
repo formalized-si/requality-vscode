@@ -100,8 +100,11 @@ final class Session {
 
   // ---- undo and redo
 
-  /** Undo (or redo) of the newest undo step, when it is a change of the agent in this session. */
-  JsonObject undoRedo(boolean undo) {
+  /**
+   * Undo (or redo) of the newest undo step, when it is a change of the agent in this session ({@code project}: and of
+   * this project; null: any).
+   */
+  JsonObject undoRedo(boolean undo, String project) {
     Object[] r = Display.getDefault().syncCall(() -> {
       IOperationHistory oh = PlatformUI.getWorkbench().getOperationSupport().getOperationHistory();
       com.unitesk.requality.vscode.ui.commands.operations.IUndoContext ctx = PlatformUI.getWorkbench().getOperationSupport()
@@ -112,19 +115,25 @@ final class Session {
       Object[] step = step(op);
       if (step == null)
         return new Object[] { op.getLabel(), null, false };
+      String of = projectOf(step);
+      if (project != null && of != null && !project.equals(of) && !project.equals(localName(of)))
+        return new Object[] { op.getLabel(), step, false, of };
       boolean called = undo ? UndoRedoMech.callUndo() : UndoRedoMech.callRedo();
       // the operation moved to the other list when it was made
       boolean done = called && (undo ? oh.getRedoOperation(ctx) == op : oh.getUndoOperation(ctx) == op);
       return new Object[] { op.getLabel(), step, done };
     });
     if (r == null)
-      throw new ToolError(undo ? "Nothing to undo" : "Nothing to redo");
+      throw new ToolError((undo ? "Nothing to undo" : "Nothing to redo") + lastStepHint(undo));
     if (r[1] == null)
       throw new ToolError("The newest " + (undo ? "undo" : "redo") + " step (" + r[0] + ") is not a change of the agent in "
           + "this session; use revert_change for the changes of review_changes");
     Object[] step = (Object[]) r[1];
     History h = (History) step[1];
     int n = (Integer) step[2];
+    if (r.length > 3)
+      throw new ToolError("The newest " + (undo ? "undo" : "redo") + " step is change " + n + " of project " + r[3] + ": "
+          + (undo ? "undo" : "redo") + " takes the newest step first. For project " + project + " use revert_change");
     if (!(Boolean) r[2])
       throw new ToolError((undo ? "Undo" : "Redo") + " of change " + n + " failed (see server_messages)");
     JsonObject e = h.entry(n);
@@ -156,6 +165,47 @@ final class Session {
           return steps.get(i);
     }
     return null;
+  }
+
+  /** The project of the change of an undo step (null: unknown). */
+  private static String projectOf(Object[] step) {
+    try {
+      JsonObject e = ((History) step[1]).entry((Integer) step[2]);
+      return e == null ? null : e.get("project").getAsString();
+    } catch (RuntimeException x) {
+      return null;
+    }
+  }
+
+  /** The folder name of a project of this name (the projects are named by either). */
+  private String localName(String project) {
+    try {
+      return core.project(project).localName;
+    } catch (RuntimeException e) {
+      return project;
+    }
+  }
+
+  /**
+   * When this session made changes but the undo history has none (the catalog was loaded again: another session used
+   * it, or it changed on disk): the change to revert instead.
+   */
+  private String lastStepHint(boolean undo) {
+    if (!undo)
+      return "";
+    Object[] last;
+    synchronized (steps) {
+      last = steps.isEmpty() ? null : steps.get(steps.size() - 1);
+    }
+    if (last == null || (Integer) last[2] <= 0)
+      return "";
+    History h = (History) last[1];
+    JsonObject e = h.entry((Integer) last[2]);
+    if (e == null || !"done".equals(e.get("state").getAsString()))
+      return "";
+    return ": the undo steps ended when the catalog was loaded again (another session used it, or it changed on disk). "
+        + "Take back your last change with revert_change (project " + e.get("project").getAsString() + ", change "
+        + last[2] + ")";
   }
 
   // ---- revert
@@ -429,7 +479,8 @@ final class Session {
     for (JsonObject e : all) {
       if (out.size() >= last)
         break;
-      out.add(verbose ? e.deepCopy() : brief(e));
+      // verbose: the operations of each change, at most 20 of each (review_changes with a change pages the rest)
+      out.add(verbose ? page(e.deepCopy(), 0, 20) : brief(e));
     }
     JsonObject r = new JsonObject();
     r.add("changes", out);

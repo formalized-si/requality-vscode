@@ -316,13 +316,22 @@ class McpServerTest {
     assertEquals(-32600, others.poll(30, TimeUnit.SECONDS).getAsJsonObject("error").get("code").getAsInt());
     send("5");
     assertEquals(-32600, others.poll(30, TimeUnit.SECONDS).getAsJsonObject("error").get("code").getAsInt());
-    // a batch gets one array with the responses
-    send("[{\"jsonrpc\":\"2.0\",\"id\":9101,\"method\":\"ping\"},{\"jsonrpc\":\"2.0\",\"method\":\"notifications/initialized\"},"
-        + "{\"jsonrpc\":\"2.0\",\"id\":9102,\"method\":\"no/such\"}]");
+    // a batch gets one array with the responses (protocol 2025-03-26; the later versions have no batches)
+    JsonObject older = new JsonObject();
+    older.addProperty("protocolVersion", "2025-03-26");
+    rpc("initialize", older);
+    String batchLine = "[{\"jsonrpc\":\"2.0\",\"id\":9101,\"method\":\"ping\"},{\"jsonrpc\":\"2.0\",\"method\":\"notifications/initialized\"},"
+        + "{\"jsonrpc\":\"2.0\",\"id\":9102,\"method\":\"no/such\"}]";
+    send(batchLine);
     JsonArray batch = others.poll(30, TimeUnit.SECONDS).getAsJsonArray("batch");
     assertEquals(2, batch.size(), batch.toString());
     assertEquals(9101, batch.get(0).getAsJsonObject().get("id").getAsInt());
     assertEquals(-32601, batch.get(1).getAsJsonObject().getAsJsonObject("error").get("code").getAsInt());
+    JsonObject newer = new JsonObject();
+    newer.addProperty("protocolVersion", "2025-06-18");
+    rpc("initialize", newer);
+    send(batchLine);
+    assertEquals(-32600, others.poll(30, TimeUnit.SECONDS).getAsJsonObject("error").get("code").getAsInt());
     CompletableFuture<JsonObject> f = new CompletableFuture<>();
     pending.put(9001, f);
     send("{\"jsonrpc\":\"2.0\",\"id\":9001,\"method\":5}");
@@ -455,7 +464,7 @@ class McpServerTest {
     Files.writeString(xxe.toPath(), "<?xml version=\"1.0\"?><!DOCTYPE c [<!ENTITY s SYSTEM \"" + secret.toURI() + "\">]>"
         + "<coverage><error name=\"e\" testuri=\"t\"><violates qid=\"/Requirements\"/><description format=\"plain\">&s;</description>"
         + "</error></coverage>");
-    String cov = callError("test_coverage", "project", P, "file", xxe.getAbsolutePath());
+    String cov = callError("test_coverage", "project", P, "coverage_file", xxe.getAbsolutePath());
     assertFalse(cov.contains("TOP-SECRET"), cov);
     File full = new File(root, "full");
     full.mkdirs();
@@ -582,7 +591,8 @@ class McpServerTest {
     call("import_document", "project", P, "file", notes.getAbsolutePath());
     JsonObject nd = call("read_document", "project", P, "document", "/Documents/notes.xhtml", "ranges", true);
     assertEquals(2, paragraph(nd, "Notes").get("heading").getAsInt(), nd.toString());
-    JsonObject quoted = call("apply_changes", "project", P, "operations", ops("[{\"op\":\"create\",\"parent\":\"/Requirements\",\"id\":\"NOTES\",\"as\":\"n\"},"
+    // verbose: the location with its text and ranges
+    JsonObject quoted = call("apply_changes", "project", P, "verbose", true, "operations", ops("[{\"op\":\"create\",\"parent\":\"/Requirements\",\"id\":\"NOTES\",\"as\":\"n\"},"
         + "{\"op\":\"locate\",\"requirement\":\"$n\",\"document\":\"/Documents/notes.xhtml\",\"quote\":\"The operator's console shall show \\\"alarms\\\" - always.\"},"
         + "{\"op\":\"locate\",\"requirement\":\"$n\",\"document\":\"/Documents/notes.xhtml\",\"quote\":\"The system shall not stop.\"}]"));
     assertEquals("The operator’s console shall show “alarms” – always.", quoted.getAsJsonArray("results").get(1)
@@ -907,7 +917,7 @@ class McpServerTest {
         + "<reqcoverage qid=\"/Requirements/GONE\"><covered_by uri=\"tests/gone.py\" label=\"test_gone\"/></reqcoverage>"
         + "<error name=\"enc_fail\" testuri=\"tests/enc_test.py\"><violates qid=\"/Requirements/SPEC/ENC\"/>"
         + "<description format=\"plain\">AES key is too short</description></error></coverage>");
-    JsonObject tc = call("test_coverage", "project", P, "file", xml.getAbsolutePath(), "under", "/Requirements/SPEC");
+    JsonObject tc = call("test_coverage", "project", P, "coverage_file", xml.getAbsolutePath(), "under", "/Requirements/SPEC");
     assertEquals(3, tc.get("leaves").getAsInt(), tc.toString());
     JsonObject log = tc.getAsJsonObject("covered").getAsJsonArray("items").get(0).getAsJsonObject();
     assertEquals("/Requirements/SPEC/LOG", log.get("path").getAsString());
@@ -918,7 +928,7 @@ class McpServerTest {
     assertEquals("AES key is too short", fail.get("description").getAsString());
     assertEquals("/Requirements/SPEC/ENC", fail.getAsJsonArray("violates").get(0).getAsString());
     assertEquals("/Requirements/GONE", tc.getAsJsonObject("unknown_requirements").getAsJsonArray("items").get(0).getAsString());
-    assertContains(callError("test_coverage", "project", P, "file", new File(root, "spec.html").getAbsolutePath()), "is no coverage file");
+    assertContains(callError("test_coverage", "project", P, "coverage_file", new File(root, "spec.html").getAbsolutePath()), "is no coverage file");
   }
 
   @Test
@@ -1148,7 +1158,7 @@ class McpServerTest {
         "enums", JsonParser.parseString("{\"Status\":{\"type\":\"string\",\"values\":[\"draft\",{\"value\":\"approved\",\"comment\":\"by the board\"}]}}"),
         "attributes", JsonParser.parseString("{\"owner\":{\"type\":\"string\",\"value\":\"team\"},\"level\":{\"type\":\"enum:Status\",\"value\":\"draft\"}}"),
         "required_attributes", JsonParser.parseString("{\"Requirement\":[{\"attribute\":\"reviewed\",\"default\":false}]}"),
-        "checker_rules", JsonParser.parseString("[{\"name\":\"has a name\",\"formula\":\"getNodeName() != ''\"}]"),
+        "checker_rules", JsonParser.parseString("[{\"name\":\"has a name\",\"formula\":\"one.attr('%Name') != null\"}]"),
         "id_prefix", "AG", "default_link_attribute", "refines", "summary", "Settings of the team");
     int settingsChange = changed.get("change").getAsInt();
     JsonObject after = call("get_project_settings", "project", A);
@@ -1178,12 +1188,18 @@ class McpServerTest {
     call("revert_change", "project", A, "change", prefixChange);
     assertEquals("AG", call("get_project_settings", "project", A).get("id_prefix").getAsString());
     assertTrue(settingsChange < prefixChange);
-    // the JavaScript of a catalog (here a checker rule) reaches no file or program
+    // the JavaScript of a catalog (here a checker rule) reaches no file or program: a rule that tries fails on its trial
     File marker = new File(root, "sandbox-marker");
-    call("change_project_settings", "project", A, "checker_rules", JsonParser.parseString(
-        "[{\"name\":\"escape\",\"formula\":\"new java.io.File('" + marker.getAbsolutePath() + "').createNewFile() || true\"}]"));
-    call("trace_coverage", "project", A, "refresh", true);
+    for (String escape : new String[] { "new java.io.File('" + marker.getAbsolutePath().replace('\\', '/') + "').createNewFile() || true",
+        "new java.util.Formatter('" + marker.getAbsolutePath().replace('\\', '/') + "').close() || true" })
+      assertContains(callError("change_project_settings", "project", A, "checker_rules", JsonParser.parseString(
+          "[{\"name\":\"escape\",\"formula\":\"" + escape + "\"}]")), "fails on");
     assertFalse(marker.exists(), "a checker rule created a file");
+    // a rule of the node: true for a correct node, a problem for the others
+    call("change_project_settings", "project", A, "checker_rules",
+        JsonParser.parseString("[{\"name\":\"not second\",\"formula\":\"one.attr('%Name') != 'First'\"}]"));
+    assertContains(call("trace_coverage", "project", A, "refresh", true).toString(), "not second");
+    assertContains(callError("trace_coverage", "project", A, "refresh", "yes"), "must be true or false");
     javax.script.ScriptEngine js = com.unitesk.requality.tool.CoreUtils.getJSEngine();
     assertEquals(3.0, ((Number) js.eval("'abc'.length")).doubleValue());
     try {
@@ -1199,6 +1215,14 @@ class McpServerTest {
     assertFalse(ScriptSandbox.visible("java.util.logging.FileHandler"));
     assertFalse(ScriptSandbox.visible("com.unitesk.requality.tool.CoreUtils"));
     assertFalse(ScriptSandbox.visible("com.unitesk.requality.nodetype.Document"));
+    assertFalse(ScriptSandbox.visible("java.util.Formatter"));
+    assertFalse(ScriptSandbox.visible("java.util.Scanner"));
+    assertFalse(ScriptSandbox.visible("com.unitesk.requality.core.model.TreeDB"));
+    assertFalse(ScriptSandbox.visible("java.util.Locale"));
+    assertFalse(ScriptSandbox.visible("java.util.TimeZone"));
+    assertFalse(ScriptSandbox.visible("java.time.zone.ZoneRulesProvider"));
+    assertTrue(ScriptSandbox.visible("com.unitesk.requality.core.script.Element"));
+    assertTrue(ScriptSandbox.visible("java.util.HashMap$Node"));
     call("change_project_settings", "project", A, "checker_rules", new JsonArray());
   }
 
@@ -1250,7 +1274,7 @@ class McpServerTest {
     // a node made twice is named
     JsonObject twice = call("apply_changes", "project", A, "operations",
         ops("[{\"op\":\"create\",\"parent\":\"/Requirements\",\"id\":\"R3\",\"name\":\"Second\"}]"));
-    assertContains(twice.getAsJsonArray("results").get(0).getAsJsonObject().get("warning").getAsString(), "/Requirements/R2");
+    assertContains(twice.getAsJsonArray("warnings").get(0).getAsJsonObject().get("warning").getAsString(), "/Requirements/R2");
     // a node by its id alone, when one node has it
     assertEquals("/Requirements/R2", call("get_node", "project", A, "node", "R2").get("path").getAsString());
     // search by the name of an attribute as the editor shows it; an unknown attribute is an error
@@ -1545,7 +1569,9 @@ class McpServerTest {
         }
       });
       answerQuestion("decline", null);
-      assertContains(declined.get(120, TimeUnit.SECONDS), "--allow");
+      String refused = declined.get(120, TimeUnit.SECONDS);
+      assertContains(refused, "The user did not allow the folder");
+      assertContains(refused, "--allow");
       // the home folder, a top folder and the hidden folders of the user are never offered
       assertFalse(Policy.askable(new File(System.getProperty("user.home"))));
       assertFalse(Policy.askable(new File(System.getProperty("user.home")).getParentFile()));
@@ -1594,5 +1620,169 @@ class McpServerTest {
     assertEquals(sum.get("requirements").getAsInt(), sum.get("unchanged").getAsInt(), up.toString());
     assertTrue(up.toString().length() < 4000, "a short result: " + up.toString().length());
     assertTrue(etsi.getUUId() != null);
+  }
+
+  @Test
+  @Order(23)
+  void theFourthReviewsAreFixed() throws Exception {
+    // a reference inside an element that the parser of the check could read as text is refused too
+    File outside = Files.createTempDirectory("requality-outside-ref").toFile();
+    File secret = new File(outside, "secret.png");
+    Files.writeString(secret.toPath(), "secret");
+    File hidden = new File(root, "hidden-ref.html");
+    Files.writeString(hidden.toPath(), "<html><body><p>The system shall hide.</p><textarea><img src=\"" + secret.getAbsolutePath()
+        + "\"/></textarea><title><img src=\"" + secret.getAbsolutePath() + "\"/></title></body></html>");
+    assertContains(callError("import_document", "project", A, "file", hidden.getAbsolutePath()), "secret.png");
+    // a table: each paragraph of a cell has its table, row and column; a picture its alternative text
+    File table = new File(root, "table.html");
+    Files.writeString(table.toPath(), "<html><body><p>Limits <img src=\"curve.png\" alt=\"Brake curve\"/></p><table>"
+        + "<tr><th>ID</th><th>Requirement</th></tr><tr><td>T1</td><td>The door shall close in 2 s.</td></tr></table></body></html>");
+    JsonObject tdoc = call("import_document", "project", A, "file", table.getAbsolutePath());
+    JsonObject tread = call("read_document", "project", A, "document", tdoc.get("path").getAsString());
+    JsonObject cell = paragraph(tread, "The door shall close");
+    assertEquals(0, cell.get("table").getAsInt(), tread.toString());
+    assertEquals(1, cell.get("row").getAsInt(), tread.toString());
+    assertEquals(1, cell.get("col").getAsInt(), tread.toString());
+    assertEquals("[\"Brake curve\"]", paragraph(tread, "Limits").getAsJsonArray("images").toString());
+    // a node file written with other line ends stays as it is after a dry run (the rollback writes no other bytes)
+    File r2 = new File(workspace, "AgentProject/root/Requirements/R2.json");
+    byte[] crlf = Files.readString(r2.toPath()).replace("\r\n", "\n").replace("\n", "\r\n").getBytes(StandardCharsets.UTF_8);
+    Files.write(r2.toPath(), crlf);
+    call("apply_changes", "project", A, "dry_run", true, "operations",
+        ops("[{\"op\":\"update\",\"node\":\"/Requirements/R2\",\"name\":\"Dry\"}]"));
+    assertTrue(java.util.Arrays.equals(crlf, Files.readAllBytes(r2.toPath())), "the dry run rewrote the file");
+    // a change on disk before the first look at a catalog is seen (the look of the load)
+    com.unitesk.requality.vscode.core.Workspace.Project ap = core.project(A);
+    TreeDB adb = core.db(A);
+    DiskWatch watch = new DiskWatch();
+    watch.loaded(ap.dir);
+    String r2text = Files.readString(r2.toPath());
+    Files.writeString(r2.toPath(), r2text.replace("Second", "Second on disk"));
+    assertTrue(watch.outdated(ap.dir, adb, ap.loadedAt), "a change after the look of the load");
+    assertTrue(new DiskWatch().outdated(ap.dir, adb, System.currentTimeMillis() - 60_000), "a change after the load, no look");
+    Files.write(r2.toPath(), crlf);
+    // the coverage by a plain id and by the id with the prefix of the project
+    File cov = new File(root, "coverage-ids.xml");
+    String prefix = com.unitesk.requality.core.model.IDMechanics.getShownIdPrefix(adb);
+    Files.writeString(cov.toPath(), "<coverage><reqcoverage qid=\"R2\"><covered_by uri=\"t\" label=\"t\" hits=\"1\"/></reqcoverage>"
+        + "<reqcoverage qid=\"" + prefix + "-R1\"><covered_by uri=\"u\" label=\"u\" hits=\"1\"/></reqcoverage></coverage>");
+    JsonObject tc = call("test_coverage", "project", A, "coverage_file", cov.getAbsolutePath());
+    // (R2 has nodes under it: the coverage lists the leaf requirements)
+    assertEquals(0, tc.getAsJsonObject("unknown_requirements").get("total").getAsInt(), tc.toString());
+    assertContains(tc.getAsJsonObject("covered").toString(), "/Requirements/R1");
+    // a bare id that two nodes have is an error
+    call("apply_changes", "project", A, "operations", ops("[{\"op\":\"create\",\"parent\":\"/Requirements\",\"id\":\"TWICE\"},"
+        + "{\"op\":\"create\",\"parent\":\"/Requirements/R2\",\"id\":\"TWICE\"}]"));
+    assertContains(callError("get_node", "project", A, "node", "TWICE"), "Several nodes have the id TWICE");
+    // a change of the values of an attribute to another type
+    call("apply_changes", "project", A, "operations", ops("[{\"op\":\"update\",\"node\":\"/Requirements/R2\",\"attributes\":{\"points\":\"3\"}}]"));
+    call("apply_changes", "project", A, "operations", ops("[{\"op\":\"rename_attribute\",\"under\":\"/Requirements\",\"attribute\":\"points\",\"value_type\":\"integer\"}]"));
+    JsonObject points = call("get_node", "project", A, "node", "/Requirements/R2").getAsJsonObject("attributes").getAsJsonObject("points");
+    assertEquals("INT", points.get("type").getAsString(), points.toString());
+    call("apply_changes", "project", A, "operations", ops("[{\"op\":\"update\",\"node\":\"/Requirements/R2\",\"attributes\":{\"label\":\"abc\"}}]"));
+    assertContains(callError("apply_changes", "project", A, "operations",
+        ops("[{\"op\":\"rename_attribute\",\"under\":\"/Requirements\",\"attribute\":\"label\",\"value_type\":\"integer\"}]")), "is no integer");
+    // many operations: counts, the named nodes and the first results; the warnings together
+    StringBuilder many = new StringBuilder("[");
+    for (int i = 0; i < 55; i++)
+      many.append(i == 0 ? "" : ",").append("{\"op\":\"create\",\"parent\":\"/Requirements\",\"id\":\"M").append(i)
+          .append("\",\"name\":\"Many\",\"as\":\"m").append(i).append("\"}");
+    JsonObject big = call("apply_changes", "project", A, "operations", ops(many.append("]").toString()));
+    assertEquals(55, big.getAsJsonObject("counts").get("create").getAsInt(), big.toString());
+    assertEquals("/Requirements/M54", big.getAsJsonObject("named").get("m54").getAsString());
+    assertTrue(big.getAsJsonArray("warnings").size() > 0, big.toString());
+    assertEquals(10, big.getAsJsonArray("results").size());
+    JsonObject listed = call("review_changes", "project", A, "verbose", true, "last", 1);
+    assertEquals(55, listed.getAsJsonArray("changes").get(0).getAsJsonObject().get("operations_total").getAsInt());
+    // undo of another project than the one of the newest step
+    assertContains(callError("undo", "project", "ReqifProject"), "of project " + A);
+    // the markup report of the converted catalog works
+    JsonObject em = call("generate_report", "project", P, "template", "com.unitesk.requality.reports.em", "output",
+        new File(root, "report-em").getAbsolutePath());
+    assertTrue(em.getAsJsonArray("files").size() >= 1, em.toString());
+    // annotations
+    for (JsonElement t : rpc("tools/list", null).getAsJsonObject("result").getAsJsonArray("tools")) {
+      JsonObject o = t.getAsJsonObject();
+      String name = o.get("name").getAsString();
+      JsonObject an = o.getAsJsonObject("annotations");
+      if (name.equals("get_tree") || name.equals("close_project"))
+        assertTrue(an.get("idempotentHint").getAsBoolean(), name);
+      if (name.equals("apply_changes"))
+        assertFalse(an.get("idempotentHint").getAsBoolean());
+    }
+  }
+
+  @Test
+  @Order(24)
+  void aVersionUpdateKeepsRepeatedTextsApart() throws Exception {
+    File v1 = new File(root, "limits.html");
+    Files.writeString(v1.toPath(), "<html><body><h1>1 Speed</h1><p>The speed limit is 50. Values above 10 shall not be used.</p>"
+        + "<h1>2 Height</h1><p>The height limit is 4. Values above 10 shall not be used.</p>"
+        + "<p>The controller shall stop.</p></body></html>");
+    JsonObject d1 = call("import_document", "project", A, "file", v1.getAbsolutePath());
+    String doc = d1.get("path").getAsString();
+    call("apply_changes", "project", A, "operations", ops("[{\"op\":\"create\",\"parent\":\"/Requirements\",\"id\":\"SPD\",\"as\":\"s\"},"
+        + "{\"op\":\"create\",\"parent\":\"/Requirements\",\"id\":\"HGT\",\"as\":\"h\"},"
+        + "{\"op\":\"create\",\"parent\":\"/Requirements\",\"id\":\"CTL\",\"as\":\"c\"},"
+        + "{\"op\":\"locate\",\"requirement\":\"$s\",\"document\":\"" + doc + "\",\"quote\":\"Values above 10 shall not be used.\",\"occurrence\":1},"
+        + "{\"op\":\"locate\",\"requirement\":\"$h\",\"document\":\"" + doc + "\",\"quote\":\"Values above 10 shall not be used.\",\"occurrence\":2},"
+        + "{\"op\":\"locate\",\"requirement\":\"$c\",\"document\":\"" + doc + "\",\"quote\":\"The controller shall stop.\"}]"));
+    File v2dir = new File(root, "limits-v2");
+    v2dir.mkdirs();
+    File v2 = new File(v2dir, "limits.html");
+    Files.writeString(v2.toPath(), "<html><body><h1>1 Speed</h1><p>The speed limit is 50. Values above 10 should not be used.</p>"
+        + "<h1>2 Height</h1><p>The height limit is 4. Values above 10 shall not be used.</p>"
+        + "<p>2.1 The controller shall stop at once.</p></body></html>");
+    JsonObject up = call("update_document_version", "project", A, "document", doc, "file", v2.getAbsolutePath(), "include_unchanged", true);
+    Map<String, JsonObject> by = new java.util.HashMap<>();
+    for (JsonElement e : up.getAsJsonArray("requirements"))
+      by.put(e.getAsJsonObject().get("requirement").getAsString(), e.getAsJsonObject());
+    assertEquals("unchanged", by.get("/Requirements/HGT").get("status").getAsString(), up.toString());
+    // the changed copy is not given the place of the copy that stayed
+    JsonObject spd = by.get("/Requirements/SPD").getAsJsonArray("locations").get(0).getAsJsonObject();
+    assertEquals("changed", spd.get("status").getAsString(), up.toString());
+    assertTrue(spd.get("modality_changed").getAsBoolean(), up.toString());
+    assertEquals("Values above 10 should not be used.", spd.get("new_text").getAsString(), up.toString());
+    assertTrue(spd.has("p"), up.toString());
+    // the clause number of the new sentence is not in the location, and numbers are no changed words
+    JsonObject ctl = by.get("/Requirements/CTL").getAsJsonArray("locations").get(0).getAsJsonObject();
+    assertEquals("The controller shall stop at once.", ctl.get("new_text").getAsString(), up.toString());
+    assertEquals("[\"once\"]", ctl.getAsJsonArray("words_added").toString(), up.toString());
+    assertFalse(ctl.has("numbers_changed"), up.toString());
+  }
+
+  @Test
+  @Order(25)
+  void aReqIfFileImportsAgainIntoTheSameRequirements() throws Exception {
+    File reqif = new File(root, "brakes.reqif");
+    String text = Files.readString(reqif.toPath());
+    // a file without ReqIF.ForeignID: the identifiers of the objects match the requirements
+    String noFid = text.replaceAll("(?s)<ATTRIBUTE-VALUE-STRING THE-VALUE=\"BRK-\\d\">\\s*<DEFINITION><ATTRIBUTE-DEFINITION-STRING-REF>ad-fid"
+        + "</ATTRIBUTE-DEFINITION-STRING-REF></DEFINITION>\\s*</ATTRIBUTE-VALUE-STRING>", "");
+    assertFalse(noFid.contains("THE-VALUE=\"BRK-1\""));
+    File first = new File(root, "nofid.reqif");
+    Files.writeString(first.toPath(), noFid);
+    call("create_project", "name", "ReqifAgain");
+    call("import_reqif", "project", "ReqifAgain", "file", first.getAbsolutePath());
+    String wet = call("search_nodes", "project", "ReqifAgain", "attribute", "name", "value", "Wet road", "operator", "EQUALS")
+        .getAsJsonArray("matches").get(0).getAsJsonObject().get("path").getAsString();
+    String wetUuid = call("get_node", "project", "ReqifAgain", "node", wet).get("uuid").getAsString();
+    call("apply_changes", "project", "ReqifAgain", "operations",
+        ops("[{\"op\":\"create\",\"parent\":\"" + wet + "\",\"type\":\"TestPurpose\",\"id\":\"TP1\"}]"));
+    File second = new File(root, "nofid2.reqif");
+    Files.writeString(second.toPath(), noFid.replace("within 60 m", "within 65 m"));
+    JsonObject again = call("import_reqif", "project", "ReqifAgain", "file", second.getAbsolutePath(), "replace", true);
+    assertFalse(again.has("deleted"), again.toString());
+    JsonObject w = call("get_node", "project", "ReqifAgain", "node", wetUuid);
+    assertContains(w.get("description").getAsString(), "within 65 m");
+    assertContains(w.getAsJsonArray("children").toString(), "TP1");
+    // a requirement that is not in the file goes, with its test purpose only with force
+    String withoutWet = noFid.replaceAll("(?s)<SPEC-HIERARCHY IDENTIFIER=\"sh-2\".*?</SPEC-HIERARCHY>", "");
+    File third = new File(root, "nofid3.reqif");
+    Files.writeString(third.toPath(), withoutWet);
+    assertContains(callError("import_reqif", "project", "ReqifAgain", "file", third.getAbsolutePath(), "replace", true),
+        "Give force true");
+    JsonObject forced = call("import_reqif", "project", "ReqifAgain", "file", third.getAbsolutePath(), "replace", true, "force", true);
+    assertEquals(2, forced.get("deleted").getAsInt(), forced.toString());
   }
 }

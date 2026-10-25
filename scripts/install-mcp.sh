@@ -12,11 +12,12 @@
 #   REQUALITY_MCP_BIN           the folder of the command link (default: ~/.local/bin)
 #   REQUALITY_MCP_ARCHIVE       a downloaded archive (.tar.gz or .zip) to install instead of a download
 #   REQUALITY_MCP_INSECURE      1: install also when the release gives no SHA-256 for the archive
+#   REQUALITY_MCP_UNVERIFIED    1: install also when the build provenance attestation cannot be checked
 #   REQUALITY_MCP_RELEASES_URL  the releases API, for tests
 #                               (default: https://api.github.com/repos/formalized-si/requality-vscode/releases)
-# When the GitHub CLI (gh 2.68 or later) is signed in to github.com, the script also verifies the build provenance
-# attestation: the release workflow of the repository made the archive from the tag of the release. Else it tells why
-# the attestation is not checked.
+# The script verifies the build provenance attestation with the GitHub CLI (gh 2.68 or later, signed in to github.com):
+# the release workflow of the repository made the archive from the tag of the release. Without gh it stops, unless
+# REQUALITY_MCP_UNVERIFIED=1 (the SHA-256, which comes from the same release, is checked).
 # A version that a running server uses stays; a later install removes it. The server keeps its caches and change
 # histories in ~/.requality-mcp, apart from the installation.
 #
@@ -53,12 +54,22 @@ asset_url() {
 # the build provenance attestation of the archive: made by the release workflow of the repository from the tag of the
 # release (the folder of the download link); not checked when gh cannot check it
 attestation() {
+  why=
   if ! command -v gh > /dev/null 2>&1; then
-    echo "Build provenance attestation is not checked: no GitHub CLI (gh)."
+    why="no GitHub CLI (gh)"
   elif ! gh attestation verify --help 2> /dev/null | grep -q -e '--source-ref'; then
-    echo "Build provenance attestation is not checked: it needs gh 2.68 or later."
+    why="it needs gh 2.68 or later"
   elif ! gh auth status --hostname github.com > /dev/null 2>&1; then
-    echo "Build provenance attestation is not checked: gh is not signed in to github.com (gh auth login)."
+    why="gh is not signed in to github.com"
+  fi
+  if [ -n "$why" ]; then
+    # the SHA-256 comes from the same release: only the attestation shows that the release workflow made the archive
+    if [ "${REQUALITY_MCP_UNVERIFIED:-}" = 1 ]; then
+      echo "Warning: the build provenance attestation is not checked ($why; REQUALITY_MCP_UNVERIFIED=1)." >&2
+      return 0
+    fi
+    fail "the build provenance attestation cannot be checked: $why. Install the GitHub CLI 2.68 or later and run" \
+      "gh auth login, or set REQUALITY_MCP_UNVERIFIED=1 to install without this check (the SHA-256 is checked)"
   else
     tag=$(basename "$(dirname "$2")")
     if out=$(gh attestation verify "$1" -R "$repo" --signer-workflow "$repo/.github/workflows/release.yml" \

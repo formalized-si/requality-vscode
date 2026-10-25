@@ -35,9 +35,10 @@ The script does these steps:
    `REQUALITY_MCP_VERSION=1.5.0` selects a release. `REQUALITY_MCP_PRERELEASE=1` also accepts the newest pre-release.
 2. It downloads the archive and compares its SHA-256 with the value that GitHub gives.
    If the release gives no SHA-256, the script stops. `REQUALITY_MCP_INSECURE=1` installs without the check.
-   If the GitHub CLI (`gh` 2.68 or later) is signed in to github.com, the script also verifies the build provenance
-   attestation: the release workflow of the repository made the archive from the tag of the release.
-   Else the script tells why it did not verify the attestation.
+   Then it verifies the build provenance attestation with the GitHub CLI (`gh` 2.68 or later, signed in with
+   `gh auth login`): the release workflow of the repository made the archive from the tag of the release. The SHA-256
+   comes from the same release, so only the attestation shows who made the archive. Without `gh`, the script stops.
+   `REQUALITY_MCP_UNVERIFIED=1` installs without the attestation (the SHA-256 is still checked).
 3. It unpacks the archive in the installation folder and runs `requality-mcp --version`.
    If the server does not start, the installed version stays.
 4. It installs the server and removes the other versions that the script installed.
@@ -110,6 +111,7 @@ The server finds the catalogs in the folders and in their subfolders.
 | --- | --- |
 | `--allow <folder>` | The agent can also import files from this folder and write reports into it. You can give this option more than once. |
 | `--convert` | Convert each catalog in an old format when it opens, without a backup. Without this option, `convert_project` converts a catalog after a backup. |
+| `--locale <language>` | The language of the messages and reports of Requality. The default is `en`; `ru` gives Russian. |
 | `--locks <folder>` | The folder of the catalog locks. The default is `~/.requality/locks`. Give a folder that the server can write when the home folder is read-only. |
 | `--release-after <minutes>` | Release a catalog that no tool used for this time. The next call that needs the project loads it again. Without this option, the server releases a catalog only when another session or VS Code waits for it (refer to [One process for each catalog](#one-process-for-each-catalog)). |
 | `--storage <folder>` | The folder for caches, logs, the histories of the changes and the backups. The default is `~/.requality-mcp`. |
@@ -174,38 +176,39 @@ The tools follow the jobs of a requirements engineer.
 | `search_nodes` | Finds nodes by text, by an attribute value or by type. Give an attribute by its name in the editor (`name`, `id`, `description`, `type`) or by its key. An unknown attribute is an error. A document location shows its text, its document and its requirements. |
 | `import_document` | Imports an HTML, XHTML, XML, DOC, DOCX, ODT, RTF, PDF or TXT file as a document. A document without text is not imported. The numbered headings of a PDF (for example "2.1 Pressure") and the titles of its outline become headings. |
 | `import_reqif` | Imports the requirements of one specification of a ReqIF file (refer to [ReqIF files](#reqif-files)). |
-| `read_document` | Shows a document paragraph by paragraph: the heading level, the text and the coverage by requirements. A paragraph is covered when each of its sentences is covered. The filter `uncovered` shows the paragraphs with text that no requirement covers, and these sentences. An older version of a document names its new version (`superseded_by`). |
-| `apply_changes` | Makes a list of changes in one step (refer to [Operations of apply_changes](#operations-of-apply_changes)). All changes are made, or none. `dry_run` examines the changes, makes none and reports each operation that fails. |
+| `read_document` | Shows a document paragraph by paragraph: the heading level, the table, row and column of a paragraph in a table, the alternative text of its pictures, the text and the coverage by requirements. A paragraph is covered when each of its sentences is covered. The filter `uncovered` shows the paragraphs with text that no requirement covers, and these sentences. An older version of a document names its new version (`superseded_by`). |
+| `apply_changes` | Makes a list of changes in one step (refer to [Operations of apply_changes](#operations-of-apply_changes)). All changes are made, or none. `dry_run` examines the changes, makes none and reports each operation that fails. The result is short: a location by its UUID and paragraph, the warnings together; with more than 50 operations, the counts, the named nodes and the first results (`verbose` gives all). |
 | `update_document_version` | Imports the new version of a document and moves the requirement locations to it, sentence by sentence, in one step. Refer to [A new version of a specification](#a-new-version-of-a-specification). |
 | `trace_coverage` | Shows the traceability: requirements without locations or test purposes, links that resolve to no node, checker problems, document coverage and open review items. An older version of a document is named, not counted. |
-| `test_coverage` | Shows the coverage of the requirements by tests from a coverage file of the test runs, and the test failures. |
+| `test_coverage` | Shows the coverage of the requirements by tests from a coverage file of the test runs (`coverage_file`), and the test failures. |
 | `review_changes` | Shows the changes of the agent, also of earlier sessions. With a change number, it shows the values before and after, a page at a time (`offset`, `limit`). |
 | `compare_with_revision` | Shows the nodes that differ from a Git revision of the catalog (refer to [Comparison with a Git revision](#comparison-with-a-git-revision)). |
 | `revert_change` | Reverts a change of `review_changes`, also a change of an earlier session. |
-| `undo`, `redo` | Undoes or redoes the newest change of the agent in this session. |
+| `undo`, `redo` | Undoes or redoes the newest change of the agent in this session. With `project`, only when that change is of the project. |
 | `get_project_settings`, `change_project_settings` | Show and change the settings of a project (refer to [Project settings](#project-settings)). |
 | `list_report_templates`, `generate_report` | Generate a report from a template, or from saved report settings, into a new or empty folder outside the catalogs. `save_as` saves the template, the root and the parameters as report settings. The templates have English names (`name_original` is the name in Requality). The coverage report takes the test coverage from a coverage file. The template `com.unitesk.requality.reports.em` shows the marked text of each requirement in its document, for a person who checks the markup. |
 | `create_project`, `open_project`, `close_project` | Create an empty catalog; open a closed or broken catalog, or load a catalog again from its files; close a catalog. |
 | `convert_project` | Converts a catalog of an older Requality after a backup. |
 | `server_messages` | Shows the messages of the Requality core and the answers of the server. |
 
-Address a node with its path (for example, `/Requirements/A/B`), its UUID or its user-visible id.
-An id alone (for example, `LIM_04`) is also correct when only one node of the project has this id.
+Address a node with its path (for example, `/Requirements/A/B`), its UUID, or its id alone (for example, `LIM_04`)
+when only one node of the project has this id (two nodes with the id give an error). The user-visible id with the id
+prefix of the project (for example, `PUMP-LIM_04`) is also correct.
 Give the project name with each call. `list_projects` gives the names.
 
 ### Operations of apply_changes
 
 | Operation | Keys | Operation |
 | --- | --- | --- |
-| `create` | parent, type, id, name, description, attributes, target, template, as | Makes a node. The types: Requirement (the default), TestPurpose, Comment, TextNode, DocFolder, ReportFolder, VirtualNode, InstancesFolder and RestrictedFolder. A VirtualNode needs `target`: the node that it reuses. `template` names a node template of `/Templates`, or `none`. A node with the name or the description of a sibling gets a warning. |
+| `create` | parent, type, id, name, description, attributes, target, template, as | Makes a node. The types: Requirement (the default), TestPurpose, Comment, TextNode, DocFolder, ReportFolder, VirtualNode, InstancesFolder and RestrictedFolder. A VirtualNode needs `target`: the node that it reuses (in a requirement, or as an instance in an InstancesFolder). `template` names a node template of `/Templates`, or `none`. A node with the name or the description of a sibling gets a warning. |
 | `update` | node, id, name, description, attributes, as | Changes a node. An attribute value `null` removes the attribute. An attribute of an enumeration takes only the values of the enumeration. |
 | `update_all` | under, attributes, type, where_attribute, where_value | Sets or removes attributes of all the nodes of a subtree (of a type, with an attribute value). |
-| `rename_attribute` | under, attribute, new_name | Gives an attribute of the nodes of a subtree another name. The values stay. |
+| `rename_attribute` | under, attribute, new_name, value_type | Gives an attribute of the nodes of a subtree another name, or converts its values to another type (string, integer, number, boolean). A value that is not of the new type (`abc` as an integer) stops the change. |
 | `delete` | node, recursive | Deletes a node. A node with nodes under it needs `recursive` true. The result counts the nodes and names the links of other nodes that the delete breaks. |
 | `move` | node, parent, after | Moves a node. |
 | `copy` | node, parent, as | Copies a node and the nodes under it (new UUIDs, the next free ids). |
 | `link`, `unlink` | from, to, attribute | Adds or removes a link. `<project>::<path>` is a node of another project. |
-| `locate` | requirement, document, quote, paragraph, occurrence, start, end, as | Marks document text for a requirement. The same text again changes nothing. A text that another requirement marks too gets a warning. |
+| `locate` | requirement, document, quote, paragraph, occurrence, start, end, as | Marks document text for a requirement. A quote can have other white space, quotation marks, dashes and letter case than the document. The same text again changes nothing. A text that another requirement marks too, and a document that has a newer version, get a warning. |
 | `unlocate` | location, requirement | Removes a location. |
 | `resolve` | item, status | Closes a review item of `trace_coverage`. |
 
@@ -237,11 +240,15 @@ The result has these parts, the most important first:
    необходимо, следует, требуется).
 3. `requirements`: the requirements to examine, lost first.
    - `lost`: no similar sentence. `suggestions` gives the most similar sentences.
-   - `changed`: the location moved to the most similar sentence. `words_removed` and `words_added` show the words that
-     changed. `modality_changed` tells that shall, must, may or not changed. `numbers_changed` tells that a number
-     changed. Unlocate the new location if it is wrong.
+   - `changed`: the location moved to the most similar sentence (in a section like the old one). `words_removed` and
+     `words_added` show the words that changed. `modality_changed` tells that shall, must, may or not changed.
+     `numbers_changed` tells that a number changed. A clause number at the start of the new sentence is not part of the
+     location. Unlocate the new location if it is wrong.
    - `context_changed`: the text is the same, but sentences came into or went out of its paragraph
-     (`paragraph_added`, `paragraph_removed`).
+     (`paragraph_added`, `paragraph_removed`), or it is in another section (`section_changed`).
+
+   A text that occurs more than once keeps its own copy: a copy that changed does not take the place of a copy that
+   stayed. Each location gives its paragraph `p` in the new version.
 
 The unchanged requirements are counted, not listed (`include_unchanged` lists them). Each list has at most `limit`
 items (default 50); `review_changes` with the change number and `offset` gives the next ones.
@@ -283,7 +290,7 @@ Give only the settings that change:
 | `attributes` | Project attributes, which all nodes inherit: name → `{"type": ..., "value": ...}`, or `null` to remove one. The types are string, integer, number, boolean, list, html and `enum:<enumeration>`. |
 | `enums` | Enumerations: name → `{"type": string, integer or number, "values": [value or {"value", "comment"}]}`, or `null` to remove one. The server does not remove an enumeration or a value that nodes use. |
 | `required_attributes` | Mandatory attributes by node type: type → `[{"attribute", "default"}]`, or `null`. The nodes of the type get the attributes that they do not have, with the default value. |
-| `checker_rules` | All checker rules: `[{"name", "formula"}]`. A formula is JavaScript that is true for a correct node. A formula that does not compile is refused. |
+| `checker_rules` | All checker rules: `[{"name", "formula"}]`. A formula is JavaScript that is true for a correct node. It sees the node as `one`: `one.attr(name)` (a user attribute, or `%Name`, `%Id`, `%Description`, `%Type`; null when absent), `one.attrs()`, `one.getParent()`, `one.getChildren()`, `one.getLinked(attribute)` and `one.getQID()`. Example: `one.attr('priority') != null`. A formula that does not compile, or that fails on the first requirements of the project, is refused. |
 | `checkers` | `{"user_visible_ids": true or false, "defined_terms": true or false}`. |
 | `id_prefix`, `default_link_attribute` | Text. |
 | `active_templates` | The active node template of a node type: type → template id of `/Templates`, or `null`. |
@@ -304,9 +311,10 @@ of DOORS, Polarion and other tools) into `/Requirements`, in one change:
 - Pictures and OLE objects of the texts are left out; their text stays. The result counts them.
 
 If the file has more than one specification, give one with `specification` (its name or its identifier).
-Import into an empty project (`create_project`). The import makes `/Requirements` the specification: in a project
-with requirements, `replace` is necessary, and the requirements that are not in the file go
-(`revert_change` brings them back).
+Import into an empty project (`create_project`). To import a new version of the file, give `replace`: the
+requirements that are in the file (by `ReqIF.ForeignID`, else by the identifier of the object) are updated and keep
+their UUIDs, test purposes and other nodes. The requirements that are not in the file go; the result lists them.
+A test purpose goes only with `force`. `revert_change` brings everything back.
 
 The export into ReqIF is not supported: the core exports only into a DOORS ReqIF model that exists already.
 
@@ -339,7 +347,8 @@ A change is one transaction of the catalog: all its operations are made, or none
 The server keeps a history of the changes for each catalog in `<storage>/journals/<key of the catalog folder>/`.
 For each change, the history has the state of each node that the change touched, before and after the change:
 the attributes, the parent, the id and the resources. The history stays after the session ends.
-The server removes the states of the changes older than one year; these changes cannot be reverted then.
+The server removes the changes older than one year from the history: they cannot be reverted then, and
+`review_changes` does not list them.
 Only the user can read the storage folder that the server makes. The backups keep the three newest copies of each
 catalog.
 
@@ -434,7 +443,9 @@ Only one Requality process can open a catalog at a time. If VS Code or another s
 
 The locks are in `~/.requality/locks` (`--locks` gives another folder). They operate for the processes of one user
 on one computer. If the server cannot write the folder of the locks, it opens the catalogs without a lock and does not
-change them; `list_projects` shows a warning. Give a folder that it can write with `--locks`.
+change or convert them; `list_projects` shows a warning. Give a folder that it can write with `--locks`.
+The folder of the locks must be on a local disk: the locks of a network file system (NFS, SMB, a Windows drive in WSL)
+may not keep another process out. `list_projects` shows a warning for such a folder.
 
 ## Questions of the Requality core
 
@@ -453,8 +464,12 @@ These features of Requality need the VS Code extension (or the Eclipse plug-in):
 
 - The export into ReqIF (refer to [ReqIF files](#reqif-files)).
 - The pictures and OLE objects of a ReqIF import.
+- The mass operations of the files of DOORS (the import of DOORS ids, their renames, the explosion of headers). The
+  other mass operations are `update_all` and `rename_attribute`.
 - The builder switch "Enable Checkers" of Eclipse. The checkers of the server run with `trace_coverage` (`refresh`).
 - Fix Locations Descriptions and Change transferred status (commands of the Eclipse explorer).
+
+Requality has no test generator of its own (its extension point is for other plug-ins).
 
 The text search finds a phrase only when the phrase has no formatting in it.
 On Windows, the folders in the arguments must have only letters of the code page of the system (a limit of the Java

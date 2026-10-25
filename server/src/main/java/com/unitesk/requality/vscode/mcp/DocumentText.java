@@ -7,6 +7,7 @@ import java.util.Arrays;
 import java.util.HashSet;
 import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 
 import org.jsoup.Jsoup;
@@ -50,6 +51,12 @@ final class DocumentText {
     final Set<Location> locations = new LinkedHashSet<>();
     /** The sentences that no location covers (90% of their characters at least). */
     final List<String> uncovered = new ArrayList<>();
+    /** The place of a paragraph in a table: the table (0 the first of the document), its row and column; -1: none. */
+    int table = -1;
+    int row = -1;
+    int col = -1;
+    /** The alternative texts (or file names) of the pictures in the paragraph. */
+    final List<String> images = new ArrayList<>();
 
     Paragraph(int index, int start, int end, String text, int heading) {
       this.index = index;
@@ -139,6 +146,10 @@ final class DocumentText {
       }
     }, body);
     DocumentText dt = new DocumentText(doc, all.toString());
+    // the tables of the document in their order (a paragraph tells its table, row and column)
+    Map<Element, Integer> tables = new java.util.HashMap<>();
+    for (Element t : body.getElementsByTag("table"))
+      tables.put(t, tables.size());
     for (int i = 0; i < runs.size(); i++) {
       int[] r = runs.get(i);
       // the line breaks inside a block are the ones of the HTML source: single spaces
@@ -146,8 +157,11 @@ final class DocumentText {
       Element owner = owners.get(i);
       String name = owner == null ? "" : owner.normalName();
       int heading = name.length() == 2 && name.charAt(0) == 'h' && Character.isDigit(name.charAt(1)) ? name.charAt(1) - '0' : 0;
-      if (!t.isEmpty())
-        dt.paragraphs.add(new Paragraph(dt.paragraphs.size(), r[0], r[1], t, heading));
+      if (!t.isEmpty()) {
+        Paragraph para = new Paragraph(dt.paragraphs.size(), r[0], r[1], t, heading);
+        place(para, owner, tables);
+        dt.paragraphs.add(para);
+      }
     }
     for (TreeNode c : doc.getWorkChildren())
       if (c instanceof Location && !c.isDisposed())
@@ -189,6 +203,65 @@ final class DocumentText {
         dt.paragraphs.get(st.p).uncovered.add(st.text);
     }
     return dt;
+  }
+
+  /** The table, row and column of a paragraph in a table cell, and the pictures of its block. */
+  private static void place(Paragraph p, Element owner, Map<Element, Integer> tables) {
+    if (owner == null)
+      return;
+    for (Element img : owner.getElementsByTag("img")) {
+      String alt = img.attr("alt").trim();
+      String src = img.attr("src").trim();
+      String name = !alt.isEmpty() ? alt : src.isEmpty() ? "" : src.substring(src.lastIndexOf('/') + 1);
+      if (!name.isEmpty())
+        p.images.add(name);
+    }
+    Element cell = owner;
+    while (cell != null && !cell.normalName().equals("td") && !cell.normalName().equals("th"))
+      cell = cell.parent();
+    if (cell == null)
+      return;
+    Element tr = cell.parent();
+    while (tr != null && !tr.normalName().equals("tr"))
+      tr = tr.parent();
+    Element table = tr == null ? null : tr.parent();
+    while (table != null && !table.normalName().equals("table"))
+      table = table.parent();
+    if (table == null || !tables.containsKey(table))
+      return;
+    p.table = tables.get(table);
+    // the rows of this table, not of the tables in its cells
+    int r = 0;
+    for (Element x : table.getElementsByTag("tr")) {
+      Element t = x.parent();
+      while (t != null && !t.normalName().equals("table"))
+        t = t.parent();
+      if (t != table)
+        continue;
+      if (x == tr) {
+        p.row = r;
+        break;
+      }
+      r++;
+    }
+    int c = 0;
+    for (Element x : tr.children()) {
+      if (!x.normalName().equals("td") && !x.normalName().equals("th"))
+        continue;
+      if (x == cell) {
+        p.col = c;
+        break;
+      }
+      c += Math.max(1, parseInt(x.attr("colspan")));
+    }
+  }
+
+  private static int parseInt(String s) {
+    try {
+      return Integer.parseInt(s.trim());
+    } catch (NumberFormatException e) {
+      return 1;
+    }
   }
 
   /** The distinct ranges of a location (old catalogs repeat them; a converted location can have none). */
@@ -249,6 +322,16 @@ final class DocumentText {
     o.addProperty("end", p.end);
     if (p.heading > 0)
       o.addProperty("heading", p.heading);
+    if (p.table >= 0) {
+      o.addProperty("table", p.table);
+      o.addProperty("row", p.row);
+      o.addProperty("col", p.col);
+    }
+    if (!p.images.isEmpty()) {
+      JsonArray im = new JsonArray();
+      p.images.forEach(im::add);
+      o.add("images", im);
+    }
     o.addProperty("coverage", p.coverage());
     o.addProperty("text", p.text);
     if ("partial".equals(p.coverage())) {
@@ -328,6 +411,21 @@ final class DocumentText {
     return java.util.regex.Pattern.compile(re.toString());
   }
 
+  /** The characters of a quote (not its white space) with any white space between them. */
+  private static java.util.regex.Pattern loose(String quote) {
+    StringBuilder re = new StringBuilder();
+    for (char c : quote.toCharArray()) {
+      if (Character.isWhitespace(c) || c == '\u00a0')
+        continue;
+      if (re.length() > 0)
+        re.append("[\\s\\u00a0]*");
+      re.append(java.util.regex.Pattern.quote(String.valueOf(c)));
+    }
+    if (re.length() == 0)
+      throw new ToolError("Empty quote");
+    return java.util.regex.Pattern.compile(re.toString());
+  }
+
   private static List<int[]> matches(java.util.regex.Pattern p, String text, int from, int to) {
     List<int[]> found = new ArrayList<>();
     java.util.regex.Matcher m = p.matcher(text);
@@ -354,6 +452,9 @@ final class DocumentText {
     List<int[]> found = matches(pattern(quote), text, from, to);
     if (found.isEmpty())
       found = matches(pattern(fold(quote)), fold(text), from, to);
+    // white space in other places ("10%" and "10 %")
+    if (found.isEmpty())
+      found = matches(loose(fold(quote)), fold(text), from, to);
     if (found.isEmpty())
       throw new ToolError("The quote does not occur in " + (paragraph >= 0 ? "paragraph " + paragraph + " of " : "")
           + doc.getQualifiedId() + closest(quote));

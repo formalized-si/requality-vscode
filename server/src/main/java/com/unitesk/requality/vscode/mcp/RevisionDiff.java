@@ -70,7 +70,13 @@ final class RevisionDiff {
     for (String e : git(catalog, null, "ls-files", "--others", "--exclude-standard", "-z", "--", ".").split("\0"))
       if (isNode(e))
         changed.add(e);
-    // the old files of the revision, by one cat-file process
+    // the old files of the revision, by one cat-file process (its requests end at new lines: a name with one is left out)
+    List<String> unreadable = new ArrayList<>();
+    for (String f : new ArrayList<>(changed))
+      if (f.indexOf('\n') >= 0 || f.indexOf('\r') >= 0) {
+        changed.remove(f);
+        unreadable.add(f.replaceAll("[\r\n]", "?") + " (a new line in the name)");
+      }
     StringBuilder q = new StringBuilder();
     List<String> asked = new ArrayList<>(changed);
     for (String f : asked)
@@ -78,7 +84,6 @@ final class RevisionDiff {
     Map<String, byte[]> old = catFile(catalog, q.toString(), asked);
     Map<String, Node> before = new LinkedHashMap<>();
     Map<String, Node> after = new LinkedHashMap<>();
-    List<String> unreadable = new ArrayList<>();
     for (String f : asked) {
       byte[] o = old.get(f);
       if (o != null)

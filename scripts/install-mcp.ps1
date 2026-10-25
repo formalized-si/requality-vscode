@@ -8,11 +8,12 @@
 #   REQUALITY_MCP_HOME          the installation folder (default: %LOCALAPPDATA%\Programs\requality-mcp)
 #   REQUALITY_MCP_ARCHIVE       a downloaded archive (.zip) to install instead of a download
 #   REQUALITY_MCP_INSECURE      1: install also when the release gives no SHA-256 for the archive
+#   REQUALITY_MCP_UNVERIFIED    1: install also when the build provenance attestation cannot be checked
 #   REQUALITY_MCP_RELEASES_URL  the releases API, for tests
 #                               (default: https://api.github.com/repos/formalized-si/requality-vscode/releases)
-# When the GitHub CLI (gh 2.68 or later) is signed in to github.com, the script also verifies the build provenance
-# attestation: the release workflow of the repository made the archive from the tag of the release. Else it tells why
-# the attestation is not checked.
+# The script verifies the build provenance attestation with the GitHub CLI (gh 2.68 or later, signed in to github.com):
+# the release workflow of the repository made the archive from the tag of the release. Without gh it stops, unless
+# REQUALITY_MCP_UNVERIFIED=1 (the SHA-256, which comes from the same release, is checked).
 # A version that a running server uses stays; a later install removes it. The server keeps its caches and change
 # histories in %USERPROFILE%\.requality-mcp, apart from the installation.
 #
@@ -46,19 +47,26 @@
   function Test-Attestation([string] $file, [string] $url) {
     # gh writes to the error stream: in Windows PowerShell 5.1 that stops the script when $ErrorActionPreference is Stop
     $ErrorActionPreference = 'Continue'
+    $why = $null
     if (-not (Get-Command gh -ErrorAction SilentlyContinue)) {
-      Write-Host 'Build provenance attestation is not checked: no GitHub CLI (gh).'
-      return
+      $why = 'no GitHub CLI (gh)'
+    } else {
+      $help = (& gh attestation verify --help 2>&1 | ForEach-Object { "$_" }) -join "`n"
+      if ($LASTEXITCODE -ne 0 -or -not $help.Contains('--source-ref')) {
+        $why = 'it needs gh 2.68 or later'
+      } else {
+        & gh auth status --hostname github.com *> $null
+        if ($LASTEXITCODE -ne 0) { $why = 'gh is not signed in to github.com' }
+      }
     }
-    $help = (& gh attestation verify --help 2>&1 | ForEach-Object { "$_" }) -join "`n"
-    if ($LASTEXITCODE -ne 0 -or -not $help.Contains('--source-ref')) {
-      Write-Host 'Build provenance attestation is not checked: it needs gh 2.68 or later.'
-      return
-    }
-    & gh auth status --hostname github.com *> $null
-    if ($LASTEXITCODE -ne 0) {
-      Write-Host 'Build provenance attestation is not checked: gh is not signed in to github.com (gh auth login).'
-      return
+    if ($why) {
+      # the SHA-256 comes from the same release: only the attestation shows that the release workflow made the archive
+      if ($env:REQUALITY_MCP_UNVERIFIED -eq '1') {
+        Write-Warning "The build provenance attestation is not checked ($why; REQUALITY_MCP_UNVERIFIED=1)."
+        return
+      }
+      throw ("The build provenance attestation cannot be checked: $why. Install the GitHub CLI 2.68 or later and run " +
+        'gh auth login, or set REQUALITY_MCP_UNVERIFIED=1 to install without this check (the SHA-256 is checked).')
     }
     $parts = $url.Split('/')
     $tag = $parts[$parts.Length - 2]

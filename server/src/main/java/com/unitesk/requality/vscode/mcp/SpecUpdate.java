@@ -143,18 +143,27 @@ final class SpecUpdate {
   }
 
   /** The best sentence (or paragraph, for a text of several sentences) for a text, with its similarity. */
-  private static Object[] best(DocumentText dt, List<Sentence> sentences, String text) {
+  private static Object[] best(DocumentText dt, List<Sentence> sentences, String text, String oldParagraph,
+      List<int[]> taken) {
     double score = 0;
+    double rank = -1;
     Sentence bestS = null;
     for (Sentence s : sentences) {
-      double sc = similarity(text, s.text);
-      if (sc > score) {
+      if (overlaps(taken, s.start, s.end))
+        continue;
+      double sc = similarity(text, bare(text, s.text));
+      // of two alike sentences, the one in a paragraph like the old one (its section)
+      double r = sc + 0.15 * Math.min(1, context(dt, s.start, oldParagraph));
+      if (sc > 0 && r > rank) {
+        rank = r;
         score = sc;
         bestS = s;
       }
     }
     for (DocumentText.Paragraph p : dt.paragraphs) {
-      double sc = similarity(text, p.text);
+      if (overlaps(taken, p.start, p.end))
+        continue;
+      double sc = similarity(text, bare(text, plain(p.text)));
       if (sc > score + 0.05) {
         score = sc;
         int s = p.start;
@@ -169,6 +178,19 @@ final class SpecUpdate {
     return bestS == null ? null : new Object[] { bestS, score };
   }
 
+  /** Whether a range overlaps one of the ranges. */
+  private static boolean overlaps(List<int[]> ranges, int start, int end) {
+    for (int[] r : ranges)
+      if (r[0] < end && start < r[1])
+        return true;
+    return false;
+  }
+
+  /** A new sentence without its clause number when the old text has none: the number is no changed word. */
+  private static String bare(String old, String sentence) {
+    return CLAUSE.matcher(old).find() ? sentence : CLAUSE.matcher(sentence).replaceFirst("");
+  }
+
   /** A text with all white space as single spaces, for comparisons. */
   static String plain(String s) {
     return s.replaceAll("[\\s\\u00a0]+", " ").trim();
@@ -179,7 +201,9 @@ final class SpecUpdate {
    * most like the old paragraph of the text, then the nearest to its relative position. A short text (a number, a
    * word) counts only in a paragraph like its old one. Null when there is none.
    */
-  private static int[] exact(DocumentText dt, String text, String oldParagraph, double relative) {
+  /** The places of a text in a document, whole words (white space between the words may differ). */
+  private static List<int[]> occurrences(DocumentText dt, String text) {
+    List<int[]> out = new ArrayList<>();
     StringBuilder re = new StringBuilder();
     for (String w : text.trim().split("[\\s\\u00a0]+")) {
       if (w.isEmpty())
@@ -189,16 +213,13 @@ final class SpecUpdate {
       re.append(Pattern.quote(w));
     }
     if (re.length() == 0)
-      return null;
+      return out;
     // whole words: "5" is not the end of "2025" (the text of the blocks has no separator between them: the start and
     // the end of a paragraph are the ends of a word too)
     String t = text.trim();
     boolean wordStart = Character.isLetterOrDigit(t.charAt(0));
     boolean wordEnd = Character.isLetterOrDigit(t.charAt(t.length() - 1));
     Matcher m = Pattern.compile(re.toString()).matcher(dt.text);
-    int[] best = null;
-    double bestContext = -1;
-    double dist = Double.MAX_VALUE;
     while (m.find()) {
       DocumentText.Paragraph p = dt.paragraphAt(m.start());
       if (wordStart && m.start() > 0 && Character.isLetterOrDigit(dt.text.charAt(m.start() - 1))
@@ -208,12 +229,76 @@ final class SpecUpdate {
       if (wordEnd && m.end() < dt.text.length() && Character.isLetterOrDigit(dt.text.charAt(m.end()))
           && !(q != null && dt.text.substring(m.end(), q.end).isBlank()))
         continue;
-      double context = p == null ? 0 : plain(p.text).equals(oldParagraph) ? 2 : similarity(oldParagraph, p.text);
-      double d = Math.abs((double) m.start() / Math.max(1, dt.text.length()) - relative);
-      if (context > bestContext || context == bestContext && d < dist) {
-        bestContext = context;
-        dist = d;
-        best = new int[] { m.start(), m.end() };
+      out.add(new int[] { m.start(), m.end() });
+    }
+    return out;
+  }
+
+  /** How much the paragraph of a place in the new text is like an old paragraph: 2 when the same, else 0 to 1. */
+  private static double context(DocumentText dt, int at, String oldParagraph) {
+    DocumentText.Paragraph p = dt.paragraphAt(at);
+    return p == null ? 0 : plain(p.text).equals(oldParagraph) ? 2 : similarity(oldParagraph, p.text);
+  }
+
+  /**
+   * The place in the new version of the marked text at {@code oldAt} of the old version (-1: no position, an old
+   * location without ranges), or null. A text can occur more than once: each old occurrence is given the new one with
+   * the most similar paragraph (and the nearest position), one to one, so that a changed copy does not take the place of
+   * a copy that stayed. The new occurrences that other old occurrences take go to {@code taken}.
+   */
+  private static int[] exact(DocumentText oldT, DocumentText dt, String text, String oldParagraph, int oldAt,
+      List<int[]> taken) {
+    List<int[]> news = occurrences(dt, text);
+    if (news.isEmpty())
+      return null;
+    List<int[]> olds = oldAt < 0 ? new ArrayList<>() : occurrences(oldT, text);
+    int mine = -1;
+    for (int i = 0; i < olds.size(); i++)
+      if (mine < 0 || Math.abs(olds.get(i)[0] - oldAt) < Math.abs(olds.get(mine)[0] - oldAt))
+        mine = i;
+    int[] best = null;
+    double bestContext = -1;
+    if (olds.size() <= 1) {
+      // one old occurrence (or none known): the new one in the most similar paragraph, then the nearest
+      double relative = oldAt < 0 ? 0.5 : (double) oldAt / Math.max(1, oldT.text.length());
+      double dist = Double.MAX_VALUE;
+      for (int[] n : news) {
+        double c = context(dt, n[0], oldParagraph);
+        double d = Math.abs((double) n[0] / Math.max(1, dt.text.length()) - relative);
+        if (c > bestContext || c == bestContext && d < dist) {
+          bestContext = c;
+          dist = d;
+          best = n;
+        }
+      }
+    } else {
+      // the pairs of an old and a new occurrence, the most alike first: each occurrence is taken once
+      List<double[]> pairs = new ArrayList<>();
+      for (int i = 0; i < olds.size(); i++) {
+        DocumentText.Paragraph op = oldT.paragraphAt(olds.get(i)[0]);
+        String para = op == null ? text : plain(op.text);
+        double ro = (double) olds.get(i)[0] / Math.max(1, oldT.text.length());
+        for (int j = 0; j < news.size(); j++) {
+          double rn = (double) news.get(j)[0] / Math.max(1, dt.text.length());
+          pairs.add(new double[] { context(dt, news.get(j)[0], para) + 0.1 * (1 - Math.abs(ro - rn)), i, j });
+        }
+      }
+      pairs.sort((a, b) -> Double.compare(b[0], a[0]));
+      boolean[] oldTaken = new boolean[olds.size()];
+      boolean[] newTaken = new boolean[news.size()];
+      for (double[] pr : pairs) {
+        int i = (int) pr[1];
+        int j = (int) pr[2];
+        if (oldTaken[i] || newTaken[j])
+          continue;
+        oldTaken[i] = true;
+        newTaken[j] = true;
+        if (i == mine) {
+          best = news.get(j);
+          bestContext = context(dt, best[0], oldParagraph);
+          break;
+        }
+        taken.add(news.get(j));
       }
     }
     if (best != null && words(text).size() < SHORT && bestContext < CONTEXT)
@@ -249,6 +334,14 @@ final class SpecUpdate {
     Location created;
     /** The location has no ranges (an old catalog): its text is the description of the location. */
     boolean fromDescription;
+    /** The headings of the sections of the old and the new place (null: none). */
+    String oldSection;
+    String newSection;
+
+    /** The text is in a section of another heading (a renumbered heading is the same section). */
+    boolean sectionChanged() {
+      return oldSection != null && newSection != null && !unnumbered(oldSection).equals(unnumbered(newSection));
+    }
     String descriptionText;
 
     Move(Location old) {
@@ -266,21 +359,46 @@ final class SpecUpdate {
       if (newRanges.isEmpty())
         return "lost";
       if (lost == 0 && exact == oldTexts.size())
-        return added.isEmpty() && removed.isEmpty() ? "unchanged" : "context_changed";
+        return added.isEmpty() && removed.isEmpty() && !sectionChanged() ? "unchanged" : "context_changed";
       return "changed";
     }
   }
 
-  /** The content words of a text in their order (not the common ones), once each. */
+  /** The sections of the first place of a location that moved. */
+  private static void sections(Move mv, DocumentText oldT, DocumentText newT, int oldAt, int newAt) {
+    if (mv.newSection != null || mv.oldSection != null || oldAt < 0)
+      return;
+    mv.oldSection = section(oldT, oldAt);
+    mv.newSection = section(newT, newAt);
+  }
+
+  /** The content words of a text in their order (not the common ones, not numbers: numbers_changed tells them), once each. */
   private static List<String> wordList(String s) {
     List<String> out = new ArrayList<>();
     for (String t : s.split("[^\\p{L}\\p{N}]+")) {
       String w = t.toLowerCase(Locale.ROOT);
-      if (!w.isEmpty() && !COMMON.contains(w) && !out.contains(w))
+      if (!w.isEmpty() && !COMMON.contains(w) && !w.matches("\\d+") && !out.contains(w))
         out.add(w);
     }
     return out;
   }
+
+  /** A heading without its clause number. */
+  static String unnumbered(String heading) {
+    return plain(CLAUSE.matcher(plain(heading)).replaceFirst(""));
+  }
+
+  /** The text of the heading of the section of a place in a document (the nearest heading before it), or null. */
+  static String section(DocumentText dt, int at) {
+    DocumentText.Paragraph p = dt.paragraphAt(at);
+    for (int i = p == null ? -1 : p.index; i >= 0; i--)
+      if (dt.paragraphs.get(i).heading > 0)
+        return dt.paragraphs.get(i).text;
+    return null;
+  }
+
+  /** A clause number at the start of a sentence ("2.1 ", "3. "). */
+  private static final Pattern CLAUSE = Pattern.compile("^\\(?\\d+(?:\\.\\d+)*[.)]?\\s+");
 
   /** The words of {@code a} that {@code b} does not have. */
   private static JsonArray missing(String a, String b) {
@@ -324,7 +442,8 @@ final class SpecUpdate {
         // a location of an old catalog without ranges: its description has its text (no position in the document)
         String d = l.getDescription();
         String text = d == null ? "" : Core.text(d).replaceAll("[\\s\\u00a0]+", " ").trim();
-        if (!text.isEmpty()) {
+        // a description without a letter or a digit (".") names no text: the location is empty
+        if (text.matches(".*[\\p{L}\\p{N}].*")) {
           mv.fromDescription = true;
           frags = new ArrayList<>();
           frags.add(new int[] { -1, -1 });
@@ -345,10 +464,12 @@ final class SpecUpdate {
         mv.oldTexts.add(text);
         DocumentText.Paragraph oldP = f[0] < 0 ? null : oldT.paragraphAt(f[0]);
         String oldPara = oldP == null ? text : plain(oldP.text);
-        int[] ex = exact(newT, text, oldPara, f[0] < 0 ? 0.5 : (double) f[0] / Math.max(1, oldT.text.length()));
+        List<int[]> taken = new ArrayList<>();
+        int[] ex = exact(oldT, newT, text, oldPara, f[0], taken);
         if (ex != null) {
           mv.exact++;
           mv.newRanges.add(ex);
+          sections(mv, oldT, newT, f[0], ex[0]);
           mv.newTexts.add(plain(newT.text.substring(ex[0], ex[1])));
           // the same text in a changed paragraph: the sentences around it can change its meaning
           DocumentText.Paragraph newP = newT.paragraphAt(ex[0]);
@@ -364,21 +485,35 @@ final class SpecUpdate {
           }
           continue;
         }
-        Object[] b = best(newT, sentences, text);
+        // the places of the other copies of the text are not free
+        Object[] b = best(newT, sentences, text, oldPara, taken);
         double sc = b == null ? 0 : (double) b[1];
         if (b != null && sc >= MOVE) {
           Sentence s = (Sentence) b[0];
-          mv.newRanges.add(new int[] { s.start, s.end });
-          mv.newTexts.add(s.text);
+          int start = s.start;
+          String newText = s.text;
+          // the clause number of the new sentence is not part of the requirement (the old text had none)
+          Matcher cl = CLAUSE.matcher(s.text);
+          if (cl.find() && !CLAUSE.matcher(text).find()) {
+            String raw = newT.text.substring(s.start, s.end);
+            Matcher rawCl = CLAUSE.matcher(raw.stripLeading());
+            if (rawCl.find()) {
+              start = s.start + (raw.length() - raw.stripLeading().length()) + rawCl.end();
+              newText = s.text.substring(cl.end());
+            }
+          }
+          mv.newRanges.add(new int[] { start, s.end });
+          mv.newTexts.add(newText);
+          sections(mv, oldT, newT, f[0], start);
           mv.similarity = Math.min(mv.similarity, sc);
-          mv.modalityChanged |= !modal(text).equals(modal(s.text));
-          mv.numbersChanged |= !numbers(text).equals(numbers(s.text));
+          mv.modalityChanged |= !modal(text).equals(modal(newText));
+          mv.numbersChanged |= !numbers(text).equals(numbers(newText));
         } else {
           mv.lost++;
           // the sentences of the new version most like the lost text: where it can be in other words
           List<Object[]> scored = new ArrayList<>();
           for (Sentence s : sentences) {
-            double x = similarity(text, s.text);
+            double x = similarity(text, bare(text, s.text));
             if (x >= SUGGEST)
               scored.add(new Object[] { s, x });
           }
@@ -483,6 +618,17 @@ final class SpecUpdate {
         }
         if (mv.created != null) {
           lo.addProperty("new_location", mv.created.getSUUId());
+          // its paragraph in the new version (read_document)
+          DocumentText.Paragraph np = mv.newRanges.isEmpty() ? null : newT.paragraphAt(mv.newRanges.get(0)[0]);
+          if (np != null)
+            lo.addProperty("p", np.index);
+          // another section: the text went to another part of the specification (check that it is the right one)
+          if (mv.sectionChanged()) {
+            JsonObject sec = new JsonObject();
+            sec.addProperty("old", mv.oldSection);
+            sec.addProperty("new", mv.newSection);
+            lo.add("section_changed", sec);
+          }
           String newText = String.join(" … ", new java.util.LinkedHashSet<>(mv.newTexts));
           if (!"unchanged".equals(mv.status()))
             lo.addProperty("new_text", newText);

@@ -47,6 +47,7 @@ public final class McpMain {
       + "  --allow <folder>    the agent may also import files from this folder and write reports into it\n"
       + "  --convert           convert catalogs in an old format when they open, without a backup (else the tool\n"
       + "                      convert_project converts one after a backup)\n"
+      + "  --locale <language> the language of the messages and reports of Requality (default en; ru for Russian)\n"
       + "  --locks <folder>    the folder of the catalog locks (default ~/.requality/locks)\n"
       + "  --release-after <minutes>\n"
       + "                      release a catalog that no tool used for this time (the next call loads it again);\n"
@@ -78,6 +79,7 @@ public final class McpMain {
     List<File> allowed = new ArrayList<>();
     boolean convert = false;
     long releaseAfter = 0;
+    String locale = "en";
     // the folder where relative arguments start: the launcher of Windows runs Java in its own folder and gives the
     // current folder of the caller in REQUALITY_CWD
     String cwd = System.getenv("REQUALITY_CWD");
@@ -104,6 +106,10 @@ public final class McpMain {
             break;
           case "--allow":
             allowed.add(folder(resolve(base, value(args, ++i, "--allow"))));
+            break;
+          case "--locale":
+            // the language of the messages and reports of the core (default English: the agent reads them)
+            locale = value(args, ++i, "--locale");
             break;
           case "--locks":
             // the folder of the catalog locks (default ~/.requality/locks), read when the workspace starts
@@ -134,6 +140,8 @@ public final class McpMain {
       stderr.print(USAGE);
       System.exit(2);
     }
+    // before a class of the core reads it (Localization)
+    java.util.Locale.setDefault(java.util.Locale.forLanguageTag(locale));
     if (resources == null)
       resources = defaultResources();
     if (folders.isEmpty()) {
@@ -148,16 +156,13 @@ public final class McpMain {
       folders.add(base.getAbsoluteFile());
     }
     storage = storage.getAbsoluteFile();
-    if (!storage.isDirectory()) {
-      storage.mkdirs();
-      // the histories of the changes keep the content of documents: only the user reads them
-      storage.setReadable(false, false);
-      storage.setReadable(true, true);
-      storage.setWritable(false, false);
-      storage.setWritable(true, true);
-      storage.setExecutable(false, false);
-      storage.setExecutable(true, true);
-    }
+    storage.mkdirs();
+    // the histories of the changes and the backups keep the content of documents: only the user reads them (also a
+    // storage folder that an earlier version or the user made)
+    History.ownerOnly(storage);
+    for (String sub : new String[] { "journals", "backups" })
+      if (new File(storage, sub).isDirectory())
+        History.ownerOnly(new File(storage, sub));
     // The core writes its logs to <user.dir>/logs (RLogger reads the property when it is loaded): in the storage, as the
     // extension starts the server in its storage folder. The folders and paths above are absolute already.
     System.setProperty("user.dir", storage.getPath());

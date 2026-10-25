@@ -86,7 +86,8 @@ class HistoryTest {
     String old = java.time.Instant.now().minus(java.time.Duration.ofDays(730)).toString();
     Files.writeString(journal.toPath(), Files.readString(journal.toPath()).replaceAll("\"time\":\"[^\"]*\"", "\"time\":\"" + old + "\""));
     History later = new History(dir, "/catalog");
-    assertEquals(1, later.entries().size());
+    // the change cannot be reverted any more: it leaves the journal too
+    assertEquals(0, later.entries().size());
     assertNull(later.states(1));
     assertFalse(new File(h.blobs(), "abc").exists());
     assertFalse(new File(h.blobs(), "unused").exists());
@@ -113,6 +114,31 @@ class HistoryTest {
     // the entries of the other server are of an earlier session for this one
     assertTrue(first.entry(2).has("session"));
     assertFalse(first.entry(1).has("session"));
+  }
+
+  @Test
+  void theJournalOfOldChangesIsCompacted() throws Exception {
+    File dir = Files.createTempDirectory("requality-history-compact").toFile();
+    History h = new History(dir, "/catalog");
+    History.Capture c = new History.Capture(h.blobs());
+    c.after.add("u1", state("A", "Alpha"));
+    c.before.add("u1", JsonNull.INSTANCE);
+    h.add("P", "apply_changes", "Agent: one", null, new JsonArray(), c, 0);
+    h.add("P", "apply_changes", "Agent: two", null, new JsonArray(), c, 0);
+    h.setState(2, "undone");
+    // the changes are two years old: their entries go from the journal, and their numbers are not given again
+    File journal = new File(dir, "journal.jsonl");
+    String old = java.time.Instant.now().minus(java.time.Duration.ofDays(730)).toString();
+    Files.writeString(journal.toPath(), Files.readString(journal.toPath()).replaceAll("\"time\":\"[^\"]*\"", "\"time\":\"" + old + "\""));
+    History later = new History(dir, "/catalog");
+    assertEquals(0, later.entries().size());
+    assertFalse(Files.readString(journal.toPath()).contains("Agent: one"));
+    assertEquals(3, later.add("P", "apply_changes", "Agent: three", null, new JsonArray(), c, 0).get("change").getAsInt());
+    assertEquals(3, new History(dir, "/catalog").add("P", "apply_changes", "Agent: four", null, new JsonArray(), c, 0)
+        .get("change").getAsInt() - 1);
+    // only the user reads the folders of the history (POSIX)
+    if (dir.toPath().getFileSystem().supportedFileAttributeViews().contains("posix"))
+      assertEquals("rwx------", java.nio.file.attribute.PosixFilePermissions.toString(Files.getPosixFilePermissions(dir.toPath())));
   }
 
   @Test

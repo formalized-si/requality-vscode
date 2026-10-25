@@ -8,6 +8,7 @@ import java.util.Arrays;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 import java.util.Set;
 
 import com.unitesk.requality.vscode.mcp.McpServer.ToolError;
@@ -23,7 +24,8 @@ final class Policy {
    * The argument is the folder and the reason.
    */
   interface Asker {
-    boolean allow(File folder, String reason);
+    /** True: allowed; false: the user declined; null: the client cannot ask. */
+    Boolean allow(File folder, String reason);
   }
 
   private volatile Asker asker;
@@ -86,8 +88,9 @@ final class Policy {
     // the folder of the file (or the folder itself), when the user allows it; never the home or a top folder
     File folder = p.toFile().isDirectory() ? p.toFile() : p.toFile().getParentFile();
     Asker a = ask ? asker : null;
-    if (a != null && folder != null && askable(folder)
-        && a.allow(folder, what.toLowerCase(Locale.ROOT) + " " + p)) {
+    Boolean answer = a != null && folder != null && askable(folder) ? a.allow(folder, what.toLowerCase(Locale.ROOT) + " " + p)
+        : null;
+    if (Boolean.TRUE.equals(answer)) {
       try {
         roots.add(folder.getCanonicalFile().toPath());
       } catch (IOException e) {
@@ -95,8 +98,11 @@ final class Policy {
       }
       return p.toFile();
     }
+    if (Boolean.FALSE.equals(answer))
+      throw new ToolError("The user did not allow the folder " + folder + ". Copy the file into a folder of the server "
+          + roots + ", or ask the user to start requality-mcp with --allow <folder>.");
     throw new ToolError(what + " " + path + " is outside the folders this server may use: " + roots
-        + ". Start requality-mcp with --allow <folder> to add a folder.");
+        + ". Copy it into one of them, or start requality-mcp with --allow <folder> to add a folder.");
   }
 
   /** A folder the user may be asked to allow: not the home folder, not one of its parents, not a top folder. */
@@ -138,6 +144,10 @@ final class Policy {
     return file(path, "document", DOCUMENT_TYPES);
   }
 
+  /** The attributes of the elements that the importer follows (tag@attribute). */
+  private static final Set<String> REFERENCES = new HashSet<>(Arrays.asList("img@src", "img@alt", "object@data", "script@src",
+      "link@href", "embed@src", "frame@src"));
+
   /** The HTML documents: the importer copies the files their references name (and downloads the CSS of a URL). */
   private static final Set<String> HTML_TYPES = new HashSet<>(Arrays.asList("html", "htm", "xhtml", "xml"));
 
@@ -150,12 +160,24 @@ final class Policy {
     int dot = name.lastIndexOf('.');
     if (dot < 0 || !HTML_TYPES.contains(name.substring(dot + 1)))
       return new ArrayList<>();
-    org.jsoup.nodes.Document d = org.jsoup.Jsoup.parse(html, null);
+    // the references as the importer reads them: its parser (HtmlCleaner) and its charset
     List<String> refs = new ArrayList<>();
-    for (String[] q : new String[][] { { "img", "src" }, { "img", "alt" }, { "object", "data" }, { "script", "src" },
-        { "link", "href" }, { "embed", "src" } })
-      for (org.jsoup.nodes.Element e : d.select(q[0] + "[" + q[1] + "]"))
-        refs.add(e.attr(q[1]).trim());
+    org.htmlcleaner.TagNode root = com.unitesk.requality.document.OmnivorousImporter.getCharset(() -> {
+      try {
+        return new java.io.FileInputStream(html);
+      } catch (IOException e) {
+        throw new java.io.UncheckedIOException(e);
+      }
+    }).getSecond();
+    if (root != null)
+      for (org.htmlcleaner.TagNode e : root.getAllElements(true)) {
+        String tag = e.getName() == null ? "" : e.getName().toLowerCase(Locale.ROOT);
+        for (Map.Entry<String, String> a : e.getAttributes().entrySet()) {
+          String attr = a.getKey().toLowerCase(Locale.ROOT);
+          if (REFERENCES.contains(tag + "@" + attr) && a.getValue() != null)
+            refs.add(a.getValue().trim());
+        }
+      }
     List<String> bad = new ArrayList<>();
     for (String r : refs) {
       if (r.isEmpty() || r.regionMatches(true, 0, "data:", 0, 5) || bad.contains(r))

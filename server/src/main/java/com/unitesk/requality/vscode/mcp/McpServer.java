@@ -97,6 +97,14 @@ public final class McpServer {
     final Handler handler;
     /** A read-only tool that changes state of the server with these arguments: it runs alone (null: never). */
     java.util.function.Predicate<JsonObject> alone;
+    /** The same call again changes nothing more (a read-only tool is). */
+    boolean idempotent;
+
+    /** The same call again changes nothing more. */
+    public Tool idempotent() {
+      idempotent = true;
+      return this;
+    }
 
     public Tool(String name, String title, String description, JsonObject inputSchema, boolean readOnly, boolean destructive,
         Handler handler) {
@@ -125,6 +133,7 @@ public final class McpServer {
       a.addProperty("title", title);
       a.addProperty("readOnlyHint", readOnly);
       a.addProperty("destructiveHint", destructive);
+      a.addProperty("idempotentHint", readOnly || idempotent);
       a.addProperty("openWorldHint", false);
       t.add("annotations", a);
       return t;
@@ -239,6 +248,13 @@ public final class McpServer {
   /** No tool call starts from now on (the running ones end). */
   public void stop() {
     stopping = true;
+    unanswered();
+  }
+
+  /** The questions to the client that wait for an answer get none (the client ends). */
+  private void unanswered() {
+    for (java.util.concurrent.CompletableFuture<JsonObject> f : pending.values())
+      f.complete(null);
   }
 
   /** Reads messages until the input ends. A malformed message gets an error and the server continues. */
@@ -255,6 +271,8 @@ public final class McpServer {
         t.printStackTrace(System.err);
       }
     }
+    // the input ended: no answer comes
+    unanswered();
   }
 
   private void handleLine(String line) {
@@ -265,7 +283,11 @@ public final class McpServer {
       send(error(null, -32700, "Parse error: " + e.getMessage()));
       return;
     }
-    if (msg.isJsonArray() && msg.getAsJsonArray().size() > 0) {
+    String pv = protocol;
+    if (msg.isJsonArray() && msg.getAsJsonArray().size() > 0 && pv != null && pv.compareTo("2025-06-18") >= 0) {
+      // the protocol versions from 2025-06-18 have no batches
+      send(error(null, -32600, "Invalid request: protocol version " + pv + " has no batches"));
+    } else if (msg.isJsonArray() && msg.getAsJsonArray().size() > 0) {
       // a batch (protocol 2025-03-26): one array with the responses, after all requests of the batch ran (the request
       // that ends last sends it)
       JsonArray batch = msg.getAsJsonArray();
@@ -507,10 +529,11 @@ public final class McpServer {
     JsonArray content = new JsonArray();
     JsonObject text = new JsonObject();
     text.addProperty("type", "text");
-    java.util.concurrent.locks.Lock lock = tool.readOnly && (tool.alone == null || !tool.alone.test(args)) ? toolsLock.readLock()
-        : toolsLock.writeLock();
     try {
       checkArguments(tool, args);
+      // (an argument of the wrong type is an error result, as in the tool)
+      java.util.concurrent.locks.Lock lock = tool.readOnly && (tool.alone == null || !tool.alone.test(args))
+          ? toolsLock.readLock() : toolsLock.writeLock();
       java.util.function.BiFunction<String, JsonObject, String> before = beforeCall;
       String notice = before == null ? null : before.apply(tool.name, args);
       Object value;

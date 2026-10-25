@@ -11,7 +11,7 @@ import org.mozilla.javascript.ContextFactory;
  * lets a script use any Java class: a formula could run a program or write a file. The MCP server lets an agent write
  * such formulas, and an agent follows the text of the documents it reads. So the scripts of the server see only the
  * classes of values (strings, numbers, collections, dates, text formats) and of the tree of Requality: no files,
- * processes, network, reflection or class loading.
+ * processes, network, reflection or class loading. The list names the classes a script may use (all others are refused).
  */
 final class ScriptSandbox {
   private ScriptSandbox() {
@@ -22,9 +22,25 @@ final class ScriptSandbox {
       "Float", "Double", "Number", "Math", "StringBuilder", "StringBuffer", "Object", "Comparable", "CharSequence",
       "Iterable", "Enum");
 
-  /** The packages of Requality whose classes a script may use: the tree, the node types and the attributes. */
-  private static final String[] REQUALITY = { "com.unitesk.requality.core.model.", "com.unitesk.requality.nodetype.",
-      "com.unitesk.requality.core.attribute.", "com.unitesk.requality.core.search." };
+  /**
+   * The classes of java.util a script may use: collections, dates and helpers (not Formatter or Scanner, which open
+   * files, nor ServiceLoader, ResourceBundle, Timer or Properties, nor Locale or TimeZone, whose defaults are the ones of
+   * the process). A nested class is judged by its outer class.
+   */
+  private static final Set<String> UTIL = Set.of("AbstractCollection", "AbstractList", "AbstractMap", "AbstractQueue",
+      "AbstractSequentialList", "AbstractSet", "ArrayDeque", "ArrayList", "Arrays", "BitSet", "Calendar", "Collection",
+      "Collections", "Comparator", "Date", "Deque", "Dictionary", "EnumMap", "EnumSet", "Enumeration", "GregorianCalendar",
+      "HashMap", "HashSet", "Hashtable", "IdentityHashMap", "ImmutableCollections", "Iterator", "LinkedHashMap",
+      "LinkedHashSet", "LinkedList", "List", "ListIterator", "Map", "NavigableMap", "NavigableSet",
+      "NoSuchElementException", "Objects", "Optional", "OptionalDouble", "OptionalInt", "OptionalLong", "PriorityQueue",
+      "Queue", "RandomAccess", "Set", "SortedMap", "SortedSet", "Stack", "StringJoiner", "TreeMap", "TreeSet",
+      "UUID", "Vector", "WeakHashMap");
+
+  /**
+   * The packages of Requality whose classes a script may use: the elements of the checker rules (core.script); the
+   * scripts get the values of the attributes as strings, numbers, lists and elements, not the nodes of the tree.
+   */
+  private static final String[] REQUALITY = { "com.unitesk.requality.core.script." };
 
   private static boolean installed;
 
@@ -54,14 +70,11 @@ final class ScriptSandbox {
       return LANG.contains(c.substring(10));
     if (c.equals("java.math.BigDecimal") || c.equals("java.math.BigInteger"))
       return true;
-    // the collections and dates of java.util (not its subpackages: logging writes files, concurrent makes threads)
+    // the listed collections and dates of java.util (not its subpackages: logging writes files, concurrent makes threads)
     if (c.startsWith("java.util.") && c.indexOf('.', 10) < 0)
-      return !c.equals("java.util.ServiceLoader") && !c.equals("java.util.Properties");
-    if (c.startsWith("java.util.regex.") || c.startsWith("java.text.") || c.startsWith("java.time."))
+      return UTIL.contains(c.substring(10));
+    if (c.startsWith("java.util.regex.") || c.startsWith("java.text.") || c.startsWith("java.time.") && !c.startsWith("java.time.zone."))
       return true;
-    // a document copies its images to any folder (duplicateImages)
-    if (c.equals("com.unitesk.requality.nodetype.Document"))
-      return false;
     for (String p : REQUALITY)
       if (c.startsWith(p))
         return true;

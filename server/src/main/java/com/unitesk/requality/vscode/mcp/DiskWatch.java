@@ -43,11 +43,16 @@ final class DiskWatch {
     last.remove(catalog.getAbsolutePath());
   }
 
+  /** Looks at the files of a catalog that was loaded now: the next look compares with them. */
+  synchronized void loaded(File catalog) {
+    last.put(catalog.getAbsolutePath(), scan(catalog));
+  }
+
   /**
    * True when node files of the catalog changed on disk in a way the tree of the server does not have. Called when no
    * transaction of the tree is open.
    */
-  synchronized boolean outdated(File catalog, TreeDB db) {
+  synchronized boolean outdated(File catalog, TreeDB db, long loadedAt) {
     // a transaction of the core (a job of its own) shows states that are not on disk yet: the next call looks
     if (db.getStorage() instanceof com.unitesk.requality.core.transaction.TransactionStorage)
       return false;
@@ -57,9 +62,14 @@ final class DiskWatch {
       return false;
     Snapshot now = scan(catalog);
     last.put(key, now);
-    if (prev == null)
-      return false;
     ITreeStorage storage = db.getStorage();
+    if (prev == null) {
+      // no look since the load (it ended before the server watched): the files newer than the start of the load
+      for (Map.Entry<String, long[]> e : now.files.entrySet())
+        if (e.getValue()[0] >= loadedAt - 2_000 && !inTree(catalog, e.getKey(), db, storage))
+          return true;
+      return false;
+    }
     for (Map.Entry<String, long[]> e : now.files.entrySet()) {
       long[] p = prev.files.get(e.getKey());
       if (p != null && p[0] == e.getValue()[0] && p[1] == e.getValue()[1])

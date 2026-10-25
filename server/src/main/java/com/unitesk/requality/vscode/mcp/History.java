@@ -90,11 +90,10 @@ final class History {
   History(File dir, String catalog) {
     this.dir = dir;
     if (dir != null) {
-      boolean fresh = !dir.isDirectory();
       new File(dir, "changes").mkdirs();
       new File(dir, "blobs").mkdirs();
-      if (fresh)
-        ownerOnly(dir.getParentFile());
+      ownerOnly(dir.getParentFile());
+      ownerOnly(dir);
       try {
         Files.writeString(new File(dir, "catalog.txt").toPath(), catalog + "\n", StandardCharsets.UTF_8);
       } catch (IOException e) {
@@ -154,8 +153,11 @@ final class History {
     }
   }
 
-  /** The history keeps the content of documents: only the user reads the folder. */
-  private static void ownerOnly(File f) {
+  /**
+   * The history keeps the content of documents: only the user reads the folder (POSIX; on Windows the folders of the
+   * user profile are the user's).
+   */
+  static void ownerOnly(File f) {
     if (f == null)
       return;
     f.setReadable(false, false);
@@ -203,6 +205,51 @@ final class History {
       for (File b : blobs)
         if (!used.contains(b.getName()) && b.lastModified() < recent)
           b.delete();
+    compact(limit);
+  }
+
+  /**
+   * Rewrites the journal without the entries of the changes older than {@code limit} (their states are gone: they cannot
+   * be reverted) and their state lines, so that the journal does not grow without end. With the lock of the folder.
+   */
+  private void compact(Instant limit) {
+    File f = new File(dir, "journal.jsonl");
+    java.util.Set<Integer> old = new java.util.HashSet<>();
+    for (JsonObject e : entries)
+      try {
+        if (Instant.parse(e.get("time").getAsString()).isBefore(limit))
+          old.add(e.get("change").getAsInt());
+      } catch (RuntimeException x) {
+        // a time of another format: kept
+      }
+    if (old.isEmpty())
+      return;
+    try {
+      // the next number stays: a change number is not given twice
+      JsonObject mark = new JsonObject();
+      mark.addProperty("next", next);
+      StringBuilder kept = new StringBuilder(mark.toString()).append('\n');
+      for (String line : Files.readString(f.toPath(), StandardCharsets.UTF_8).split("\n")) {
+        if (line.isBlank())
+          continue;
+        try {
+          JsonObject o = JsonParser.parseString(line).getAsJsonObject();
+          int c = o.has("change") ? o.get("change").getAsInt() : o.has("state_of") ? o.get("state_of").getAsInt() : -1;
+          if (old.contains(c) || o.has("next"))
+            continue;
+        } catch (RuntimeException x) {
+          continue; // a line a server did not finish
+        }
+        kept.append(line).append('\n');
+      }
+      File tmp = new File(dir, "journal.jsonl.tmp");
+      Files.writeString(tmp.toPath(), kept.toString(), StandardCharsets.UTF_8);
+      Files.move(tmp.toPath(), f.toPath(), StandardCopyOption.REPLACE_EXISTING, java.nio.file.StandardCopyOption.ATOMIC_MOVE);
+      read = -1;
+      refresh();
+    } catch (IOException | RuntimeException x) {
+      System.err.println("[mcp] cannot compact the history " + f + ": " + x);
+    }
   }
 
   File blobs() {
@@ -241,6 +288,8 @@ final class History {
           byId.remove(c);
           byId.put(c, o);
           n = Math.max(n, c + 1);
+        } else if (o.has("next")) {
+          n = Math.max(n, o.get("next").getAsInt());
         } else if (o.has("state_of") && byId.containsKey(o.get("state_of").getAsInt())) {
           byId.get(o.get("state_of").getAsInt()).addProperty("state", o.get("state").getAsString());
         }
