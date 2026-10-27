@@ -1843,8 +1843,9 @@ class McpServerTest {
     Files.writeString(f2.toPath(), v2.append("</body></html>").toString());
     long t = System.nanoTime();
     JsonObject up = call("update_document_version", "project", "Copies", "document", doc, "file", f2.getAbsolutePath());
-    long seconds = (System.nanoTime() - t) / 1_000_000_000L;
-    assertTrue(seconds < 60, "the update took " + seconds + " s");
+    long millis = TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - t);
+    System.out.println("MCP update of " + n + " repeated paragraphs: " + millis + " ms");
+    assertTrue(millis < 60_000, "the update took " + millis + " ms");
     JsonObject sum = up.getAsJsonObject("summary");
     assertEquals(n - 1, sum.get("unchanged").getAsInt(), up.toString());
     assertEquals(1, sum.get("changed").getAsInt(), up.toString());
@@ -1982,5 +1983,38 @@ class McpServerTest {
       offset = page.get("next_offset").getAsInt();
     } while (true);
     assertEquals(gaps.subList(1, 7), untested);
+  }
+
+  @Test
+  @Order(29)
+  void locationChangesResortOnlyWhenOrderUsesLocations() throws Exception {
+    JsonObject init = new JsonObject();
+    init.addProperty("protocolVersion", "2025-06-18");
+    rpc("initialize", init);
+    call("create_project", "name", "SortTriggers");
+    TreeDB db = core.db("SortTriggers");
+    TreeNode node = Core.node(db, "/Requirements");
+    var updater = com.unitesk.requality.core.propagator.ParentChildrenUpdater.getOne();
+    for (var method : com.unitesk.requality.core.sorting.SortingSettings.SortingMethod.values()) {
+      db.setSortingMethod(com.unitesk.requality.core.sorting.SortingSettings.init(method, false), true);
+      assertEquals(method, db.getSortingSettings().getMethod());
+      var locations = changedAttribute(Requirement.ATTR_LOCATIONS);
+      assertEquals(method == com.unitesk.requality.core.sorting.SortingSettings.SortingMethod.BY_LOCATIONS,
+          updater.shouldBeApplied(node, locations, com.unitesk.requality.core.events.Moment.AFTER), method.toString());
+      assertFalse(updater.shouldBeApplied(node, locations, com.unitesk.requality.core.events.Moment.BEFORE));
+      assertTrue(updater.shouldBeApplied(node, changedAttribute(TreeNode.ATTR_NAMEORID),
+          com.unitesk.requality.core.events.Moment.AFTER), method.toString());
+      assertTrue(updater.shouldBeApplied(node, changedAttribute(TreeNode.ATTR_PREDICATE),
+          com.unitesk.requality.core.events.Moment.AFTER), method.toString());
+      assertEquals(method == com.unitesk.requality.core.sorting.SortingSettings.SortingMethod.BY_INDEX,
+          updater.shouldBeApplied(node, changedAttribute(TreeDB.INDEX_ATTRIBUTE),
+              com.unitesk.requality.core.events.Moment.AFTER), method.toString());
+    }
+  }
+
+  private static com.unitesk.requality.core.operation.ChangesSet<com.unitesk.requality.core.attribute.Attribute>
+      changedAttribute(String key) {
+    return new com.unitesk.requality.core.operation.ChangesSet<>(java.util.Set.of(key), java.util.Set.of(), java.util.Set.of(),
+        Map.of(), java.util.Collections.singletonMap(key, null), List.of(key));
   }
 }

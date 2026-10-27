@@ -2,6 +2,8 @@
 
 ## 1.5.0 (pre-release)
 
+- Bulk document updates avoid re-sorting every sibling after each location change when the catalog is sorted by
+  name or index. Sorting by document locations still updates immediately.
 - Search, trace coverage, test coverage and Git comparison support bounded result pages (`offset`, `limit`,
   `next_offset`), so agents can inspect a large catalog without requesting an oversized response.
 - **Connect AI Agent (MCP)...** prepares a configuration for the open folders and the extension's Java runtime
