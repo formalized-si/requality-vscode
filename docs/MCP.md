@@ -127,6 +127,13 @@ The log files of the Requality core are in `<storage>/logs`. The server writes o
 
 ## Connect an agent
 
+**From the VS Code extension:** run **Requality: Connect AI Agent (MCP)...**, choose the agent, then review
+and copy the generated configuration. It uses the Java runtime selected by the extension, its bundled server
+and every open local workspace folder. Merge the entry with any existing servers in the agent's settings.
+Close the catalog in Requality before asking the agent to open it. If you move or upgrade the extension and
+the old path no longer exists, generate the configuration again. For a path independent of VS Code updates,
+use the standalone installation below.
+
 Use the full path of the command.
 
 **Claude Code**
@@ -354,6 +361,9 @@ catalog.
 
 - `undo` and `redo` operate on the changes of the agent in this session, newest first.
   `undo` does not undo a change that a person made in VS Code.
+- A failed change or a dry run that deletes, moves or renames existing nodes discards the uncommitted transaction
+  and reloads the catalog. Its files stay untouched. The response reports this reload. Earlier session undo/redo steps
+  end there; the persistent history and `revert_change` remain available.
 - `revert_change` reverts any change, also a change of an earlier session.
   The nodes of the change become as they were before it. A deleted node comes back with its UUID,
   so the links and the locations that refer to it are correct again.

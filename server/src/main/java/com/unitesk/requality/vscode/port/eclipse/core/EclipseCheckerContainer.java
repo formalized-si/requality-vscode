@@ -442,6 +442,10 @@ public class EclipseCheckerContainer extends CheckerContainer {
   
   @Override
   protected void startNewThread() {
+    // VSCODE: Settings changes can request a restart directly, without consulting isEnabled(). In headless mode the
+    // requesting tool runs the checks itself; a worker would wait for that same tool to finish its workspace change.
+    if (Boolean.getBoolean("requality.noBackgroundChecks"))
+      return;
     WorkspaceJob wd = null;
     synchronized (EclipseCheckerContainer.this) {
       if(checkthread != null || checkthreadid != -1)
@@ -571,6 +575,10 @@ public class EclipseCheckerContainer extends CheckerContainer {
 
   @Override
   public boolean isEnabled() {
+    // VSCODE: the server without a window (requality-mcp) checks the nodes when a tool asks (trace_coverage with refresh), not
+    // in the background: a check that runs while a tool reads the nodes can show it a node without some attributes
+    if (Boolean.getBoolean("requality.noBackgroundChecks"))
+      return false;
     IProject p = EclipseTracker.getTracker(DBNamesManager.DEFAULT).getProject(getDB());
     if(p == null)
       return super.isEnabled();

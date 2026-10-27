@@ -290,10 +290,21 @@ final class DocumentText {
 
   /** The paragraph that contains a character, or null. */
   Paragraph paragraphAt(int pos) {
-    for (Paragraph p : paragraphs)
-      if (p.start <= pos && pos < p.end)
-        return p;
-    return null;
+    // the paragraphs are in the order of the text, their ranges do not overlap: the last one that starts at pos or before
+    int lo = 0;
+    int hi = paragraphs.size() - 1;
+    Paragraph found = null;
+    while (lo <= hi) {
+      int mid = (lo + hi) >>> 1;
+      Paragraph p = paragraphs.get(mid);
+      if (p.start <= pos) {
+        found = p;
+        lo = mid + 1;
+      } else {
+        hi = mid - 1;
+      }
+    }
+    return found != null && pos < found.end ? found : null;
   }
 
   /** Characters (not white space) of all paragraphs and of the covered parts. */

@@ -22,7 +22,8 @@ public abstract class UIJob extends Job {
 
   @Override
   protected void execute() {
-    Display.getDefault().asyncExec(super::execute);
+    // the display runs it as work of the thread that scheduled the job
+    Display.getDefault().asyncExec(scheduledFrom, super::execute);
   }
 
   public Display getDisplay() {

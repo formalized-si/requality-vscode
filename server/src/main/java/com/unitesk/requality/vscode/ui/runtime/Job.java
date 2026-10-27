@@ -206,9 +206,13 @@ public abstract class Job {
   /** cancel() while the job starts running, before its monitor exists. */
   private boolean cancelRunning;
 
+  /** The thread that scheduled the job held the lock of the background work: the job runs while it holds it. */
+  volatile Background.Holder scheduledFrom;
+
   public final synchronized void schedule(long delay) {
     if (!shouldSchedule())
       return;
+    scheduledFrom = Background.current();
     // JobManager.schedule: a job that is running (or about to run) is rescheduled when it is done.
     if (state == RUNNING || aboutToRun) {
       rescheduleDelay = Math.max(0, delay);
@@ -309,7 +313,10 @@ public abstract class Job {
       }
       fireChange((l, e) -> l.running(e), 0, null);
       try {
-        status = run(reporter);
+        // no call of the server runs at the same time (when it sets the lock of the background work)
+        IStatus[] st = new IStatus[1];
+        Background.run(scheduledFrom, () -> st[0] = run(reporter));
+        status = st[0];
       } finally {
         reporter.done();
       }

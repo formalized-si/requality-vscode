@@ -1,5 +1,6 @@
 package com.unitesk.requality.vscode.mcp;
 
+import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
@@ -73,6 +74,7 @@ class McpServerTest {
     // outside change
     System.setProperty("requality.diskWatch", "0");
     ScriptSandbox.install();
+    System.setProperty("requality.noBackgroundChecks", "true");
     root = Files.createTempDirectory("requality-mcp-test").toFile();
     workspace = new File(root, "workspace");
     storage = new File(root, "storage");
@@ -1658,8 +1660,9 @@ class McpServerTest {
     watch.loaded(ap.dir);
     String r2text = Files.readString(r2.toPath());
     Files.writeString(r2.toPath(), r2text.replace("Second", "Second on disk"));
-    assertTrue(watch.outdated(ap.dir, adb, ap.loadedAt), "a change after the look of the load");
-    assertTrue(new DiskWatch().outdated(ap.dir, adb, System.currentTimeMillis() - 60_000), "a change after the load, no look");
+    String rel = "root/" + ap.dir.toPath().resolve("root").relativize(r2.toPath()).toString().replace('\\', '/');
+    assertEquals(rel, watch.outdated(ap.dir, adb, ap.loadedAt), "a change after the look of the load");
+    assertEquals(rel, new DiskWatch().outdated(ap.dir, adb, System.currentTimeMillis() - 60_000), "a change after the load, no look");
     Files.write(r2.toPath(), crlf);
     // the coverage by a plain id and by the id with the prefix of the project
     File cov = new File(root, "coverage-ids.xml");
@@ -1784,5 +1787,112 @@ class McpServerTest {
         "Give force true");
     JsonObject forced = call("import_reqif", "project", "ReqifAgain", "file", third.getAbsolutePath(), "replace", true, "force", true);
     assertEquals(2, forced.get("deleted").getAsInt(), forced.toString());
+  }
+
+  @Test
+  @Order(26)
+  void manyCopiesOfATextUpdateQuickly() throws Exception {
+    // 500 paragraphs with the same sentence: more pairs of old and new places than are compared, the places go in order
+    int n = 500;
+    StringBuilder v1 = new StringBuilder("<html><body>");
+    for (int i = 0; i < n; i++)
+      v1.append("<p>Rule ").append(i).append(". Values above 10 shall not be used.</p>");
+    File f1 = new File(root, "copies.html");
+    Files.writeString(f1.toPath(), v1.append("</body></html>").toString());
+    call("create_project", "name", "Copies");
+    String doc = call("import_document", "project", "Copies", "file", f1.getAbsolutePath()).get("path").getAsString();
+    // (at most 500 operations in one call)
+    StringBuilder creates = new StringBuilder("[");
+    StringBuilder locates = new StringBuilder("[");
+    for (int i = 0; i < n; i++) {
+      creates.append(i == 0 ? "" : ",").append("{\"op\":\"create\",\"parent\":\"/Requirements\",\"id\":\"C").append(i).append("\"}");
+      locates.append(i == 0 ? "" : ",").append("{\"op\":\"locate\",\"requirement\":\"/Requirements/C").append(i)
+          .append("\",\"document\":\"").append(doc).append("\",\"quote\":\"Values above 10 shall not be used.\",\"occurrence\":")
+          .append(i + 1).append("}");
+    }
+    call("apply_changes", "project", "Copies", "operations", ops(creates.append("]").toString()));
+    call("apply_changes", "project", "Copies", "operations", ops(locates.append("]").toString()));
+    // the new version: a new copy before rule 100, rule 250 changed
+    StringBuilder v2 = new StringBuilder("<html><body>");
+    for (int i = 0; i < n; i++) {
+      if (i == 100)
+        v2.append("<p>Rule new. Values above 10 shall not be used.</p>");
+      v2.append("<p>Rule ").append(i).append(i == 250 ? ". Values above 10 should not be used.</p>" : ". Values above 10 shall not be used.</p>");
+    }
+    File dir = new File(root, "copies-v2");
+    dir.mkdirs();
+    File f2 = new File(dir, "copies.html");
+    Files.writeString(f2.toPath(), v2.append("</body></html>").toString());
+    long t = System.nanoTime();
+    JsonObject up = call("update_document_version", "project", "Copies", "document", doc, "file", f2.getAbsolutePath());
+    long seconds = (System.nanoTime() - t) / 1_000_000_000L;
+    assertTrue(seconds < 60, "the update took " + seconds + " s");
+    JsonObject sum = up.getAsJsonObject("summary");
+    assertEquals(n - 1, sum.get("unchanged").getAsInt(), up.toString());
+    assertEquals(1, sum.get("changed").getAsInt(), up.toString());
+    assertEquals(0, sum.get("lost").getAsInt(), up.toString());
+    JsonObject changed = up.getAsJsonArray("requirements").get(0).getAsJsonObject();
+    assertEquals("/Requirements/C250", changed.get("requirement").getAsString(), up.toString());
+    assertTrue(changed.getAsJsonArray("locations").get(0).getAsJsonObject().get("modality_changed").getAsBoolean(), up.toString());
+    // the new copy has no requirement: it is a new sentence, with the other sentence of its new paragraph
+    assertContains(up.getAsJsonArray("new_sentences").toString(), "{\"p\":100,\"quote\":\"Values above 10 shall not be used.\",\"statement\":true}");
+    assertContains(up.getAsJsonArray("new_sentences").toString(), "Rule new.");
+    assertEquals(2, sum.get("new_sentences").getAsInt(), up.toString());
+  }
+
+  @Test
+  @Order(27)
+  void aRollbackOfAMoveOrARenameKeepsEveryFile() throws Exception {
+    call("create_project", "name", "Rollback");
+    call("apply_changes", "project", "Rollback", "operations", ops("[{\"op\":\"create\",\"parent\":\"/Requirements\",\"id\":\"A\",\"as\":\"a\"},"
+        + "{\"op\":\"create\",\"parent\":\"$a\",\"id\":\"A1\",\"description\":\"keep me\"},"
+        + "{\"op\":\"create\",\"parent\":\"/Requirements\",\"id\":\"F\"}]"));
+    File a1 = new File(workspace, "Rollback/root/Requirements/A/A1.json");
+    assertTrue(a1.isFile(), a1.toString());
+    java.nio.file.Path resource = a1.toPath().resolveSibling("attachment.bin");
+    byte[] resourceBytes = new byte[] { 0, 1, 2, (byte) 255 };
+    Files.write(resource, resourceBytes);
+    java.nio.file.Path link = resource.resolveSibling("attachment-link");
+    boolean linked = false;
+    try {
+      Files.createSymbolicLink(link, resource.getFileName());
+      linked = true;
+    } catch (UnsupportedOperationException | java.io.IOException e) {
+      // Windows without the Create symbolic links privilege still exercises the binary resource.
+      if (!System.getProperty("os.name").toLowerCase(java.util.Locale.ROOT).startsWith("windows"))
+        throw e;
+    }
+    String before = call("get_tree", "project", "Rollback", "node", "/Requirements", "depth", 5).toString();
+    // a dry run that moves a node: the node is not under both parents afterwards
+    JsonObject dry = call("apply_changes", "project", "Rollback", "dry_run", true, "operations",
+        ops("[{\"op\":\"move\",\"node\":\"/Requirements/A\",\"parent\":\"/Requirements/F\"}]"));
+    assertContains(dry.get("note").getAsString(), "loaded again");
+    assertEquals(before, call("get_tree", "project", "Rollback", "node", "/Requirements", "depth", 5).toString());
+    // a call that fails after a rename, a move and a new node with the old id: the files of the children stay
+    String failed = callError("apply_changes", "project", "Rollback", "operations", ops("[{\"op\":\"update\",\"node\":\"/Requirements/A\",\"id\":\"Z\"},"
+        + "{\"op\":\"move\",\"node\":\"/Requirements/Z\",\"parent\":\"/Requirements/F\"},"
+        + "{\"op\":\"create\",\"parent\":\"/Requirements\",\"id\":\"A\"},{\"op\":\"update\",\"node\":\"/Requirements/NOPE\",\"name\":\"x\"}]"));
+    assertContains(failed, "loaded again");
+    assertTrue(a1.isFile() && Files.readString(a1.toPath()).contains("keep me"), "the rollback removed " + a1);
+    assertEquals(before, call("get_tree", "project", "Rollback", "node", "/Requirements", "depth", 5).toString());
+    assertEquals("keep me", call("get_node", "project", "Rollback", "node", "/Requirements/A/A1").get("description").getAsString());
+    assertArrayEquals(resourceBytes, Files.readAllBytes(resource));
+    if (linked) {
+      assertTrue(Files.isSymbolicLink(link));
+      assertEquals(resource.getFileName(), Files.readSymbolicLink(link));
+    }
+    // A dry-run deletion also discards its transaction, including descendants, without touching catalog resources.
+    JsonObject deleted = call("apply_changes", "project", "Rollback", "dry_run", true, "operations",
+        ops("[{\"op\":\"delete\",\"node\":\"/Requirements/A\",\"recursive\":true}]"));
+    assertContains(deleted.get("note").getAsString(), "loaded again");
+    assertEquals(before, call("get_tree", "project", "Rollback", "node", "/Requirements", "depth", 5).toString());
+    assertArrayEquals(resourceBytes, Files.readAllBytes(resource));
+    if (linked)
+      assertTrue(Files.isSymbolicLink(link));
+    // a dry run of new nodes only keeps the project as it is (no load)
+    JsonObject plain = call("apply_changes", "project", "Rollback", "dry_run", true, "operations",
+        ops("[{\"op\":\"create\",\"parent\":\"/Requirements\",\"id\":\"N\"}]"));
+    assertFalse(plain.get("note").getAsString().contains("loaded again"), plain.toString());
+    assertEquals(before, call("get_tree", "project", "Rollback", "node", "/Requirements", "depth", 5).toString());
   }
 }

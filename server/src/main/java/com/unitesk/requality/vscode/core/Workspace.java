@@ -409,7 +409,7 @@ public final class Workspace {
   /** Runs on the loader thread and waits for it. */
   private void submit(Runnable r) throws Exception {
     try {
-      loader.submit(r).get();
+      loader.submit(loading(r)).get();
     } catch (java.util.concurrent.RejectedExecutionException e) {
       // shutting down
     }
@@ -482,10 +482,21 @@ public final class Workspace {
     return false;
   }
 
+  /**
+   * A load or unload: the jobs and the work of the display that it starts and that run while it runs do not wait for
+   * the calls of the server (a call can wait for the load); the ones that run later do (see {@code Background}).
+   */
+  private static Runnable loading(Runnable r) {
+    return () -> com.unitesk.requality.vscode.ui.runtime.Background.holding(() -> {
+      r.run();
+      return null;
+    });
+  }
+
   /** Runs a load or unload on the loader thread (nothing after shutdown). */
   private void run(Runnable r) {
     try {
-      loader.execute(r);
+      loader.execute(loading(r));
     } catch (java.util.concurrent.RejectedExecutionException e) {
       // the server is shutting down
     }
@@ -614,12 +625,16 @@ public final class Workspace {
     if (p == null)
       return false;
     Project fp = p;
+    // loading until the new load ends: no caller takes the tree that is stopped next, nor a tree in the middle
     fp.loading = true;
     run(() -> {
-      // the catalog stays locked between the two: another process does not take it in the middle
-      unload(fp, false, true);
-      fp.loading = false;
-      load(fp);
+      try {
+        // the catalog stays locked between the two: another process does not take it in the middle
+        unload(fp, false, true);
+        load(fp);
+      } finally {
+        fp.loading = false;
+      }
     });
     return true;
   }

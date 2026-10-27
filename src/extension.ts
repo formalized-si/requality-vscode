@@ -1,6 +1,7 @@
 import * as vscode from 'vscode';
 import { App, SelectionHub } from './app';
 import { activateCore } from './features/core';
+import { activateMcp } from './features/mcp';
 import { activateCompare } from './features/compare';
 import { activateServerCommands } from './features/serverCommands';
 import { activateWorkbench } from './features/workbench';
@@ -40,6 +41,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<Requal
   registerServerViews(app);
 
   activateCore(app);
+  activateMcp(app);
   activateCompare(app);
   activateWorkbench(app);
   // Last: commands not implemented by a feature module run their Eclipse command, wizard or menu on the server.

@@ -2,6 +2,17 @@
 
 ## 1.5.0 (pre-release)
 
+- **Connect AI Agent (MCP)...** prepares a configuration for the open folders and the extension's Java runtime
+  (Codex, VS Code, Claude Code, Claude Desktop or Cursor).
+- A rollback after deleting, moving or renaming existing nodes discards the unsaved transaction and reloads the tree.
+  The response explains when session undo/redo is reset; persistent changes can still be reverted. Binary resources
+  and symbolic links are kept.
+- Specification updates align paragraphs before matching repeated sentences, preserve changed occurrences and
+  report newly inserted copies as uncovered text. Repeated text is matched once per update.
+- MCP calls coordinate with background jobs and display work, including nested jobs, so a call cannot outlive work
+  it has already started. Checkers run on request in headless mode.
+- Local logs are excluded from the extension package.
+
 The port now uses the branch `unstable` of Requality (commit `e3f807bd4`, 2026-10-23).
 Release 1.4 does not get changes after 2026-06-10. The upstream developers make all changes in `unstable`.
 

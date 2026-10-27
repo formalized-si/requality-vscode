@@ -42,7 +42,8 @@ The extension uses the original Requality core and the original user interface c
 ## How the port works
 
 - The extension starts a Java server. The server contains the Requality core and all 320 classes of the plug-in.
-- Each plug-in class is identical to its upstream class. Only the package names and the imports are different.
+- The port retains the upstream plug-in classes, with adapted package names and imports, compatibility fixes and
+  changes needed for headless execution.
 - A compatibility layer in the server implements the Eclipse APIs that the plug-in uses.
   These APIs are SWT, JFace, workbench, navigator, resources, team, commands, compare and LTK.
 - The server reads `plugin.xml` as Eclipse does.
@@ -84,6 +85,11 @@ The extension starts the Requality server.
 The **Requality** side bar and the **Requality** panel show the views of the Requality perspective.
 
 ## Requality without a window (MCP server)
+
+In VS Code, run **Requality: Connect AI Agent (MCP)...** to prepare a configuration for Codex, VS Code,
+Claude Code, Claude Desktop or Cursor. It uses the Java runtime of the extension and all open local workspace
+folders. Review the configuration in the editor and copy it into the agent's settings. Close the catalog in
+Requality before using it from the agent; only one process can open it at a time.
 
 The Requality MCP server is Requality without a window, for AI agents on your computer (Claude Code, Codex, Cursor
 and others). The agent starts the server and uses its tools through the Model Context Protocol.

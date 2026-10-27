@@ -115,6 +115,11 @@ let current = null;
     { op: 'locate', requirement: '$r2', document: doc.path, quote: 'The system shall stop.' },
     { op: 'link', from: '$r1', to: '$r2' }] });
   const r2 = await s.tool('get_node', { project: 'Smoke', node: '/Requirements/R2' });
+  await s.tool('apply_changes', { project: 'Smoke', dry_run: true, operations: [
+    { op: 'move', node: '/Requirements/R2', parent: '/Requirements/R1' }] });
+  const unchanged = await s.tool('get_node', { project: 'Smoke', node: '/Requirements/R2' });
+  check(unchanged.uuid === r2.uuid && unchanged.locations.length === 1,
+    'a dry-run move preserves the node, its UUID and its location after reload');
   // a report without the HTTP server of the web editors (the headless server starts none)
   const out = path.join(catalogs, 'report');
   const report = await s.tool('generate_report', { project: 'Smoke', template: 'com.unitesk.requality.reports.tableview', output: out });

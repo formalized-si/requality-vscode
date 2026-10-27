@@ -172,8 +172,27 @@ public final class Display {
   }
 
   public void asyncExec(Runnable r) {
+    asyncExec(com.unitesk.requality.vscode.ui.runtime.Background.current(), r);
+  }
+
+  /** {@link #asyncExec(Runnable)} of work that {@code from} hands over (see {@code Background}). */
+  public void asyncExec(com.unitesk.requality.vscode.ui.runtime.Background.Holder from, Runnable r) {
     if (r != null)
-      queue.offer(r);
+      queue.offer(guarded(from, r));
+  }
+
+  /**
+   * The work in the queue: it runs when no call of the server runs (with the lock of the background work). The display
+   * thread does not wait for the lock (a call can wait for the display): the work goes to the end of the queue again.
+   */
+  private Runnable guarded(com.unitesk.requality.vscode.ui.runtime.Background.Holder from, Runnable r) {
+    return new Runnable() {
+      @Override
+      public void run() {
+        if (!com.unitesk.requality.vscode.ui.runtime.Background.tryRun(from, r))
+          timers.schedule(() -> queue.offer(this), 20, TimeUnit.MILLISECONDS);
+      }
+    };
   }
 
   public void syncExec(Runnable r) {
@@ -185,7 +204,7 @@ public final class Display {
     }
     CountDownLatch done = new CountDownLatch(1);
     AtomicReference<Throwable> err = new AtomicReference<>();
-    queue.offer(() -> {
+    queue.offer(guarded(com.unitesk.requality.vscode.ui.runtime.Background.current(), () -> {
       try {
         r.run();
       } catch (Throwable t) {
@@ -193,7 +212,7 @@ public final class Display {
       } finally {
         done.countDown();
       }
-    });
+    }));
     try {
       done.await();
     } catch (InterruptedException e) {

@@ -223,7 +223,8 @@ final class RequalityTools {
           if (Core.optBool(a, "dry_run", false)) {
             results(r, Session.dryRun(db, label, () -> Changes.run(db, ops, true)), ops, verbose);
             r.addProperty("dry_run", true);
-            r.addProperty("note", "Nothing was changed. The operations can be applied.");
+            r.addProperty("note", "Nothing was changed. The operations can be applied."
+                + (Core.reloadedByRollback() ? " " + Core.RELOAD_NOTE : ""));
             return r;
           }
           JsonObject e = session.change(db, "apply_changes", label, summary, () -> Changes.run(db, ops));
@@ -1222,7 +1223,8 @@ final class RequalityTools {
   }
 
   static void deleteTree(File f) {
-    File[] l = f.listFiles();
+    // A catalog resource may be a link. Remove the link, never files outside the tree being cleaned up.
+    File[] l = java.nio.file.Files.isSymbolicLink(f.toPath()) ? null : f.listFiles();
     if (l != null)
       for (File c : l)
         deleteTree(c);

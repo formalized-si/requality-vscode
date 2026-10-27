@@ -59,11 +59,21 @@ final class SpecUpdate {
 
   private static final Pattern NUMBER = Pattern.compile("\\d+(?:[.,]\\d+)*");
 
+  /** The word sets of the texts during an update (a text is split once): null outside of an update. */
+  private static final ThreadLocal<Map<String, Set<String>>> WORDS = new ThreadLocal<>();
+
+  /** The content words of a text (a set that the caller does not change). */
   private static Set<String> words(String s) {
-    Set<String> w = new HashSet<>();
+    Map<String, Set<String>> cache = WORDS.get();
+    Set<String> w = cache == null ? null : cache.get(s);
+    if (w != null)
+      return w;
+    w = new HashSet<>();
     for (String t : s.toLowerCase(Locale.ROOT).split("[^\\p{L}\\p{N}]+"))
       if (!t.isEmpty() && !COMMON.contains(t))
         w.add(t);
+    if (cache != null && cache.size() < 500_000)
+      cache.put(s, w);
     return w;
   }
 
@@ -142,14 +152,17 @@ final class SpecUpdate {
       out.add(new Sentence(p.index, s, e, dt.text.substring(s, e).replaceAll("[\\s\\u00a0]+", " ")));
   }
 
-  /** The best sentence (or paragraph, for a text of several sentences) for a text, with its similarity. */
+  /**
+   * The best sentence (or paragraph, for a text of several sentences) for a text, with its similarity: not one of the
+   * places {@code taken} (start to end), only in the paragraph {@code only} when it is not -1.
+   */
   private static Object[] best(DocumentText dt, List<Sentence> sentences, String text, String oldParagraph,
-      List<int[]> taken) {
+      java.util.NavigableMap<Integer, Integer> taken, int only) {
     double score = 0;
     double rank = -1;
     Sentence bestS = null;
     for (Sentence s : sentences) {
-      if (overlaps(taken, s.start, s.end))
+      if (only >= 0 && s.p != only || overlaps(taken, s.start, s.end))
         continue;
       double sc = similarity(text, bare(text, s.text));
       // of two alike sentences, the one in a paragraph like the old one (its section)
@@ -161,9 +174,9 @@ final class SpecUpdate {
       }
     }
     for (DocumentText.Paragraph p : dt.paragraphs) {
-      if (overlaps(taken, p.start, p.end))
+      if (only >= 0 && p.index != only || overlaps(taken, p.start, p.end))
         continue;
-      double sc = similarity(text, bare(text, plain(p.text)));
+      double sc = similarity(text, bare(text, p.text));
       if (sc > score + 0.05) {
         score = sc;
         int s = p.start;
@@ -178,12 +191,10 @@ final class SpecUpdate {
     return bestS == null ? null : new Object[] { bestS, score };
   }
 
-  /** Whether a range overlaps one of the ranges. */
-  private static boolean overlaps(List<int[]> ranges, int start, int end) {
-    for (int[] r : ranges)
-      if (r[0] < end && start < r[1])
-        return true;
-    return false;
+  /** Whether a range overlaps one of the ranges (start to end; they do not overlap each other). */
+  private static boolean overlaps(java.util.NavigableMap<Integer, Integer> ranges, int start, int end) {
+    Map.Entry<Integer, Integer> r = ranges.lowerEntry(end);
+    return r != null && r.getValue() > start;
   }
 
   /** A new sentence without its clause number when the old text has none: the number is no changed word. */
@@ -196,11 +207,6 @@ final class SpecUpdate {
     return s.replaceAll("[\\s\\u00a0]+", " ").trim();
   }
 
-  /**
-   * The occurrence of a text (white space aside, whole words) in the new version: of several, the one in the paragraph
-   * most like the old paragraph of the text, then the nearest to its relative position. A short text (a number, a
-   * word) counts only in a paragraph like its old one. Null when there is none.
-   */
   /** The places of a text in a document, whole words (white space between the words may differ). */
   private static List<int[]> occurrences(DocumentText dt, String text) {
     List<int[]> out = new ArrayList<>();
@@ -237,32 +243,122 @@ final class SpecUpdate {
   /** How much the paragraph of a place in the new text is like an old paragraph: 2 when the same, else 0 to 1. */
   private static double context(DocumentText dt, int at, String oldParagraph) {
     DocumentText.Paragraph p = dt.paragraphAt(at);
-    return p == null ? 0 : plain(p.text).equals(oldParagraph) ? 2 : similarity(oldParagraph, p.text);
+    // the text of a paragraph has single spaces already
+    return p == null ? 0 : p.text.equals(oldParagraph) ? 2 : similarity(oldParagraph, p.text);
+  }
+
+  /** The most pairs of old and new places of one text that are compared; more places go in their order. */
+  static final long PAIRS = 200_000;
+
+  /**
+   * The places of a text in the old and the new version, and the new place of each old place (-1: none), one to one.
+   * An old place goes first to the new paragraph of its paragraph (the k-th place of the text in the old paragraph to
+   * the k-th in the new one); the other old places get the free new places with the most similar paragraph (and the
+   * nearest position). So a changed copy does not take the place of a copy that stayed.
+   */
+  private static final class Places {
+    final List<int[]> olds;
+    final List<int[]> news;
+    final int[] assigned;
+
+    Places(DocumentText oldT, DocumentText dt, int[] align, String text) {
+      news = occurrences(dt, text);
+      olds = news.isEmpty() ? new ArrayList<>() : occurrences(oldT, text);
+      assigned = new int[olds.size()];
+      Arrays.fill(assigned, -1);
+      if (olds.isEmpty())
+        return;
+      DocumentText.Paragraph[] op = new DocumentText.Paragraph[olds.size()];
+      DocumentText.Paragraph[] np = new DocumentText.Paragraph[news.size()];
+      for (int i = 0; i < op.length; i++)
+        op[i] = oldT.paragraphAt(olds.get(i)[0]);
+      Map<Integer, List<Integer>> inParagraph = new java.util.HashMap<>();
+      for (int j = 0; j < np.length; j++) {
+        np[j] = dt.paragraphAt(news.get(j)[0]);
+        if (np[j] != null)
+          inParagraph.computeIfAbsent(np[j].index, k -> new ArrayList<>()).add(j);
+      }
+      boolean[] newTaken = new boolean[np.length];
+      Map<Integer, Integer> seen = new java.util.HashMap<>();
+      for (int i = 0; i < op.length; i++) {
+        if (op[i] == null || align[op[i].index] < 0)
+          continue;
+        int k = seen.merge(op[i].index, 1, Integer::sum) - 1;
+        List<Integer> there = inParagraph.get(align[op[i].index]);
+        if (there != null && k < there.size()) {
+          assigned[i] = there.get(k);
+          newTaken[there.get(k)] = true;
+        }
+      }
+      List<Integer> restOld = new ArrayList<>();
+      List<Integer> restNew = new ArrayList<>();
+      for (int i = 0; i < op.length; i++)
+        if (assigned[i] < 0)
+          restOld.add(i);
+      for (int j = 0; j < np.length; j++)
+        if (!newTaken[j])
+          restNew.add(j);
+      if (restOld.isEmpty() || restNew.isEmpty())
+        return;
+      if ((long) restOld.size() * restNew.size() > PAIRS) {
+        // too many to compare: in their order
+        for (int k = 0; k < Math.min(restOld.size(), restNew.size()); k++)
+          assigned[restOld.get(k)] = restNew.get(k);
+        return;
+      }
+      // the similarity of two paragraphs once (many places share their paragraphs)
+      Map<Long, Double> like = new java.util.HashMap<>();
+      List<double[]> pairs = new ArrayList<>();
+      for (int i : restOld) {
+        double ro = (double) olds.get(i)[0] / Math.max(1, oldT.text.length());
+        for (int j : restNew) {
+          double c;
+          if (np[j] == null)
+            c = 0;
+          else if (op[i] == null)
+            c = similarity(text, np[j].text);
+          else {
+            long key = ((long) op[i].index << 32) | np[j].index;
+            Double v = like.get(key);
+            if (v == null) {
+              v = op[i].text.equals(np[j].text) ? 2 : similarity(op[i].text, np[j].text);
+              like.put(key, v);
+            }
+            c = v;
+          }
+          double rn = (double) news.get(j)[0] / Math.max(1, dt.text.length());
+          pairs.add(new double[] { c + 0.1 * (1 - Math.abs(ro - rn)), i, j });
+        }
+      }
+      pairs.sort((x, y) -> Double.compare(y[0], x[0]));
+      for (double[] pr : pairs) {
+        int i = (int) pr[1];
+        int j = (int) pr[2];
+        if (assigned[i] >= 0 || newTaken[j])
+          continue;
+        assigned[i] = j;
+        newTaken[j] = true;
+      }
+    }
   }
 
   /**
    * The place in the new version of the marked text at {@code oldAt} of the old version (-1: no position, an old
-   * location without ranges), or null. A text can occur more than once: each old occurrence is given the new one with
-   * the most similar paragraph (and the nearest position), one to one, so that a changed copy does not take the place of
-   * a copy that stayed. The new occurrences that other old occurrences take go to {@code taken}.
+   * location without ranges), or null. The new places that the other old places of the text take go to {@code taken}.
    */
-  private static int[] exact(DocumentText oldT, DocumentText dt, String text, String oldParagraph, int oldAt,
-      List<int[]> taken) {
-    List<int[]> news = occurrences(dt, text);
-    if (news.isEmpty())
+  private static int[] exact(Map<String, Places> cache, int[] align, DocumentText oldT, DocumentText dt, String text,
+      String oldParagraph, int oldAt, java.util.NavigableMap<Integer, Integer> taken) {
+    Places pl = cache.computeIfAbsent(text, t -> new Places(oldT, dt, align, t));
+    if (pl.news.isEmpty())
       return null;
-    List<int[]> olds = oldAt < 0 ? new ArrayList<>() : occurrences(oldT, text);
-    int mine = -1;
-    for (int i = 0; i < olds.size(); i++)
-      if (mine < 0 || Math.abs(olds.get(i)[0] - oldAt) < Math.abs(olds.get(mine)[0] - oldAt))
-        mine = i;
     int[] best = null;
     double bestContext = -1;
-    if (olds.size() <= 1) {
-      // one old occurrence (or none known): the new one in the most similar paragraph, then the nearest
+    if (oldAt < 0 || pl.olds.isEmpty()) {
+      // no position (or the text is not found again in the old version): the new place in the most similar paragraph,
+      // then the nearest
       double relative = oldAt < 0 ? 0.5 : (double) oldAt / Math.max(1, oldT.text.length());
       double dist = Double.MAX_VALUE;
-      for (int[] n : news) {
+      for (int[] n : pl.news) {
         double c = context(dt, n[0], oldParagraph);
         double d = Math.abs((double) n[0] / Math.max(1, dt.text.length()) - relative);
         if (c > bestContext || c == bestContext && d < dist) {
@@ -272,33 +368,18 @@ final class SpecUpdate {
         }
       }
     } else {
-      // the pairs of an old and a new occurrence, the most alike first: each occurrence is taken once
-      List<double[]> pairs = new ArrayList<>();
-      for (int i = 0; i < olds.size(); i++) {
-        DocumentText.Paragraph op = oldT.paragraphAt(olds.get(i)[0]);
-        String para = op == null ? text : plain(op.text);
-        double ro = (double) olds.get(i)[0] / Math.max(1, oldT.text.length());
-        for (int j = 0; j < news.size(); j++) {
-          double rn = (double) news.get(j)[0] / Math.max(1, dt.text.length());
-          pairs.add(new double[] { context(dt, news.get(j)[0], para) + 0.1 * (1 - Math.abs(ro - rn)), i, j });
+      int mine = 0;
+      for (int i = 1; i < pl.olds.size(); i++)
+        if (Math.abs(pl.olds.get(i)[0] - oldAt) < Math.abs(pl.olds.get(mine)[0] - oldAt))
+          mine = i;
+      for (int i = 0; i < pl.assigned.length; i++)
+        if (i != mine && pl.assigned[i] >= 0) {
+          int[] n = pl.news.get(pl.assigned[i]);
+          taken.put(n[0], n[1]);
         }
-      }
-      pairs.sort((a, b) -> Double.compare(b[0], a[0]));
-      boolean[] oldTaken = new boolean[olds.size()];
-      boolean[] newTaken = new boolean[news.size()];
-      for (double[] pr : pairs) {
-        int i = (int) pr[1];
-        int j = (int) pr[2];
-        if (oldTaken[i] || newTaken[j])
-          continue;
-        oldTaken[i] = true;
-        newTaken[j] = true;
-        if (i == mine) {
-          best = news.get(j);
-          bestContext = context(dt, best[0], oldParagraph);
-          break;
-        }
-        taken.add(news.get(j));
+      if (pl.assigned[mine] >= 0) {
+        best = pl.news.get(pl.assigned[mine]);
+        bestContext = context(dt, best[0], oldParagraph);
       }
     }
     if (best != null && words(text).size() < SHORT && bestContext < CONTEXT)
@@ -415,6 +496,15 @@ final class SpecUpdate {
    * document (it stays, as the history).
    */
   static JsonObject run(TreeDB db, Document oldDoc, Document newDoc, boolean detachOld) throws Exception {
+    WORDS.set(new java.util.HashMap<>());
+    try {
+      return move(db, oldDoc, newDoc, detachOld);
+    } finally {
+      WORDS.remove();
+    }
+  }
+
+  private static JsonObject move(TreeDB db, Document oldDoc, Document newDoc, boolean detachOld) throws Exception {
     if (oldDoc == newDoc)
       throw new ToolError("The old and the new document are the same node");
     DocumentText oldT = DocumentText.of(oldDoc);
@@ -428,6 +518,9 @@ final class SpecUpdate {
     List<Sentence> sentences = sentences(newT);
     List<Sentence> oldSentences = sentences(oldT);
     List<Move> moves = new ArrayList<>();
+    // the places of each marked text in both versions, found once; the new paragraph of each old paragraph
+    Map<String, Places> places = new java.util.HashMap<>();
+    int[] align = ParagraphAlignment.align(oldT.paragraphs, newT.paragraphs);
     boolean owned = false;
     for (Location l : oldT.locations) {
       Move mv = new Move(l);
@@ -463,9 +556,18 @@ final class SpecUpdate {
           continue;
         mv.oldTexts.add(text);
         DocumentText.Paragraph oldP = f[0] < 0 ? null : oldT.paragraphAt(f[0]);
-        String oldPara = oldP == null ? text : plain(oldP.text);
-        List<int[]> taken = new ArrayList<>();
-        int[] ex = exact(oldT, newT, text, oldPara, f[0], taken);
+        String oldPara = oldP == null ? text : oldP.text;
+        int counterpart = oldP == null ? -1 : align[oldP.index];
+        java.util.NavigableMap<Integer, Integer> taken = new java.util.TreeMap<>();
+        int[] ex = exact(places, align, oldT, newT, text, oldPara, f[0], taken);
+        if (ex != null && counterpart >= 0) {
+          DocumentText.Paragraph at = newT.paragraphAt(ex[0]);
+          // the text is in another paragraph and its own paragraph changed: an edit of the text in its own paragraph
+          // wins over a copy elsewhere
+          Object[] here = at != null && at.index == counterpart ? null : best(newT, sentences, text, oldPara, taken, counterpart);
+          if (here != null && (double) here[1] >= MOVE)
+            ex = null;
+        }
         if (ex != null) {
           mv.exact++;
           mv.newRanges.add(ex);
@@ -473,7 +575,7 @@ final class SpecUpdate {
           mv.newTexts.add(plain(newT.text.substring(ex[0], ex[1])));
           // the same text in a changed paragraph: the sentences around it can change its meaning
           DocumentText.Paragraph newP = newT.paragraphAt(ex[0]);
-          if (oldP != null && newP != null && !plain(newP.text).equals(oldPara)) {
+          if (oldP != null && newP != null && !newP.text.equals(oldPara)) {
             List<String> before = sentencesOf(oldSentences, oldP.index);
             List<String> after = sentencesOf(sentences, newP.index);
             for (String x : after)
@@ -485,8 +587,10 @@ final class SpecUpdate {
           }
           continue;
         }
-        // the places of the other copies of the text are not free
-        Object[] b = best(newT, sentences, text, oldPara, taken);
+        // first in the new paragraph of the old one, then anywhere; the places of the other copies of the text are not free
+        Object[] b = counterpart < 0 ? null : best(newT, sentences, text, oldPara, taken, counterpart);
+        if (b == null || (double) b[1] < MOVE)
+          b = best(newT, sentences, text, oldPara, taken, -1);
         double sc = b == null ? 0 : (double) b[1];
         if (b != null && sc >= MOVE) {
           Sentence s = (Sentence) b[0];
@@ -675,20 +779,42 @@ final class SpecUpdate {
       for (int i = 0; i < reqs.size(); i++)
         if (st.equals(reqs.get(i).getAsJsonObject().get("status").getAsString()))
           sorted.add(reqs.get(i));
-    // the sentences of the new version that the old one does not have and no requirement marks now: candidates for
-    // new requirements (statement: with a word of a requirement, such as shall or must)
-    Set<String> old = new HashSet<>();
-    for (Sentence s : oldSentences)
-      old.add(plain(s.text));
+    // the sentences of the new version that no requirement marks now and that its old paragraph did not have (a new
+    // paragraph, a new sentence of a changed paragraph, a new copy of a text): candidates for new requirements
+    // (statement: with a word of a requirement, such as shall or must). A paragraph that only moved has no new sentences.
+    int[] oldOf = new int[newT.paragraphs.size()];
+    Arrays.fill(oldOf, -1);
+    for (int i = 0; i < align.length; i++)
+      if (align[i] >= 0)
+        oldOf[align[i]] = i;
+    Map<String, Integer> gone = new java.util.HashMap<>();
+    for (int i = 0; i < align.length; i++)
+      if (align[i] < 0)
+        gone.merge(oldT.paragraphs.get(i).text, 1, Integer::sum);
+    Set<Integer> moved = new HashSet<>();
+    for (DocumentText.Paragraph np : newT.paragraphs)
+      if (oldOf[np.index] < 0 && gone.getOrDefault(np.text, 0) > 0) {
+        gone.merge(np.text, -1, Integer::sum);
+        moved.add(np.index);
+      }
     DocumentText after = DocumentText.of(newDoc);
+    // the characters that the locations of the new version mark
+    int[] marked = new int[after.text.length() + 1];
+    for (Location l : after.locations)
+      for (int[] f : DocumentText.fragments(l))
+        if (f[0] >= 0 && f[1] <= after.text.length() && f[0] < f[1]) {
+          marked[f[0]]++;
+          marked[f[1]]--;
+        }
+    for (int i = 1; i < marked.length; i++)
+      marked[i] += marked[i - 1];
     JsonArray fresh = new JsonArray();
     for (Sentence s : sentences(after)) {
-      if (old.contains(plain(s.text)))
+      if (moved.contains(s.p) || oldOf[s.p] >= 0 && sentencesOf(oldSentences, oldOf[s.p]).contains(plain(s.text)))
         continue;
       boolean covered = false;
-      for (Location l : after.locations)
-        for (int[] f : DocumentText.fragments(l))
-          covered |= f[0] < s.end && f[1] > s.start;
+      for (int i = s.start; i < s.end && !covered; i++)
+        covered = marked[i] > 0;
       if (!covered) {
         JsonObject n = new JsonObject();
         n.addProperty("p", s.p);

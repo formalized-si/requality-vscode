@@ -149,6 +149,9 @@ public final class McpServer {
   private final Map<String, Prompt> prompts = new LinkedHashMap<>();
 
   public McpServer(InputStream in, OutputStream out, ExecutorService workers, String version, String instructions) {
+    // the jobs of the workbench (and the work of its display) run only while no tool runs: a tool does not read a node
+    // that a job loads or changes at the same time
+    com.unitesk.requality.vscode.ui.runtime.Background.lock(toolsLock.writeLock());
     this.in = in;
     this.out = out;
     this.workers = workers;
@@ -409,7 +412,7 @@ public final class McpServer {
   public <T> T shared(java.util.function.Supplier<T> task) {
     toolsLock.readLock().lock();
     try {
-      return task.get();
+      return com.unitesk.requality.vscode.ui.runtime.Background.holding(task);
     } finally {
       toolsLock.readLock().unlock();
     }
@@ -419,7 +422,10 @@ public final class McpServer {
   public void exclusive(Runnable task) {
     toolsLock.writeLock().lock();
     try {
-      task.run();
+      com.unitesk.requality.vscode.ui.runtime.Background.holding(() -> {
+        task.run();
+        return null;
+      });
     } finally {
       toolsLock.writeLock().unlock();
     }
@@ -539,7 +545,8 @@ public final class McpServer {
       Object value;
       lock.lock();
       try {
-        value = tool.handler.call(args);
+        // the jobs that the tool starts while it runs do not wait for it
+        value = com.unitesk.requality.vscode.ui.runtime.Background.holdingCall(() -> tool.handler.call(args));
       } finally {
         lock.unlock();
       }

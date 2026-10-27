@@ -43,6 +43,30 @@ final class Core {
 
   Core(HeadlessClient headless) {
     this.headless = headless;
+    reloader = db -> {
+      Workspace.Project p = workspace().project(db.getLocalName());
+      if (p == null)
+        return false;
+      disk.forget(p.dir);
+      return workspace().reloadProject(p.dir);
+    };
+  }
+
+  /** Loads the project of a tree again from its files (after a rollback that moved or renamed nodes); false: cannot. */
+  private static volatile java.util.function.Predicate<TreeDB> reloader = db -> false;
+
+  /** The rollback of the last transaction on this thread loaded the project again. */
+  private static final ThreadLocal<Boolean> RELOADED = ThreadLocal.withInitial(() -> false);
+
+  /** A sentence for the result of a call whose rollback loaded the project again. */
+  static final String RELOAD_NOTE = "The project was loaded again after the rollback (it deleted, moved or renamed existing nodes): undo and "
+      + "redo of the earlier changes end here; revert_change still works.";
+
+  /** True when the rollback of the last transaction on this thread loaded the project again (and clears it). */
+  static boolean reloadedByRollback() {
+    boolean r = RELOADED.get();
+    RELOADED.set(false);
+    return r;
   }
 
   HeadlessClient headless() {
@@ -213,14 +237,14 @@ final class Core {
       return null; // the tool tells it
     }
     // no change runs while the files are compared with the tree
-    boolean outdated = mcp.shared(() -> {
+    String changed = mcp.shared(() -> {
       TreeDB db = Nodes.findDB(p.localName);
       return db != null && !p.loading && !p.closed && !p.released && p.error == null && Nodes.isReady(db)
-          && disk.outdated(p.dir, db, p.loadedAt);
+          ? disk.outdated(p.dir, db, p.loadedAt) : null;
     });
-    if (!outdated)
+    if (changed == null)
       return null;
-    System.err.println("[mcp] the catalog " + p.dir + " changed on disk: the project loads again");
+    System.err.println("[mcp] the catalog " + p.dir + " changed on disk (" + changed + "): the project loads again");
     mcp.exclusive(() -> {
       // the load looks at the files again when it ends
       disk.forget(p.dir);
@@ -448,6 +472,7 @@ final class Core {
       sleep(100);
     }
     boolean open = true;
+    RELOADED.set(false);
     try {
       T r = body.call();
       if (commit) {
@@ -467,6 +492,13 @@ final class Core {
           capture.after(db, ts);
       }
       return r;
+    } catch (Exception e) {
+      if (open) {
+        open = false;
+        if (rollback(db))
+          throw new ToolError((e instanceof ToolError ? e.getMessage() : message(e)) + " " + RELOAD_NOTE);
+      }
+      throw e;
     } finally {
       if (open)
         rollback(db);
@@ -477,7 +509,7 @@ final class Core {
    * Rolls back the open transaction. The link index of the core follows the changes of a transaction as they are made
    * and does not follow a rollback: the links of the nodes it touched, and the links to them, are indexed again.
    */
-  private static void rollback(TreeDB db) {
+  private static boolean rollback(TreeDB db) {
     java.util.Set<UUID> touched = java.util.Collections.emptySet();
     // The rollback of the core writes the inverse of each operation to the files, as the server formats them (its line
     // ends, its order): each file of a touched node gets its bytes back, also one that changed on disk meanwhile.
@@ -488,6 +520,28 @@ final class Core {
           .getStorage();
       touched = ts.getTouchedNodes();
       com.unitesk.requality.core.storage.ITreeStorage base = ts.getStorage();
+      boolean structural = false;
+      for (UUID u : touched)
+        try {
+          JsonObject was = History.state(base, u, null);
+          JsonObject now = History.state(ts, u, null);
+          structural |= was != null && (now == null || !was.get("id").equals(now.get("id"))
+              || !String.valueOf(was.get("parent")).equals(String.valueOf(now.get("parent"))));
+        } catch (Exception e) {
+          // If the node cannot be inspected, discard and reload rather than risk inverse file operations.
+          structural = true;
+        }
+      if (structural) {
+        // The transaction has never committed. Inverse operations against the base storage can delete directories
+        // still belonging to other nodes (rename A, create A, fail). Keep the files untouched and replace the tree.
+        db.discardTransactionForReload();
+        boolean reloaded = reloader.test(db);
+        RELOADED.set(reloaded);
+        if (!reloaded)
+          throw new ToolError("The unsaved change was discarded, but the project could not be reloaded. "
+              + "Open the project again before making another change.");
+        return true;
+      }
       for (UUID u : touched)
         try {
           JsonObject st = History.state(base, u, null);
@@ -509,7 +563,7 @@ final class Core {
     } catch (RuntimeException e) {
       // the exception of the body tells what failed
       e.printStackTrace(System.err);
-      return;
+      return false;
     } finally {
       for (Map.Entry<java.io.File, byte[]> e : external.entrySet())
         try {
@@ -532,6 +586,7 @@ final class Core {
     } catch (RuntimeException e) {
       e.printStackTrace(System.err);
     }
+    return false;
   }
 
   /** A readable message of a core exception (the tree logic exceptions have no messages). */

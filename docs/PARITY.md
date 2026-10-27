@@ -17,9 +17,9 @@ Line counts (-/+) are the differences between each ported file and its mechanica
 | Upstream classes | 320 |
 | Ported | 320 |
 | Not ported | 0 |
-| Ported, identical to the mechanical port (-0 +0) | 320 |
-| Ported, with hand adaptations | 0 |
-| `VSCODE:` comments in ported classes | 0 |
+| Ported, identical to the mechanical port (-0 +0) | 319 |
+| Ported, with hand adaptations | 1 |
+| `VSCODE:` comments in ported classes | 2 |
 | Upstream bugs fixed (see below) | 0 |
 
 ## Not ported
@@ -34,6 +34,7 @@ Lines -/+ are removed/added lines versus the mechanical port. Comments are the t
 
 | Class | Upstream path | -/+ | VSCODE comments |
 |---|---|---:|---|
+| EclipseCheckerContainer | `com/unitesk/requality/eclipse/core/EclipseCheckerContainer.java` | -0 +8 | Settings changes can request a restart directly, without consulting isEnabled(). In headless mode the requesting tool runs the checks itself; a worker would wait for that same tool to finish its workspace change.<br>the server without a window (requality-mcp) checks the nodes when a tool asks (trace_coverage with refresh), not in the background: a check that runs while a tool reads the nodes can show it a node without some attributes |
 
 ## Upstream bugs fixed
 
@@ -43,7 +44,7 @@ None found.
 
 ## Command map
 
-180 VS Code commands from `docs/command-map.json`.
+181 VS Code commands from `docs/command-map.json`.
 
 | VS Code command | Title | Eclipse origin |
 |---|---|---|
@@ -62,6 +63,7 @@ None found.
 | `requality.compareWith.clipboard` | Clipboard | org.eclipse.compare ClipboardCompare (Compare With > Clipboard) |
 | `requality.compareWith.eachOther` | Each Other | org.eclipse.team.ui / org.eclipse.compare CompareAction (Compare With > Each Other) |
 | `requality.compareWith.localHistory` | Local History... | org.eclipse.team.ui CompareLocalHistory (Compare With > Local History...) |
+| `requality.configureMcp` | Connect AI Agent (MCP)... |  |
 | `requality.configureProject` | Configure and Detect Nested Projects... | org.eclipse.e4.ui.importer.configureProject (Configure submenu of projects) |
 | `requality.copy` | Copy | CopyNode / org.eclipse.ui.edit.copy |
 | `requality.copyQId` | Copy Full Name | CopyNodeQId |

@@ -70,6 +70,8 @@ public final class McpMain {
       System.setProperty("java.awt.headless", "true");
     // no HTTP or WebSocket server for the web editors: nothing shows them (DefaultAPISource, VSCODE-PATCH)
     System.setProperty("requality.noServers", "true");
+    // the checkers run when a tool asks for them (trace_coverage refresh), not in the background
+    System.setProperty("requality.noBackgroundChecks", "true");
     // the JavaScript of the catalogs (formulas, checker rules) uses no Java class that reaches files or programs
     ScriptSandbox.install();
 
