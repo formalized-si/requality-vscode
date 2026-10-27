@@ -64,7 +64,7 @@ final class RequalityTools {
   static final String SUPERSEDED_BY = "superseded_by";
   static final String PREVIOUS_VERSION = "previous_version";
   private static final String NODE = "Node: its UUID or its path in the project, for example /Requirements/A/B.";
-  /** get_node lists at most this many children (get_tree pages larger ones). */
+  /** get_node lists at most this many children (search_nodes pages larger subtrees). */
   private static final int MAX_CHILDREN = 100;
 
   /** Adds the tools and prompts; returns the access to the core they use. */
@@ -161,7 +161,8 @@ final class RequalityTools {
         "Finds nodes under a node. With 'text': the nodes whose user-visible attributes (id, name, description and the "
             + "others) contain the text. With 'attribute': the nodes where this attribute matches 'operator' and 'value'. "
             + "With 'type' alone: the nodes of the type. Each match gives the attributes that matched; a document location "
-            + "gives its text, its document and its requirements.",
+            + "gives its text, its document and its requirements. Results are sorted by path; use next_offset as "
+            + "offset with the same filters to read the next page.",
         Schema.object().prop("project", "string", PROJECT, true)
             .prop("text", "string", "Text to find in the user-visible attributes (case-insensitive).", false)
             .prop("attribute", "string", "Attribute name, for example status, name, id, description or type.", false)
@@ -170,6 +171,7 @@ final class RequalityTools {
             .prop("under", "string", NODE + " Search only under this node (default: the project root).", false)
             .prop("type", "string", "Only nodes of this type, for example Requirement or Location; alone: all nodes of "
                 + "the type.", false)
+            .prop("offset", "integer", "First match to return (default 0; use next_offset for the next page).", false)
             .prop("limit", "integer", "At most this many matches (default 100).", false).build(),
         true, false, a -> search(core, a)));
 
@@ -411,32 +413,38 @@ final class RequalityTools {
     mcp.add(new Tool("trace_coverage", "Trace coverage",
         "The traceability of a project as data: requirements without document locations or without test purposes "
             + "(leaf requirements), links that do not resolve, checker problems, the coverage of each document by "
-            + "locations, and the open review items of document updates.",
+            + "locations, and the open review items of document updates. Each list gives its total and next_offset "
+            + "when more items remain; use offset to read the next page. Keep filters unchanged between pages.",
         Schema.object().prop("project", "string", PROJECT, true)
             .prop("under", "string", "Only the requirements under this node (default /Requirements).", false)
             .prop("refresh", "boolean", "Run the checkers again first (default false).", false)
             .prop("documents", "boolean", "Include the coverage of the documents (default true).", false)
+            .prop("offset", "integer", "First item in each list (default 0). For subsequent pages use refresh false "
+                + "and documents false to avoid repeating checker work and document summaries.", false)
             .prop("limit", "integer", "At most this many items in each list (default 50).", false).build(),
         true, false, a -> {
           TreeDB db = core.db(Core.str(a, "project"));
           return Coverage.report(db, Core.node(db, Core.optStr(a, "under", Requirement.getTypeRootQId())),
-              Core.optBool(a, "refresh", false), Core.optBool(a, "documents", true), Math.max(1, Core.optInt(a, "limit", 50)));
+              Core.optBool(a, "refresh", false), Core.optBool(a, "documents", true),
+              Math.max(0, Core.optInt(a, "offset", 0)), Math.max(1, Core.optInt(a, "limit", 50)));
         }).alone(a -> a.has("refresh") && Core.optBool(a, "refresh", false)));
 
     mcp.add(new Tool("test_coverage", "Test coverage",
         "The coverage of the requirements by tests, from a coverage file of the test runs (XML, the file a coverage "
             + "source of Requality reads): the leaf requirements tests cover (with the tests and hits), the ones no test "
             + "covers, the test failures with the requirements they violate, and the requirements of the file that the "
-            + "project does not have. It changes nothing. The file: " + TestCoverage.FORMAT,
+            + "project does not have. Each list gives its total and next_offset when more items remain; use offset "
+            + "with the same file and filters to read the next page. It changes nothing. The file: " + TestCoverage.FORMAT,
         Schema.object().prop("project", "string", PROJECT, true)
             .prop("coverage_file", "string", "Absolute path of the coverage file (in a folder of the server).", true)
             .prop("under", "string", "Only the requirements under this node (default /Requirements).", false)
+            .prop("offset", "integer", "First item in each list (default 0; use its next_offset for the next page).", false)
             .prop("limit", "integer", "At most this many items in each list (default 50).", false).build(),
         true, false, a -> {
           TreeDB db = core.db(Core.str(a, "project"));
           File file = policy.file(Core.str(a, "coverage_file"), "coverage file", java.util.Set.of("xml"));
           return TestCoverage.report(db, Core.node(db, Core.optStr(a, "under", Requirement.getTypeRootQId())), file,
-              Math.max(1, Core.optInt(a, "limit", 50)));
+              Math.max(0, Core.optInt(a, "offset", 0)), Math.max(1, Core.optInt(a, "limit", 50)));
         }));
 
     mcp.add(new Tool("review_changes", "Review changes",
@@ -460,16 +468,17 @@ final class RequalityTools {
             + "added, deleted and changed nodes with the attributes that changed (name, description, locations, user "
             + "attributes; before and after) and the old path of a moved or renamed node. It shows every change since the "
             + "revision, also the ones of VS Code, of a colleague or of another session: for a review before a commit or a "
-            + "pull request.",
+            + "pull request. Results are paged with offset and limit; next_offset gives the next page.",
         Schema.object().prop("project", "string", PROJECT, true)
             .prop("revision", "string", "A commit, branch or tag, for example HEAD (default), main or HEAD~3.", false)
             .prop("under", "string", "Only the nodes under this path, for example /Requirements/A.", false)
+            .prop("offset", "integer", "First node in each list (default 0; use next_offset for the next page).", false)
             .prop("limit", "integer", "At most this many nodes in each list (default 100).", false).build(),
         true, false, a -> {
           TreeDB db = core.db(Core.str(a, "project"));
           Workspace.Project p = core.workspace().project(db.getLocalName());
           return RevisionDiff.compare(p.dir, Core.optStr(a, "revision", "HEAD"), Core.optStr(a, "under", null),
-              Math.max(1, Core.optInt(a, "limit", 100)));
+              Math.max(0, Core.optInt(a, "offset", 0)), Math.max(1, Core.optInt(a, "limit", 100)));
         }));
 
     mcp.add(new Tool("revert_change", "Revert change",
@@ -982,8 +991,10 @@ final class RequalityTools {
         children.add(Core.briefWithChildren(c));
     }
     o.add("children", children);
-    if (total > MAX_CHILDREN)
+    if (total > MAX_CHILDREN) {
       o.addProperty("children_total", total);
+      o.addProperty("children_hint", "Use search_nodes with under set to this node, a text or type filter, and offset/limit to page its subtree.");
+    }
     if (locations > 0)
       o.addProperty("locations_count", locations);
     JsonArray types = new JsonArray();
@@ -1111,18 +1122,22 @@ final class RequalityTools {
       throw new InvalidParams("Give 'text', 'attribute' or 'type'");
     }
     int limit = Math.max(1, Core.optInt(a, "limit", 100));
+    int offset = Math.max(0, Core.optInt(a, "offset", 0));
     NodeSearch search = new NodeSearch(req);
     search.execute(under);
+    List<Pair<? extends TreeNode, List<String>>> matches = new ArrayList<>(search.getMatches());
+    // Stable pages also after a reload; the core's traversal order is not part of the tool's contract.
+    matches.removeIf(m -> m.getFirst() == null || m.getFirst().isDisposed() || m.getFirst().isVirtual()
+        || (type != null && !type.equalsIgnoreCase(m.getFirst().getType())));
+    matches.sort(java.util.Comparator.comparing((Pair<? extends TreeNode, List<String>> m) -> m.getFirst().getQualifiedId())
+        .thenComparing(m -> m.getFirst().getSUUId()));
     JsonArray out = new JsonArray();
     int total = 0;
     Map<Document, DocumentText> texts = new HashMap<>();
-    for (Pair<? extends TreeNode, List<String>> m : search.getMatches()) {
+    for (Pair<? extends TreeNode, List<String>> m : matches) {
       TreeNode n = m.getFirst();
-      // a virtual node is a copy of its target: the target is the match
-      if (n == null || n.isDisposed() || n.isVirtual() || (type != null && !type.equalsIgnoreCase(n.getType())))
-        continue;
       total++;
-      if (out.size() >= limit)
+      if (total <= offset || out.size() >= limit)
         continue;
       JsonObject o = Core.brief(n);
       JsonArray keys = new JsonArray();
@@ -1166,6 +1181,8 @@ final class RequalityTools {
     }
     JsonObject r = obj("matches", out);
     r.addProperty("total", total);
+    if ((long) offset + out.size() < total)
+      r.addProperty("next_offset", offset + out.size());
     return r;
   }
 

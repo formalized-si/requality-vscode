@@ -52,7 +52,7 @@ final class RevisionDiff {
     }
   }
 
-  static JsonObject compare(File catalog, String revision, String under, int limit) throws Exception {
+  static JsonObject compare(File catalog, String revision, String under, int offset, int limit) throws Exception {
     if (!REVISION.matcher(revision).matches() || revision.startsWith("-"))
       throw new InvalidParams("Invalid revision " + revision + " (a commit, a branch, a tag or HEAD~1)");
     String top = git(catalog, null, "rev-parse", "--show-toplevel").trim();
@@ -103,14 +103,14 @@ final class RevisionDiff {
       if (b == null) {
         if (!inside(n.path, filter))
           continue;
-        if (counts[0]++ < limit)
+        if (counts[0]++ >= offset && added.size() < limit)
           added.add(brief(e.getKey(), n));
         continue;
       }
       JsonObject d = difference(b, n);
       if (d == null || !inside(n.path, filter) && !inside(b.path, filter))
         continue;
-      if (counts[2]++ < limit) {
+      if (counts[2]++ >= offset && modified.size() < limit) {
         JsonObject m = brief(e.getKey(), n);
         if (!b.path.equals(n.path))
           m.addProperty("was", b.path);
@@ -121,7 +121,7 @@ final class RevisionDiff {
     }
     // a node that moved has its old file and its new file among the changed ones: it is in both sets
     for (Map.Entry<String, Node> e : before.entrySet())
-      if (!after.containsKey(e.getKey()) && inside(e.getValue().path, filter) && counts[1]++ < limit)
+      if (!after.containsKey(e.getKey()) && inside(e.getValue().path, filter) && counts[1]++ >= offset && deleted.size() < limit)
         deleted.add(brief(e.getKey(), e.getValue()));
     JsonObject r = new JsonObject();
     r.addProperty("revision", revision);
@@ -134,8 +134,10 @@ final class RevisionDiff {
     r.add("added", added);
     r.add("deleted", deleted);
     r.add("changed", modified);
-    if (counts[0] > limit || counts[1] > limit || counts[2] > limit)
-      r.addProperty("more", "Some lists have more than " + limit + " nodes: give a larger limit or 'under'");
+    if (counts[0] > (long) offset + limit || counts[1] > (long) offset + limit || counts[2] > (long) offset + limit) {
+      r.addProperty("next_offset", offset + limit);
+      r.addProperty("more", "Use next_offset as offset with the same revision and under to read the next page");
+    }
     if (!unreadable.isEmpty())
       r.add("unreadable", strings(unreadable));
     return r;

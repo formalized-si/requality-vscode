@@ -78,7 +78,8 @@ final class RequalityPrompts {
           String project = arg(a, "project", "");
           String under = arg(a, "under", "/Requirements");
           return "Audit the traceability of the Requality project " + project + " under " + under + ".\n\n"
-              + "1. Run trace_coverage with refresh true.\n"
+              + "1. Run trace_coverage with refresh true. Read every page of lists that have next_offset: pass it "
+              + "as offset, with refresh false and documents false on subsequent pages.\n"
               + "2. For each document with a low coverage, read the uncovered text (read_document, filter \"uncovered\") "
               + "and tell which parts look like requirement statements.\n"
               + "3. Report: requirements without document text, requirements without test purposes, broken links, "

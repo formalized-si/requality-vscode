@@ -2,6 +2,8 @@
 
 ## 1.5.0 (pre-release)
 
+- Search, trace coverage, test coverage and Git comparison support bounded result pages (`offset`, `limit`,
+  `next_offset`), so agents can inspect a large catalog without requesting an oversized response.
 - **Connect AI Agent (MCP)...** prepares a configuration for the open folders and the extension's Java runtime
   (Codex, VS Code, Claude Code, Claude Desktop or Cursor).
 - A rollback after deleting, moving or renaming existing nodes discards the unsaved transaction and reloads the tree.

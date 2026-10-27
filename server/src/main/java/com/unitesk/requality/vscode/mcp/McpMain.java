@@ -40,7 +40,9 @@ public final class McpMain {
       + "or unique id, and give the project name (list_projects) with each call. A project must be ready; a project in the "
       + "format of an older Requality needs convert_project first; a locked project is open in another process (a call "
       + "waits for it). Files to import and report folders must be in the folders of the server (the user may allow "
-      + "another folder when the client asks).";
+      + "another folder when the client asks). Read all result pages: pass next_from as from for read_document and "
+      + "next_offset as offset for search_nodes, coverage lists, review_changes and compare_with_revision. Keep the "
+      + "same filters and finish reading before changing the catalog or input file.";
 
   static final String USAGE = "Usage: requality-mcp [options] [<folder with Requality catalogs>...]\n"
       + "The default folder is the current one. Options:\n"

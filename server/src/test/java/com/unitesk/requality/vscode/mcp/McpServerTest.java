@@ -1473,6 +1473,24 @@ class McpServerTest {
     assertContains(changed, "\"before\":\"Second\",\"after\":\"Second, renamed\"");
     assertContains(changed, "\"path\":\"/Requirements/R2/R3\",");
     assertContains(changed, "\"was\":\"/Requirements/R3\"");
+    Map<String, JsonArray> paged = new java.util.LinkedHashMap<>();
+    for (String key : List.of("added", "deleted", "changed"))
+      paged.put(key, new JsonArray());
+    int offset = 0;
+    do {
+      JsonObject page = call("compare_with_revision", "project", A, "revision", "HEAD", "offset", offset, "limit", 1);
+      assertEquals(d.get("counts"), page.get("counts"));
+      for (Map.Entry<String, JsonArray> e : paged.entrySet()) {
+        assertTrue(page.getAsJsonArray(e.getKey()).size() <= 1);
+        e.getValue().addAll(page.getAsJsonArray(e.getKey()));
+      }
+      if (!page.has("next_offset"))
+        break;
+      assertTrue(page.get("next_offset").getAsInt() > offset);
+      offset = page.get("next_offset").getAsInt();
+    } while (true);
+    for (Map.Entry<String, JsonArray> e : paged.entrySet())
+      assertEquals(d.get(e.getKey()), e.getValue());
     assertContains(callError("compare_with_revision", "project", A, "revision", "--output=/tmp/x"), "Invalid revision");
     assertContains(callError("compare_with_revision", "project", A, "revision", "nosuchbranch"), "No revision nosuchbranch");
   }
@@ -1894,5 +1912,75 @@ class McpServerTest {
         ops("[{\"op\":\"create\",\"parent\":\"/Requirements\",\"id\":\"N\"}]"));
     assertFalse(plain.get("note").getAsString().contains("loaded again"), plain.toString());
     assertEquals(before, call("get_tree", "project", "Rollback", "node", "/Requirements", "depth", 5).toString());
+  }
+
+  @Test
+  @Order(28)
+  void anAgentCanReadEveryPageWithoutGrowingItsContext() throws Exception {
+    JsonObject init = new JsonObject();
+    init.addProperty("protocolVersion", "2025-06-18");
+    rpc("initialize", init);
+    call("create_project", "name", "Pages");
+    JsonArray changes = new JsonArray();
+    for (int i : new int[] { 6, 0, 5, 1, 4, 2, 3 }) {
+      JsonObject op = new JsonObject();
+      op.addProperty("op", "create");
+      op.addProperty("parent", "/Requirements");
+      op.addProperty("id", "R" + i);
+      op.addProperty("name", "Paged requirement " + i);
+      changes.add(op);
+    }
+    call("apply_changes", "project", "Pages", "operations", changes);
+    List<String> found = new ArrayList<>();
+    int offset = 0;
+    do {
+      JsonObject page = call("search_nodes", "project", "Pages", "text", "Paged requirement", "limit", 2, "offset", offset);
+      assertEquals(page, call("search_nodes", "project", "Pages", "text", "Paged requirement", "limit", 2, "offset", offset));
+      assertEquals(7, page.get("total").getAsInt());
+      assertTrue(page.getAsJsonArray("matches").size() <= 2);
+      for (JsonElement e : page.getAsJsonArray("matches"))
+        found.add(e.getAsJsonObject().get("id").getAsString());
+      if (!page.has("next_offset"))
+        break;
+      int next = page.get("next_offset").getAsInt();
+      assertTrue(next > offset, page.toString());
+      offset = next;
+    } while (true);
+    assertEquals(List.of("R0", "R1", "R2", "R3", "R4", "R5", "R6"), found);
+    JsonObject pastEnd = call("search_nodes", "project", "Pages", "type", "Requirement", "offset", 100);
+    assertTrue(pastEnd.getAsJsonArray("matches").isEmpty());
+    assertFalse(pastEnd.has("next_offset"));
+
+    List<String> gaps = new ArrayList<>();
+    offset = 0;
+    do {
+      JsonObject report = call("trace_coverage", "project", "Pages", "documents", false, "limit", 2, "offset", offset);
+      JsonObject page = report.getAsJsonObject("requirements").getAsJsonObject("leaves_without_locations");
+      assertEquals(7, page.get("total").getAsInt());
+      for (JsonElement e : page.getAsJsonArray("items"))
+        gaps.add(e.getAsJsonObject().get("path").getAsString());
+      if (!page.has("next_offset"))
+        break;
+      offset = page.get("next_offset").getAsInt();
+    } while (true);
+    assertEquals(found.stream().map(id -> "/Requirements/" + id).toList(), gaps);
+
+    File coverage = new File(root, "paged-coverage.xml");
+    Files.writeString(coverage.toPath(), "<coverage><reqcoverage qid=\"/Requirements/R0\">"
+        + "<covered_by uri=\"test/start\" label=\"Start\" hits=\"1\"/></reqcoverage></coverage>");
+    List<String> untested = new ArrayList<>();
+    offset = 0;
+    do {
+      JsonObject report = call("test_coverage", "project", "Pages", "coverage_file", coverage.getAbsolutePath(), "limit", 2, "offset", offset);
+      assertEquals(14.3, report.get("covered_percent").getAsDouble());
+      JsonObject page = report.getAsJsonObject("uncovered");
+      assertEquals(6, page.get("total").getAsInt());
+      for (JsonElement e : page.getAsJsonArray("items"))
+        untested.add(e.getAsJsonObject().get("path").getAsString());
+      if (!page.has("next_offset"))
+        break;
+      offset = page.get("next_offset").getAsInt();
+    } while (true);
+    assertEquals(gaps.subList(1, 7), untested);
   }
 }

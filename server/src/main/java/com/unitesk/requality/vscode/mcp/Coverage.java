@@ -22,40 +22,17 @@ final class Coverage {
   private Coverage() {
   }
 
-  /** A list of at most {@code limit} items with the total number. */
-  private static final class Capped {
-    final JsonArray items = new JsonArray();
-    int total;
-    final int limit;
-
-    Capped(int limit) {
-      this.limit = limit;
-    }
-
-    void add(com.google.gson.JsonElement e) {
-      total++;
-      if (items.size() < limit)
-        items.add(e);
-    }
-
-    JsonObject json() {
-      JsonObject o = new JsonObject();
-      o.addProperty("total", total);
-      o.add("items", items);
-      return o;
-    }
-  }
-
-  static JsonObject report(TreeDB db, TreeNode under, boolean refresh, boolean documents, int limit) throws Exception {
+  static JsonObject report(TreeDB db, TreeNode under, boolean refresh, boolean documents, int offset, int limit) throws Exception {
     List<Requirement> reqs = new ArrayList<>();
     collect(under, reqs);
     if (under instanceof Requirement && under.getWorkParent() != null && under.getWorkParent().getWorkParent() == null)
       reqs.remove(under); // the /Requirements folder is no requirement of its own
+    reqs.sort(java.util.Comparator.comparing(TreeNode::getQualifiedId));
     int leaves = 0;
-    Capped noLocations = new Capped(limit);
-    Capped noTests = new Capped(limit);
-    Capped broken = new Capped(limit);
-    Capped problems = new Capped(limit);
+    ResultPage noLocations = new ResultPage(offset, limit);
+    ResultPage noTests = new ResultPage(offset, limit);
+    ResultPage broken = new ResultPage(offset, limit);
+    ResultPage problems = new ResultPage(offset, limit);
     int errors = 0;
     int warnings = 0;
     for (Requirement r : reqs) {
@@ -155,11 +132,11 @@ final class Coverage {
       }
       o.add("documents", docs);
     }
-    Capped todo = new Capped(limit);
+    ResultPage todo = new ResultPage(offset, limit);
     int completed = 0;
     TreeNode links = db.getNode("/ToDoLinks");
     if (links != null)
-      for (TreeNode t : links.getWorkChildren())
+      for (TreeNode t : links.getSortedWorkChildren())
         if (t instanceof ToDoItem && !t.isDisposed()) {
           // the completed ones are done; the open ones and the ones to check are listed
           if ("COMPLETED".equals(t.attrs().getStringAttributeValue(ToDoItem.ATTR_STATUS))) {

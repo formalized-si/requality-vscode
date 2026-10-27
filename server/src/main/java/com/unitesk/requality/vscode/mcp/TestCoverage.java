@@ -32,7 +32,7 @@ final class TestCoverage {
       + "qid=\"/Requirements/A/B\"/><description format=\"plain\">...</description></error></coverage>. A qid is the path, "
       + "the UUID, the user-visible id (with the id prefix of the project) or the id of a requirement that one node has.";
 
-  static JsonObject report(TreeDB db, TreeNode under, File file, int limit) {
+  static JsonObject report(TreeDB db, TreeNode under, File file, int offset, int limit) {
     CoverageFromFile src = new CoverageFromFile();
     src.setTargetStorage(new CoverageStorage(db));
     src.setSettings(file.toURI().toString());
@@ -53,8 +53,9 @@ final class TestCoverage {
     }
     List<Requirement> leaves = new ArrayList<>();
     collect(under, leaves);
-    Capped covered = new Capped(limit);
-    Capped uncovered = new Capped(limit);
+    leaves.sort(java.util.Comparator.comparing(TreeNode::getQualifiedId));
+    ResultPage covered = new ResultPage(offset, limit);
+    ResultPage uncovered = new ResultPage(offset, limit);
     for (Requirement r : leaves) {
       TreeNodeCoverageInfo info = byPath.get(r.getQualifiedId());
       JsonObject o = item(r);
@@ -76,10 +77,12 @@ final class TestCoverage {
       }
     }
     // the requirements of the file that the project does not have (renamed or deleted since the tests ran)
-    Capped unknown = new Capped(limit);
+    ResultPage unknown = new ResultPage(offset, limit);
+    unknownKeys.sort(String::compareTo);
     for (String qid : unknownKeys)
       unknown.add(new com.google.gson.JsonPrimitive(qid));
-    Capped failures = new Capped(limit);
+    ResultPage failures = new ResultPage(offset, limit);
+    List<JsonObject> failureItems = new ArrayList<>();
     Map<String, TestErrorInfo[]> errs = src.getErrors();
     if (errs != null)
       for (TestErrorInfo[] list : errs.values())
@@ -97,8 +100,10 @@ final class TestCoverage {
               reqs.add(n != null ? n.getQualifiedId() : q);
             }
           o.add("violates", reqs);
-          failures.add(o);
+          failureItems.add(o);
         }
+    failureItems.sort(java.util.Comparator.comparing(JsonObject::toString));
+    failureItems.forEach(failures::add);
     JsonObject r = new JsonObject();
     r.addProperty("file", file.getPath());
     r.addProperty("under", under.getQualifiedId());
@@ -176,27 +181,4 @@ final class TestCoverage {
     return o;
   }
 
-  /** A list of at most {@code limit} items with the total number. */
-  private static final class Capped {
-    final JsonArray items = new JsonArray();
-    int total;
-    final int limit;
-
-    Capped(int limit) {
-      this.limit = limit;
-    }
-
-    void add(com.google.gson.JsonElement e) {
-      total++;
-      if (items.size() < limit)
-        items.add(e);
-    }
-
-    JsonObject json() {
-      JsonObject o = new JsonObject();
-      o.addProperty("total", total);
-      o.add("items", items);
-      return o;
-    }
-  }
 }

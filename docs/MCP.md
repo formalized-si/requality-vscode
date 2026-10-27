@@ -203,6 +203,15 @@ when only one node of the project has this id (two nodes with the id give an err
 prefix of the project (for example, `PUMP-LIM_04`) is also correct.
 Give the project name with each call. `list_projects` gives the names.
 
+Large results are paged. `search_nodes` accepts `offset` and `limit` and returns `next_offset` when more matches
+remain, sorted by path. `trace_coverage` and `test_coverage` accept the same arguments; each list has its own
+`total`, `items` and, when needed, `next_offset`. Pass a list's `next_offset` as the next call's `offset` to continue
+that list. Totals and coverage percentages always describe the whole selection, not just the page.
+`compare_with_revision` pages each of its added, deleted and changed lists and gives one `next_offset` to continue them.
+Keep the same filters, and finish reading before changing the catalog or the coverage file. For later pages of
+`trace_coverage`, use `refresh: false` and `documents: false` to avoid repeating checks and document summaries.
+For `read_document`, use `next_from` as `from`; for the details of a change, use `review_changes` with `offset` and `limit`.
+
 ### Operations of apply_changes
 
 | Operation | Keys | Operation |

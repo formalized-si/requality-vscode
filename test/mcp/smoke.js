@@ -120,6 +120,17 @@ let current = null;
   const unchanged = await s.tool('get_node', { project: 'Smoke', node: '/Requirements/R2' });
   check(unchanged.uuid === r2.uuid && unchanged.locations.length === 1,
     'a dry-run move preserves the node, its UUID and its location after reload');
+  const searchArgs = { project: 'Smoke', type: 'Requirement', under: '/Requirements', limit: 1 };
+  const first = await s.tool('search_nodes', searchArgs);
+  const next = await s.tool('search_nodes', { ...searchArgs, offset: first.next_offset });
+  check(first.next_offset === 1 && first.matches.length === 1 && next.matches.length === 1
+    && first.matches[0].uuid !== next.matches[0].uuid && first.total === next.total,
+    'search pages keep their size, total and distinct nodes');
+  const coverageArgs = { project: 'Smoke', documents: false, limit: 1 };
+  const gap1 = (await s.tool('trace_coverage', coverageArgs)).requirements.leaves_without_test_purposes;
+  const gap2 = (await s.tool('trace_coverage', { ...coverageArgs, offset: gap1.next_offset })).requirements.leaves_without_test_purposes;
+  check(gap1.next_offset === 1 && gap1.total === 2 && gap2.total === 2 && !('next_offset' in gap2)
+    && gap1.items[0].path !== gap2.items[0].path, 'coverage pages reach the last gap without duplicates');
   // a report without the HTTP server of the web editors (the headless server starts none)
   const out = path.join(catalogs, 'report');
   const report = await s.tool('generate_report', { project: 'Smoke', template: 'com.unitesk.requality.reports.tableview', output: out });
