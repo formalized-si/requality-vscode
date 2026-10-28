@@ -1842,10 +1842,37 @@ class McpServerTest {
     File f2 = new File(dir, "copies.html");
     Files.writeString(f2.toPath(), v2.append("</body></html>").toString());
     long t = System.nanoTime();
-    JsonObject up = call("update_document_version", "project", "Copies", "document", doc, "file", f2.getAbsolutePath());
+    AtomicInteger childRefreshes = new AtomicInteger();
+    AtomicInteger intermediateReferences = new AtomicInteger();
+    TreeDB copies = core.db("Copies");
+    var listener = new com.unitesk.requality.core.events.DefaultTreeChangeListener() {
+      @Override
+      public void changed(List<com.unitesk.requality.core.events.TreeNodeChangeEvent> changes) {
+        // Count immediate recalculations, not their later transaction notifications a second time.
+      }
+
+      @Override
+      public void changed(TreeNode node, com.unitesk.requality.core.operation.ChangesSet<com.unitesk.requality.core.attribute.Attribute> what) {
+        if (node instanceof Document && what.contains(TreeNode.ATTR_CHILDREN_UUIDS))
+          childRefreshes.incrementAndGet();
+        if (node instanceof Requirement requirement && what.contains(Requirement.ATTR_LOCATIONS)
+            && requirement.getLocations(false).size() != 1)
+          intermediateReferences.incrementAndGet();
+      }
+    };
+    copies.addListener(listener);
+    JsonObject up;
+    try {
+      up = call("update_document_version", "project", "Copies", "document", doc, "file", f2.getAbsolutePath());
+    } finally {
+      copies.removeListener(listener);
+    }
     long millis = TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - t);
     System.out.println("MCP update of " + n + " repeated paragraphs: " + millis + " ms");
     assertTrue(millis < 60_000, "the update took " + millis + " ms");
+    assertTrue(childRefreshes.get() > 0 && childRefreshes.get() <= 3,
+        "document child lists were rebuilt " + childRefreshes.get() + " times");
+    assertEquals(0, intermediateReferences.get(), "only final references are published, without an old+new intermediate set");
     JsonObject sum = up.getAsJsonObject("summary");
     assertEquals(n - 1, sum.get("unchanged").getAsInt(), up.toString());
     assertEquals(1, sum.get("changed").getAsInt(), up.toString());
@@ -1857,6 +1884,16 @@ class McpServerTest {
     assertContains(up.getAsJsonArray("new_sentences").toString(), "{\"p\":100,\"quote\":\"Values above 10 shall not be used.\",\"statement\":true}");
     assertContains(up.getAsJsonArray("new_sentences").toString(), "Rule new.");
     assertEquals(2, sum.get("new_sentences").getAsInt(), up.toString());
+    Document updated = (Document) Core.node(copies, up.get("new_document").getAsString());
+    assertEquals(n, updated.getShownChildren().size());
+    int lastStart = -1;
+    for (TreeNode child : updated.getShownChildren()) {
+      var location = (com.unitesk.requality.nodetype.Location) child;
+      int start = location.getFragments().get(0)[0];
+      assertTrue(start > lastStart, "locations must remain in document order");
+      lastStart = start;
+      assertEquals(1, location.getRequirements().length);
+    }
   }
 
   @Test
@@ -2010,6 +2047,44 @@ class McpServerTest {
           updater.shouldBeApplied(node, changedAttribute(TreeDB.INDEX_ATTRIBUTE),
               com.unitesk.requality.core.events.Moment.AFTER), method.toString());
     }
+  }
+
+  @Test
+  @Order(30)
+  void aFailedLocationBatchRestoresChildUpdatesAndRollsBack() throws Exception {
+    JsonObject init = new JsonObject();
+    init.addProperty("protocolVersion", "2025-06-18");
+    rpc("initialize", init);
+    call("create_project", "name", "LocationBatch");
+    File file = new File(root, "batch.html");
+    Files.writeString(file.toPath(), "<html><body><p>The system shall stop.</p></body></html>");
+    String path = call("import_document", "project", "LocationBatch", "file", file.getAbsolutePath()).get("path").getAsString();
+    TreeDB db = core.db("LocationBatch");
+    Session.dryRun(db, "Failed batch", () -> {
+      Document doc = (Document) Core.node(db, path);
+      org.junit.jupiter.api.Assertions.assertThrows(IllegalStateException.class, () ->
+          doc.createLocations(3, (index, location) -> {
+            if (index == 1)
+              throw new IllegalStateException("initializer failed");
+            location.setDescription("first");
+          }));
+      assertEquals(2, doc.getShownChildren().size(), "failed initialization still publishes the created children");
+      doc.createLocation();
+      assertEquals(3, doc.getShownChildren().size(), "ordinary child updates resume after failure");
+      return null;
+    });
+    assertEquals(0, Core.node(db, path).getShownChildren().size(), "rollback removes every partially created location");
+    Core.transaction(db, "Create after rollback", true, true, () -> {
+      Document doc = (Document) Core.node(db, path);
+      assertTrue(doc.createLocations(0, (index, location) -> {
+        throw new AssertionError("empty batch must not call initializer");
+      }).isEmpty());
+      doc.createLocations(2, (index, location) -> location.setDescription("location " + index));
+      assertEquals(2, doc.getShownChildren().size());
+      return null;
+    });
+    call("open_project", "project", "LocationBatch");
+    assertEquals(2, Core.node(core.db("LocationBatch"), path).getShownChildren().size(), "locations survive reload");
   }
 
   private static com.unitesk.requality.core.operation.ChangesSet<com.unitesk.requality.core.attribute.Attribute>

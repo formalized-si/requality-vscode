@@ -638,7 +638,10 @@ final class SpecUpdate {
       throw new ToolError("The locations of " + oldDoc.getQualifiedId() + " belong to no requirement (was it updated already, "
           + "with detach_old?): nothing to move");
     // one new location for each set of ranges: the old locations that move to the same text share it
-    Map<String, Location> byRanges = new java.util.HashMap<>();
+    Map<String, Integer> byRanges = new java.util.HashMap<>();
+    List<List<Object>> markups = new ArrayList<>();
+    List<String> descriptions = new ArrayList<>();
+    Map<Move, Integer> assignedLocations = new LinkedHashMap<>();
     for (Move mv : moves) {
       if (mv.newRanges.isEmpty())
         continue;
@@ -649,27 +652,39 @@ final class SpecUpdate {
           frags.add(r[0] + Location.FRAGMENT_SEPARATOR + r[1]);
       frags.sort(Location.FRAGMENT_SORTER);
       String key = frags.toString();
-      Location l = byRanges.get(key);
-      if (l == null) {
-        l = newDoc.createLocation(null);
-        l.attrs().setConstAttribute(Location.ATTR_MARKUP, new ListValue(AttributeType.STRING, frags), Flag.HIDDEN);
-        l.setDescription("<p>" + Changes.escape(String.join(" ", new java.util.LinkedHashSet<>(mv.newTexts))) + "</p>");
-        l.commitAttributes();
-        byRanges.put(key, l);
+      Integer index = byRanges.get(key);
+      if (index == null) {
+        index = markups.size();
+        markups.add(frags);
+        descriptions.add("<p>" + Changes.escape(String.join(" ", new java.util.LinkedHashSet<>(mv.newTexts))) + "</p>");
+        byRanges.put(key, index);
       }
+      assignedLocations.put(mv, index);
+    }
+    List<Location> locations = newDoc.createLocations(markups.size(), (index, l) -> {
+      l.attrs().setConstAttribute(Location.ATTR_MARKUP, new ListValue(AttributeType.STRING, markups.get(index)), Flag.HIDDEN);
+      l.setDescription(descriptions.get(index));
+    });
+    Set<Requirement> changedRequirements = new java.util.LinkedHashSet<>();
+    for (Map.Entry<Move, Integer> assignment : assignedLocations.entrySet()) {
+      Move mv = assignment.getKey();
+      Location l = locations.get(assignment.getValue());
       for (Requirement r : mv.requirements)
         if (!r.getLocations(false).contains(l)) {
           r.addLocation(l.getUUId());
-          r.commitAttributes();
+          changedRequirements.add(r);
         }
       mv.created = l;
     }
     if (detachOld)
       for (Move mv : moves)
         for (Requirement r : mv.requirements) {
-          r.removeLocation(mv.old);
-          r.commitAttributes();
+          if (r.removeLocation(mv.old))
+            changedRequirements.add(r);
         }
+    // Publish the final references once per requirement, rather than writing an intermediate old+new set.
+    for (Requirement r : changedRequirements)
+      r.commitAttributes();
     // the result for each requirement (a requirement can have several locations in the document)
     Map<Requirement, List<Move>> byReq = new LinkedHashMap<>();
     for (Move mv : moves)

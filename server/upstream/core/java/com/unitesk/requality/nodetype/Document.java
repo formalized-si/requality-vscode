@@ -105,10 +105,17 @@ public class Document extends TreeNode implements ITreeChangeListener, INodeChan
   private freemarker.ext.dom.NodeModel modelCache = null;
   private freemarker.ext.dom.NodeModel modelLocCache = null;
 
+  // VSCODE-PATCH: a version update creates many locations in one transaction. Publish their child list once,
+  // after their markup is set, instead of re-sorting an ever-growing list for each new location.
+  private boolean creatingLocations;
+
   @Override
   protected void addChildUUID(UUID uid) {
     //resetCache();
-    super.addChildUUID(uid);
+    if (creatingLocations)
+      super.addChildUUID(uid, OFlag.NO_UPDATE);
+    else
+      super.addChildUUID(uid);
   };
 
   @Override
@@ -447,6 +454,36 @@ public class Document extends TreeNode implements ITreeChangeListener, INodeChan
             getTreeDB().createChildNode(id, getUUId(), id.toString(), Location.TYPE_NAME, true);
     // saveDOM(); // moved to ReqMarker.addSelectionTo
     return l;
+  }
+
+  /**
+   * Creates and initializes locations in the caller's transaction, then publishes the complete ordered child list.
+   * The initializer sets the location's attributes; it must not read the document's derived child lists or create
+   * more locations. Attribute commits, node creation events and transaction undo remain active for every location.
+   */
+  public List<Location> createLocations(int count, java.util.function.BiConsumer<Integer, Location> initialize) {
+    if (count < 0 || creatingLocations)
+      throw new IllegalArgumentException("Invalid or nested location batch");
+    java.util.Objects.requireNonNull(initialize);
+    List<Location> result = new java.util.ArrayList<>(count);
+    if (count == 0)
+      return result;
+    getChildrenRelatedVirtuals();
+    creatingLocations = true;
+    try {
+      for (int i = 0; i < count; i++) {
+        Location location = createLocation();
+        result.add(location);
+        initialize.accept(i, location);
+        location.commitAttributes();
+      }
+      return result;
+    } finally {
+      creatingLocations = false;
+      // Also restore a consistent child list on failure; the caller can then roll back the transaction.
+      updateLocalAttribute(TreeNode.ATTR_CHILDREN_UUIDS);
+      commitAttributes();
+    }
   }
 
   private class RegionDescription {

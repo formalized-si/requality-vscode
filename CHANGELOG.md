@@ -2,6 +2,9 @@
 
 ## 1.5.0 (pre-release)
 
+- Specification updates create document locations as a batch and rebuild their ordered child list once, keeping
+  location attributes, links and undo history while avoiding a full re-sort for every new location. Each requirement's
+  final references are committed once instead of writing an intermediate set with both old and new locations.
 - Bulk document updates avoid re-sorting every sibling after each location change when the catalog is sorted by
   name or index. Sorting by document locations still updates immediately.
 - Search, trace coverage, test coverage and Git comparison support bounded result pages (`offset`, `limit`,
