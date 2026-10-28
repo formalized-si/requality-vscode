@@ -338,6 +338,7 @@ If the minor number of the version is odd, the packages and the GitHub release a
 - The integration tests use the `native` mode first. Then they use the `eclipse` mode and push keys in its webview.
 - The CI workflow (`.github/workflows/ci.yml`) runs the tests on Linux and on Windows.
 - `npm run media` makes the pictures of this file (`media/readme`) with the ETSI catalog.
+  See [refreshing the demo media](docs/MEDIA.md) to update the matching Formalized website assets in the same run.
 
 ### Windows registry test
 
