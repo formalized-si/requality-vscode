@@ -8,16 +8,29 @@ name: Release
 #     --signer-workflow formalized-si/requality-vscode/.github/workflows/release.yml
 #
 # The build job runs the build tools (npm install scripts, Gradle) with read access only and no stored credentials. The
-# publish job, which can write, sign and publish, runs no build tool: it takes the files of the build job.
+# publish job writes the GitHub release and attestations. Independent store jobs have read-only GitHub access and
+# publish the exact release assets. A manual run retries an existing release without rebuilding or recreating it.
 # The actions are pinned by commit.
 on:
   push:
     tags: ['v*']
   workflow_dispatch:
+    inputs:
+      release_tag:
+        description: 'Existing GitHub release tag to publish (no rebuild)'
+        type: string
+        required: true
+      registry:
+        description: 'Registry to retry'
+        type: choice
+        options: [both, marketplace, open-vsx]
+        default: both
+        required: true
 permissions:
   contents: read
 jobs:
   build:
+    if: github.event_name == 'push'
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -51,6 +64,7 @@ jobs:
             release/requality-mcp-*
           if-no-files-found: error
   publish:
+    if: github.event_name == 'push'
     needs: build
     runs-on: ubuntu-latest
     permissions:
@@ -62,7 +76,6 @@ jobs:
         with:
           name: requality-vscode-packages
           path: release
-      # a manual run (workflow_dispatch) can build any branch: only a tag gets an attestation
       - uses: actions/attest-build-provenance@e8998f949152b193b063cb0ec769d69d929409be # v2
         if: startsWith(github.ref, 'refs/tags/')
         with:
@@ -82,20 +95,68 @@ jobs:
           pre=$([ $((minor % 2)) -eq 1 ] && echo --prerelease || true)
           gh release create "$GITHUB_REF_NAME" release/*.vsix release/requality-mcp-* --repo "$GITHUB_REPOSITORY" \
             --title "$GITHUB_REF_NAME" --notes-file source/CHANGELOG.md $pre
-      # the tokens are given only to the steps that publish; the publishing tools are installed without install scripts
+  stores:
+    name: Publish (${{ matrix.registry }})
+    needs: publish
+    if: ${{ !cancelled() && (github.event_name == 'workflow_dispatch' || needs.publish.result == 'success') }}
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    strategy:
+      fail-fast: false
+      matrix:
+        registry: ${{ github.event_name == 'workflow_dispatch' && inputs.registry != 'both' && fromJSON(format('["{0}"]', inputs.registry)) || fromJSON('["marketplace", "open-vsx"]') }}
+    concurrency:
+      group: stores-${{ matrix.registry }}-${{ inputs.release_tag || github.ref_name }}
+      cancel-in-progress: false
+    env:
+      RELEASE_TAG: ${{ inputs.release_tag || github.ref_name }}
+    steps:
+      - name: Require publishing credential
+        env:
+          PUBLISH_TOKEN: ${{ secrets[format('{0}_PAT', matrix.registry == 'marketplace' && 'VSCE' || 'OVSX')] }}
+          SECRET_NAME: ${{ matrix.registry == 'marketplace' && 'VSCE_PAT' || 'OVSX_PAT' }}
+        run: |
+          if [ -z "$PUBLISH_TOKEN" ]; then
+            echo "::error::Missing $SECRET_NAME. Store publication has not happened. Add the secret and retry this existing release."
+            exit 1
+          fi
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+          sparse-checkout: scripts/verify-release-vsix.py
+          sparse-checkout-cone-mode: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: 22
+      - name: Download and verify the existing release VSIX
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          if [[ ! "$RELEASE_TAG" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "::error::Expected an existing release tag v<major>.<minor>.<patch>"
+            exit 1
+          fi
+          gh release view "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" \
+            --json tagName,isDraft,isPrerelease,assets > "$RUNNER_TEMP/release.json"
+          python3 scripts/verify-release-vsix.py "$RUNNER_TEMP/release.json" "$RELEASE_TAG"
+          gh release download "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" --pattern '*.vsix' --dir release
+          python3 scripts/verify-release-vsix.py "$RUNNER_TEMP/release.json" "$RELEASE_TAG" release
+      # No dependency of the extension or build script runs in these jobs. The PAT is exposed only to publishing.
+      - name: Install the pinned publishing tool without install scripts
+        env:
+          PUBLISH_TOOL: ${{ matrix.registry == 'marketplace' && '@vscode/vsce@4.0.0' || 'ovsx@1.3.0' }}
+        run: npm install --prefix "$RUNNER_TEMP/publisher" --ignore-scripts --no-package-lock --no-audit --no-fund "$PUBLISH_TOOL"
       - name: Visual Studio Marketplace
-        if: startsWith(github.ref, 'refs/tags/')
+        if: matrix.registry == 'marketplace'
         env:
           VSCE_PAT: ${{ secrets.VSCE_PAT }}
-          npm_config_ignore_scripts: 'true'
-        run: |
-          if [ -z "$VSCE_PAT" ]; then echo "No VSCE_PAT"; exit 0; fi
-          npx --yes @vscode/vsce@4.0.0 publish --packagePath release/*.vsix
+        run: '"$RUNNER_TEMP/publisher/node_modules/.bin/vsce" publish --packagePath release/*.vsix --skip-duplicate'
       - name: Open VSX
-        if: startsWith(github.ref, 'refs/tags/')
+        if: matrix.registry == 'open-vsx'
         env:
           OVSX_PAT: ${{ secrets.OVSX_PAT }}
-          npm_config_ignore_scripts: 'true'
         run: |
-          if [ -z "$OVSX_PAT" ]; then echo "No OVSX_PAT"; exit 0; fi
-          for f in release/*.vsix; do npx --yes ovsx@1.3.0 publish "$f" -p "$OVSX_PAT"; done
+          for f in release/*.vsix; do
+            "$RUNNER_TEMP/publisher/node_modules/.bin/ovsx" publish "$f" --skip-duplicate
+          done
