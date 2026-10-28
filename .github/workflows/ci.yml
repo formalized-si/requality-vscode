@@ -22,6 +22,7 @@ jobs:
         with:
           distribution: temurin
           java-version: 21
+      - run: python3 -m unittest discover -s test/release -v
       - run: npm ci
       - run: npm run check
       - run: npm run build

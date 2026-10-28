@@ -330,6 +330,17 @@ The status bar shows the current perspective. Click it to open the **Open Perspe
 The workflow `.github/workflows/release.yml` makes a release for a tag `v<version>`.
 It publishes the packages to the Visual Studio Marketplace (secret `VSCE_PAT`) and to Open VSX (secret `OVSX_PAT`).
 If the minor number of the version is odd, the packages and the GitHub release are pre-releases.
+Store publication fails explicitly when its token is missing; the other registry still runs independently.
+
+To retry an existing release (including a partially published one), run:
+
+```sh
+gh workflow run release.yml --ref main -f release_tag=v1.5.0 -f registry=both
+```
+
+Use `registry=marketplace` or `registry=open-vsx` to retry one store. A manual run downloads the seven VSIX from the
+existing GitHub release, checks their SHA-256 digests, identities, platforms and pre-release markers, and skips
+versions already published. It does not build packages, move the tag, recreate the release or reissue MCP attestations.
 
 ## Test
 

@@ -14,3 +14,6 @@ server/.gradle/
 server/logs/
 /release/
 /jre/
+
+# Python release verification tests
+__pycache__/
