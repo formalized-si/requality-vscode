@@ -142,6 +142,8 @@ public class Shell extends Composite {
     o.addProperty("title", text);
     o.addProperty("host", host);
     o.addProperty("view", hostView);
+    // a modal shell (a dialog) runs a nested event loop until it is closed; a workbench part does not
+    o.addProperty("modal", (getStyle() & (SWT.APPLICATION_MODAL | SWT.PRIMARY_MODAL | SWT.SYSTEM_MODAL)) != 0);
     Display.Transport t = Display.transport();
     if (t != null)
       t.openShell(this, o);

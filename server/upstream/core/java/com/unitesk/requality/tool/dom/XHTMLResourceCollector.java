@@ -72,6 +72,23 @@ public class XHTMLResourceCollector {
     }
     p = Pattern.compile(sb.toString(), Pattern.MULTILINE | Pattern.DOTALL);
   }
+  /**
+   * VSCODE-PATCH: a check of each URL and file the import reads for a document (null: none). The MCP server allows only
+   * the files of its folders and no URL. A refused reference is not read and goes to {@link #REFUSED}.
+   */
+  public static volatile java.util.function.Predicate<Object> guard;
+  /** VSCODE-PATCH: the references the guard refused (the caller clears and reads it). */
+  public static final java.util.List<String> REFUSED = java.util.Collections.synchronizedList(new java.util.ArrayList<>());
+
+  /** VSCODE-PATCH: throws when the guard refuses the URL or file of a reference. */
+  private static void check(Object target, String ref) throws IOException {
+    java.util.function.Predicate<Object> g = guard;
+    if (g != null && !g.test(target)) {
+      REFUSED.add(ref);
+      throw new IOException("The reference " + ref + " is refused");
+    }
+  }
+
   private final TagNode root;
   private final String src;
   private final String dst;
@@ -179,6 +196,7 @@ public class XHTMLResourceCollector {
               if (isExternalHref(href)) {
                 // TODO http/ftp files loading?
                 if (href.startsWith("https") || href.startsWith("ftp")) {
+                  check(href, href);
                   URL srcUrl = new URL(href);
                   InputStream in = null;
                   try {
@@ -198,8 +216,10 @@ public class XHTMLResourceCollector {
                 href = CoreUtils.URLDecode(href);
                 f = file.toPath().resolve(href).toFile();
                 fname = f.getName();
-                if (f.exists())
+                if (f.exists()) {
+                  check(f, href);
                   fis = getLowerCssStream(f);
+                }
               }
               if (fis != null) {
                 String rname = "css/" + fname;
@@ -539,6 +559,7 @@ public class XHTMLResourceCollector {
         doc.setResourceContent("imgs/" + name2 + "." + ext, new ByteArrayInputStream(content), OFlag.NONE);
       } else if (docImgSrc.startsWith("http:/") || docImgSrc.startsWith("https:/")
           || docImgSrc.startsWith("ftp:/")) {
+        check(docImgSrc, encodedDocImgSrc);
         URL srcUrl = new URL(docImgSrc);
         InputStream in = srcUrl.openConnection().getInputStream();
         try {
@@ -559,6 +580,7 @@ public class XHTMLResourceCollector {
           in.close();
         }
       } else if (docImgSrc.startsWith("file:/")) {
+        check(new File(new URI(encodedDocImgSrc)), encodedDocImgSrc);
         FileInputStream fis2 = new FileInputStream(new File(new URI(encodedDocImgSrc)));
         try {
           doc.setResourceContent(dstFile, fis2, OFlag.NONE);
@@ -570,8 +592,12 @@ public class XHTMLResourceCollector {
       } else {
         String sourcePath = src + "/" + docImgSrc;
         File sf = new File(sourcePath);
-        if (!sf.exists())
+        // VSCODE-PATCH: an absolute path, not a path in the current folder of the process (a missing file of a document
+        // copied the file of that name from the folder the server runs in)
+        if (!sf.exists() && new File(docImgSrc).isAbsolute())
           sf = new File(docImgSrc);
+        if (sf.exists())
+          check(sf, encodedDocImgSrc);
         FileInputStream fis2 = new FileInputStream(sf);
         try {
           doc.setResourceContent(dstFile, fis2, OFlag.NONE);

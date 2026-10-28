@@ -165,6 +165,10 @@ public class ReportGenerator {
       try {
         Configuration cfg = new Configuration();
         cfg.setObjectWrapper(new DefaultObjectWrapper());
+        // VSCODE-PATCH: a template cannot make Java objects that run programs or scripts (?new of Execute,
+        // ObjectConstructor, JythonRuntime) nor reach the Java API of the data (?api)
+        cfg.setNewBuiltinClassResolver(freemarker.core.TemplateClassResolver.SAFER_RESOLVER);
+        cfg.setAPIBuiltinEnabled(false);
   
         File f = new File(URI.create(cont.template.getReportPath()));
         cfg.setDirectoryForTemplateLoading(f.getParentFile());

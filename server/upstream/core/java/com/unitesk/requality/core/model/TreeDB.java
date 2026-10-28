@@ -2024,6 +2024,39 @@ public class TreeDB implements ICacheStorageProvider, IMultiPartDataProvider{
   }
 
   /**
+   * VSCODE-PATCH: discard an uncommitted transaction without inverse operations on the base storage. The caller must
+   * immediately reload this tree: node objects and indexes can still contain the discarded changes. Used by the MCP
+   * server after a failed or dry-run structural edit, whose inverse operations could delete untouched directories.
+   */
+  public synchronized void discardTransactionForReload() {
+    if (isVirtual) {
+      TreeDB root = Instantiator.getRootTree(this);
+      if (root != this)
+        root.discardTransactionForReload();
+      return;
+    }
+    if (!(storage instanceof TransactionStorage))
+      throw new IllegalStateException("transaction not started");
+    String lname = getLocalName(), pname = getProjectName();
+    TransactionStorage abandoned = (TransactionStorage) storage;
+    while (!que.isEmpty()) {
+      Future<?> task = que.poll();
+      if (task != null && !task.isDone())
+        task.cancel(true);
+    }
+    storage = abandoned.getStorage();
+    storage.setDeltaTarget(storageDeltaListener);
+    abandoned.setDeltaTarget(nullDeltaListener);
+    getGuiChanges().clear();
+    try {
+      abandoned.dispose();
+    } finally {
+      stopChangeRow();
+      TreeStateManager.getOne(getTracker()).setState(lname, pname, this, TreeState.READY);
+    }
+  }
+
+  /**
    * Add listener on transactions events
    *
    * @param l listener to add

@@ -3,3 +3,4 @@
 *.cmd text eol=crlf
 server/gradlew text eol=lf
 *.sh text eol=lf
+server/src/main/dist/bin/requality-mcp text eol=lf

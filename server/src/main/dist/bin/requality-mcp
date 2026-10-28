@@ -1,0 +1,58 @@
+#!/bin/sh
+# Requality MCP server: Requality without a window, for AI agents (Model Context Protocol on standard input/output).
+#
+# Usage: requality-mcp [options] [<folder with Requality catalogs>...]   (default folder: the current one;
+# requality-mcp --help lists the options)
+#
+# Java: $REQUALITY_JAVA, else the Java runtime of the package (jre/, or the one of the VS Code extension), else
+# $JAVA_HOME, else java on the PATH (Java 17 or later). $REQUALITY_JAVA_OPTS replaces the default -Xmx2g.
+# Java runs in the folder of the package; relative arguments start in the current folder.
+set -e
+unset CDPATH
+script="$0"
+# a link to the script (for example in ~/bin) points to the package
+hops=0
+while [ -h "$script" ]; do
+  hops=$((hops + 1))
+  if [ "$hops" -gt 40 ]; then
+    echo "requality-mcp: too many links to $0" >&2
+    exit 1
+  fi
+  link=$(readlink "$script")
+  case "$link" in
+    /*) script="$link" ;;
+    *) script="$(dirname "$script")/$link" ;;
+  esac
+done
+# the physical folder, not a path through a link (an installer can point the link to another version while Java runs)
+home=$(cd -P -- "$(dirname -- "$script")/.." && pwd -P)
+# relative arguments start in the current folder (Java runs in the folder of the package)
+REQUALITY_CWD=$(pwd)
+export REQUALITY_CWD
+if [ -n "$REQUALITY_JAVA" ]; then
+  java="$REQUALITY_JAVA"
+elif [ -x "$home/jre/bin/java" ]; then
+  java="$home/jre/bin/java"
+elif [ -x "$home/../../jre/bin/java" ]; then
+  # dist/server of the VS Code extension: the runtime is jre/ of the extension
+  java="$home/../../jre/bin/java"
+elif [ -n "$JAVA_HOME" ] && [ -x "$JAVA_HOME/bin/java" ]; then
+  java="$JAVA_HOME/bin/java"
+else
+  java=java
+fi
+# a command name is found on the PATH, a relative path starts in the current folder: both before the cd below
+case "$java" in
+  */*) ;;
+  *) java=$(command -v "$java" || echo "$java") ;;
+esac
+case "$java" in
+  /* | "") ;;
+  */*) java="$REQUALITY_CWD/$java" ;;
+esac
+cd "$home"
+# the options are words: no quotes
+# shellcheck disable=SC2086
+exec "$java" ${REQUALITY_JAVA_OPTS:--Xmx2g} -Dfile.encoding=UTF-8 -Djava.awt.headless=true \
+  --add-opens java.base/java.lang=ALL-UNNAMED -cp "$home/lib/*" \
+  com.unitesk.requality.vscode.mcp.McpMain --resources "$home/resources" "$@"

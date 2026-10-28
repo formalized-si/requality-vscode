@@ -94,6 +94,15 @@ async function connect(port: number): Promise<{ page: Cdp }> {
 
 async function main(): Promise<void> {
   const root = path.resolve(__dirname, '..', '..', '..');
+  // One recording supplies both the repository and the existing Formalized project page.
+  // Validate the optional destination before launching VS Code or replacing any media.
+  const site = process.env.REQUALITY_MEDIA_SITE ? path.resolve(process.env.REQUALITY_MEDIA_SITE) : undefined;
+  const siteAssets = site && path.join(site, 'dist', 'projects', 'requality-vscode', 'assets');
+  if (siteAssets && (!fs.existsSync(path.join(site!, '.openai', 'hosting.json')) || !fs.existsSync(siteAssets))) {
+    throw new Error(`REQUALITY_MEDIA_SITE must be the existing Formalized site checkout: ${site}`);
+  }
+  execFileSync('ffmpeg', ['-version'], { stdio: 'ignore' });
+  execFileSync('ffprobe', ['-version'], { stdio: 'ignore' });
   const catalog = path.join(root, 'server', 'build', 'test-catalogs', 'etsi', 'TS103096');
   if (!fs.existsSync(catalog)) {
     throw new Error(`${catalog} is missing: run "npm run test:server" first (it downloads the catalog).`);
@@ -101,8 +110,11 @@ async function main(): Promise<void> {
   const work = fs.mkdtempSync(path.join(os.tmpdir(), 'requality-media-'));
   const workspace = path.join(work, 'workspace');
   const frames = path.join(work, 'frames');
+  const generated = path.join(work, 'generated');
   fs.mkdirSync(workspace, { recursive: true });
   fs.mkdirSync(frames, { recursive: true });
+  fs.mkdirSync(generated, { recursive: true });
+  console.log(`Recording in ${work}; existing repository/site media stays unchanged until capture and encoding succeed.`);
   const userSettings = path.join(work, 'user-data', 'User');
   fs.mkdirSync(userSettings, { recursive: true });
   fs.writeFileSync(path.join(userSettings, 'settings.json'), JSON.stringify({
@@ -161,7 +173,7 @@ async function main(): Promise<void> {
   // the title bar of the window (the Extension Development Host) is cut from the pictures
   const crop = `crop=${WIDTH}:${HEIGHT - TITLE_BAR}:0:${TITLE_BAR}`;
   for (const [frame, file] of SCREENSHOTS) {
-    execFileSync('ffmpeg', ['-y', '-loglevel', 'error', '-i', path.join(frames, `${frame}.png`), '-vf', crop, path.join(out, file)]);
+    execFileSync('ffmpeg', ['-y', '-loglevel', 'error', '-i', path.join(frames, `${frame}.png`), '-vf', crop, path.join(generated, file)]);
   }
   // the GIF: the frames for their times, 960 pixels wide, with one palette made of all of them
   const list = path.join(frames, 'frames.txt');
@@ -169,7 +181,36 @@ async function main(): Promise<void> {
     + `file '${path.join(frames, GIF_FRAMES[GIF_FRAMES.length - 1][0] + '.png')}'\n`);
   execFileSync('ffmpeg', ['-y', '-loglevel', 'error', '-f', 'concat', '-safe', '0', '-i', list,
     '-vf', `${crop},scale=960:-1:flags=lanczos,split[a][b];[a]palettegen=max_colors=128[p];[b][p]paletteuse=dither=none`,
-    '-loop', '0', path.join(out, 'overview.gif')]);
+    '-loop', '0', path.join(generated, 'overview.gif')]);
+  const probe = JSON.parse(execFileSync('ffprobe', ['-v', 'error', '-show_entries',
+    'stream=width,height,nb_frames:format=duration', '-of', 'json', path.join(generated, 'overview.gif')],
+  { encoding: 'utf8' })) as { streams: Array<{ width: number; height: number; nb_frames: string }>; format: { duration: string } };
+  const gif = probe.streams[0];
+  const duration = Number(probe.format.duration);
+  const frameCount = Number(gif?.nb_frames);
+  const expectedDuration = GIF_FRAMES.reduce((sum, [, seconds]) => sum + seconds, 0);
+  if (!gif || gif.width !== 960 || gif.height !== 574 || !Number.isFinite(frameCount) || frameCount < GIF_FRAMES.length
+      || !Number.isFinite(duration) || duration < expectedDuration - 0.1) {
+    throw new Error(`Incomplete GIF: ${JSON.stringify(probe)}. Captures retained in ${work}`);
+  }
+  const files = ['overview.gif', ...SCREENSHOTS.map(([, file]) => file)];
+  for (const file of files) {
+    fs.copyFileSync(path.join(generated, file), path.join(out, file));
+  }
+  if (siteAssets) {
+    for (const file of files) {
+      fs.copyFileSync(path.join(generated, file), path.join(siteAssets, file));
+    }
+    const revision = execFileSync('git', ['rev-parse', 'HEAD'], { cwd: root, encoding: 'utf8' }).trim();
+    fs.writeFileSync(path.join(siteAssets, 'README.txt'),
+      `Requality for VS Code screenshots and animated demonstration\n\n`
+      + `Recorded from formalized-si/requality-vscode at commit ${revision} on ${new Date().toISOString()}.\n`
+      + `overview.gif contains ${gif.nb_frames} frames, ${probe.format.duration} seconds, ${gif.width} × ${gif.height} pixels.\n`
+      + `All five media files come from the same VS Code recording of the ETSI integration-test catalogue.\n`
+      + `Project: https://github.com/formalized-si/requality-vscode\n`
+      + `The extension license is included as LICENSE-requality.txt. The original Requality code is Apache-2.0; see the upstream provenance in the project repository.\n`);
+    console.log(`Matching media copied to ${siteAssets}; deploy the existing Site after reviewing the recording.`);
+  }
   fs.rmSync(work, { recursive: true, force: true });
   console.log(`pictures in ${out}`);
 }

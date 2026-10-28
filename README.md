@@ -15,7 +15,24 @@ The extension uses the original Requality core and the original user interface c
 > **Unofficial port.** ISP RAS develops Requality. This extension is not a product of ISP RAS.
 > formalized.si made the port from the Requality source code that ISP RAS published under the Apache License 2.0.
 
+## Agent workflow
+
+![Live Requality MCP workflow: import a specification, create traceable requirements, check coverage, review a changed specification and revert it](media/readme/agent-flow.gif)
+
+This reproducible demo runs a scripted MCP client against the real Requality server. It shows the actual tool
+responses, including a changed stopping distance (60 → 55 m), a new untraced statement, and a verified revert.
+It is not a recording of a Codex or Claude conversation. [Full request/response transcript](media/readme/agent-flow.json).
+
+## VS Code workbench
+
 ![The Requality Explorer, the Properties view, the Document Editor and the UniEditor](media/readme/overview.gif)
+
+## Two ways to use Requality
+
+- **In VS Code:** the views, editors and wizards of the Eclipse plug-in (refer to [Features](#features)).
+- **Without a window:** an MCP server for the AI agents on your computer (Claude Code, Codex, Cursor and others).
+  You give the jobs to the agent, and the agent uses Requality. Refer to
+  [Requality without a window (MCP server)](#requality-without-a-window-mcp-server).
 
 ## Features
 
@@ -30,11 +47,13 @@ The extension uses the original Requality core and the original user interface c
 - The Properties, Outline, Links Explorer, Bookmarks, Tasks, History, Synchronize, Problems and Progress views
   are the Eclipse views.
 - The packages for Windows, Linux and macOS contain a Java runtime. You do not have to install Java.
+- An AI agent can use Requality without a window. Refer to [Requality without a window (MCP server)](#requality-without-a-window-mcp-server).
 
 ## How the port works
 
 - The extension starts a Java server. The server contains the Requality core and all 320 classes of the plug-in.
-- Each plug-in class is identical to its upstream class. Only the package names and the imports are different.
+- The port retains the upstream plug-in classes, with adapted package names and imports, compatibility fixes and
+  changes needed for headless execution.
 - A compatibility layer in the server implements the Eclipse APIs that the plug-in uses.
   These APIs are SWT, JFace, workbench, navigator, resources, team, commands, compare and LTK.
 - The server reads `plugin.xml` as Eclipse does.
@@ -74,6 +93,48 @@ To install a VSIX file (for example, from the GitHub releases):
 
 The extension starts the Requality server.
 The **Requality** side bar and the **Requality** panel show the views of the Requality perspective.
+
+## Requality without a window (MCP server)
+
+In VS Code, run **Requality: Connect AI Agent (MCP)...** to prepare a configuration for Codex, VS Code,
+Claude Code, Claude Desktop or Cursor. It uses the Java runtime of the extension and all open local workspace
+folders. Review the configuration in the editor and copy it into the agent's settings. Close the catalog in
+Requality before using it from the agent; only one process can open it at a time.
+
+The Requality MCP server is Requality without a window, for AI agents on your computer (Claude Code, Codex, Cursor
+and others). The agent starts the server and uses its tools through the Model Context Protocol.
+The tools follow the jobs of a requirements engineer:
+
+- turn a specification into requirements with document locations;
+- move the traceability to a new version of a specification;
+- show the coverage by document text and by tests;
+- show the changes of the agent for a review, with undo and revert, and compare a catalog with a Git revision.
+
+The agent also imports ReqIF files, changes the project settings (attributes, enumerations, mandatory attributes,
+checker rules) and makes the reports.
+
+The installers and the archives come with the releases from version 1.5.0. To install on macOS or Linux (the script
+downloads the archive with a Java runtime from the GitHub releases):
+
+```
+curl -fsSL https://raw.githubusercontent.com/formalized-si/requality-vscode/main/scripts/install-mcp.sh -o install-mcp.sh
+sh install-mcp.sh
+claude mcp add requality -- ~/.local/bin/requality-mcp /path/to/catalogs
+```
+
+The script verifies the build provenance attestation of the archive with the GitHub CLI (`gh auth login`); without
+`gh`, set `REQUALITY_MCP_UNVERIFIED=1` to install with the SHA-256 check only.
+On Windows, use `scripts/install-mcp.ps1`. Before version 1.5.0 is released, build the server from the source code
+(refer to [docs/MCP.md](docs/MCP.md#install)). From version 1.5.0, the VS Code extension contains the same server:
+`dist/server/bin/requality-mcp`.
+
+- Only one Requality process can open a catalog at a time. Two sessions of the agent take turns: an idle session
+  releases a catalog when the other one needs it. VS Code keeps a catalog until you close it there.
+- The agent can import files and write reports only in the folders of the catalogs, in the `--allow` folders and in
+  the folders that you allow when the agent asks.
+- A catalog of an older Requality is converted only after a backup (`convert_project`).
+
+Refer to [docs/MCP.md](docs/MCP.md) for the other agents, the tools, the options and the features that need a window.
 
 ## Eclipse views in VS Code
 
@@ -263,6 +324,8 @@ The status bar shows the current perspective. Click it to open the **Open Perspe
 5. Run `npm run package`. This command makes the file `requality-vscode-1.5.0.vsix` without a Java runtime.
 6. To make the packages of a release, run `npm run package:platforms`.
    This command makes one VSIX file for each platform with a Java runtime, and one without, in `release/`.
+7. To make the archives of the MCP server, run `npm run package:mcp`.
+   This command makes one archive for each platform with a Java runtime, and one without, in `release/`.
 
 The workflow `.github/workflows/release.yml` makes a release for a tag `v<version>`.
 It publishes the packages to the Visual Studio Marketplace (secret `VSCE_PAT`) and to Open VSX (secret `OVSX_PAT`).
@@ -275,6 +338,7 @@ If the minor number of the version is odd, the packages and the GitHub release a
 | `npm run test:server` | The Java tests of the server. |
 | `npm run test:unit` | The unit tests of the renderer and of the extension. |
 | `npm run test:integration` | The tests of the extension in a VS Code that the test downloads. |
+| `npm run test:mcp` | The test of `dist/server/bin/requality-mcp`: its options, and two sessions of an agent (a change of the first session is reverted in the second one). |
 | `npm test` | All the tests above. |
 
 - The server tests download the public ETSI TS 103 096 catalog into `server/build/test-catalogs`.
@@ -284,6 +348,7 @@ If the minor number of the version is odd, the packages and the GitHub release a
 - The integration tests use the `native` mode first. Then they use the `eclipse` mode and push keys in its webview.
 - The CI workflow (`.github/workflows/ci.yml`) runs the tests on Linux and on Windows.
 - `npm run media` makes the pictures of this file (`media/readme`) with the ETSI catalog.
+  See [refreshing the demo media](docs/MEDIA.md) to update the matching Formalized website assets in the same run.
 
 ### Windows registry test
 
@@ -315,8 +380,9 @@ The Requality core does not load these nodes. The catalog data causes these mess
 | `server/src/main/java/.../vscode/port/` | The ported Eclipse plug-in classes. |
 | `server/src/main/java/.../vscode/ui/` | The compatibility layer: SWT, JFace, workbench and the other Eclipse APIs. |
 | `server/src/main/java/.../vscode/services/` | The JSON-RPC services of the server. |
+| `server/src/main/java/.../vscode/mcp/` | The headless server and its MCP server (tools for AI agents). |
 | `scripts/` | The tools for the port, and the generators of the manifest and of the parity report. |
-| `docs/` | `PARITY.md` (generated), `PORTING-GUIDE.md` and `command-map.json`. |
+| `docs/` | `MCP.md`, `PARITY.md` (generated), `PORTING-GUIDE.md` and `command-map.json`. |
 
 ## License
 

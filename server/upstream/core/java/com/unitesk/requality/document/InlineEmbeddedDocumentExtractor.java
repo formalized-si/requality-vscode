@@ -60,8 +60,9 @@ public class InlineEmbeddedDocumentExtractor extends ParsingEmbeddedDocumentExtr
     TemporaryResources tmp = new TemporaryResources();
     try {
       CloseShieldInputStream csis = new CloseShieldInputStream(stream);
+      // VSCODE-PATCH: Tika 3 (no XXE in the XFA forms of a PDF) takes the metadata too
       final TikaInputStream newStream =
-          TikaInputStream.get(csis, tmp);
+          TikaInputStream.get(csis, tmp, metadata);
       try{
         if (stream instanceof TikaInputStream) {
           final Object container = ((TikaInputStream) stream).getOpenContainer();

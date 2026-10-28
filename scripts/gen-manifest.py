@@ -81,6 +81,7 @@ cmd('requality.showProperties', 'Show Properties', 'org.eclipse.ui.views.Propert
 cmd('requality.properties', 'Properties', 'org.eclipse.ui.file.properties (Alt+Enter): PropertiesActionProvider PropertyDialogAction, else PropertyDialogHandler', palette=False)
 cmd('requality.restartServer', 'Restart Requality Server', None)
 cmd('requality.showLog', 'Show Server Log', None)
+cmd('requality.configureMcp', 'Connect AI Agent (MCP)...', None)
 # ---- creation (CreateNode with requality.parameter.NodeType, dynamic New menu)
 cmd('requality.new', 'Other...', 'com.unitesk.requality.CreateDynNewMenu (NewMenuPoint)', palette=False)
 # The New submenu: Test (CreateTest) and the NewMenuPoint items (NewTypedTemplatedMenuPoint, with the active template)
@@ -543,6 +544,7 @@ LIGHT_IMG = toolitem('LightLinks', 'image')
 HIDE_CHECKED = toolitem('HideCompletedItems', 'checked')
 
 title = [
+    dict(command='requality.configureMcp', when=EXPL_VIEWS, group='mcp@1'),
     dict(command='requality.explorer.back', when=EXPL_VIEWS + ' && requality.explorer.frames', group='navigation@-3'),
     dict(command='requality.explorer.forward', when=EXPL_VIEWS + ' && requality.explorer.frames', group='navigation@-2'),
     dict(command='requality.explorer.up', when=EXPL_VIEWS + ' && requality.explorer.frames', group='navigation@-1'),

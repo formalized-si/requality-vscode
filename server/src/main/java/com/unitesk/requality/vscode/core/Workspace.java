@@ -58,6 +58,12 @@ public final class Workspace {
      * Eclipse.
      */
     public volatile boolean loading;
+    /** The tree is stopped and the catalog released for another process (the MCP server does it when idle). */
+    public volatile boolean released;
+    /** Why the catalog loaded without its lock (no folder for the lock files), or null when this process holds it. */
+    public volatile String unlocked;
+    /** When the last load of the tree started (the files read by it are not newer). */
+    public volatile long loadedAt;
 
     Project(File dir) {
       this(dir, true);
@@ -71,6 +77,11 @@ public final class Workspace {
   }
 
   private final RequalityServer server;
+  /** The start of the error of a project whose catalog another process holds (see CatalogLocks). */
+  public static final String LOCKED = "The catalog is open in another Requality process";
+
+  /** The catalogs this server loads are locked for it (one server per catalog, see CatalogLocks). */
+  private final CatalogLocks locks = CatalogLocks.forUser();
   /** The workspace folders (replaced as a whole when they change). */
   private volatile List<File> folders = new ArrayList<>();
   /** One discovery at a time: a scan and the application of its result are not interleaved with another scan. */
@@ -251,9 +262,11 @@ public final class Workspace {
     state.setClosed(p.dir, true);
     p.closed = true;
     // On the calling thread: the tracker calls this from its own jobs (version update), which the loader thread may
-    // be waiting for, so a load in progress must not be waited for here.
+    // be waiting for, so a load in progress must not be waited for here. During a load the catalog stays locked: a
+    // format conversion closes the project, writes the catalog and opens the project again; a load that ends with the
+    // project closed releases the lock.
     if (p.requality)
-      unload(p);
+      unload(p, false, p.loading);
     changed();
   }
 
@@ -396,7 +409,7 @@ public final class Workspace {
   /** Runs on the loader thread and waits for it. */
   private void submit(Runnable r) throws Exception {
     try {
-      loader.submit(r).get();
+      loader.submit(loading(r)).get();
     } catch (java.util.concurrent.RejectedExecutionException e) {
       // shutting down
     }
@@ -469,10 +482,21 @@ public final class Workspace {
     return false;
   }
 
+  /**
+   * A load or unload: the jobs and the work of the display that it starts and that run while it runs do not wait for
+   * the calls of the server (a call can wait for the load); the ones that run later do (see {@code Background}).
+   */
+  private static Runnable loading(Runnable r) {
+    return () -> com.unitesk.requality.vscode.ui.runtime.Background.holding(() -> {
+      r.run();
+      return null;
+    });
+  }
+
   /** Runs a load or unload on the loader thread (nothing after shutdown). */
   private void run(Runnable r) {
     try {
-      loader.execute(r);
+      loader.execute(loading(r));
     } catch (java.util.concurrent.RejectedExecutionException e) {
       // the server is shutting down
     }
@@ -492,6 +516,143 @@ public final class Workspace {
     for (Project p : projects())
       if (!p.closed)
         unload(p);
+    locks.releaseAll();
+  }
+
+  private final List<java.util.function.Consumer<Project>> loadListeners = new java.util.concurrent.CopyOnWriteArrayList<>();
+
+  /** Calls the listener on the loader thread when a project was loaded (the MCP server looks at its files then). */
+  public void onLoaded(java.util.function.Consumer<Project> l) {
+    loadListeners.add(l);
+  }
+
+  /** The projects whose catalog lock a thread waits for. */
+  private final java.util.Set<String> lockWaits = java.util.concurrent.ConcurrentHashMap.newKeySet();
+
+  /**
+   * Waits a while for the lock of a catalog another process holds (asking it to give the catalog up), then loads the
+   * project (once the lock is held; the load releases it when the project was closed or removed meanwhile).
+   */
+  private void awaitLock(Project p) {
+    if (!lockWaits.add(p.localName))
+      return;
+    Thread t = new Thread(() -> {
+      try {
+        if (locks.acquire(p.dir)) {
+          // the project loads now: until the load starts it is not reported locked
+          p.error = null;
+          run(() -> load(p));
+        }
+      } catch (IOException e) {
+        RLogger.logError(e);
+      } finally {
+        lockWaits.remove(p.localName);
+      }
+    }, "requality-catalog-lock-" + p.localName);
+    t.setDaemon(true);
+    t.start();
+  }
+
+  /** Waits again for the catalog of a project another process holds (see {@link #awaitLock}). */
+  public void requestLock(Project p) {
+    String e = p.error;
+    if (e != null && e.startsWith(LOCKED) && !p.closed)
+      awaitLock(p);
+  }
+
+  /** True while a thread waits for the lock of the catalog of the project. */
+  public boolean waitsForLock(Project p) {
+    return lockWaits.contains(p.localName);
+  }
+
+  /** True when another process waits for the catalog of the project, which this process holds. */
+  public boolean lockWanted(Project p) {
+    return locks.holds(p.dir) && locks.wanted(p.dir);
+  }
+
+  /** The folder of the lock files of the catalogs. */
+  public File lockFolder() {
+    return locks.folder();
+  }
+
+  /** The file systems whose locks need not exclude the processes of other computers or of other systems. */
+  private static final java.util.Set<String> NETWORK = java.util.Set.of("nfs", "nfs4", "smbfs", "cifs", "smb", "smb2", "smb3",
+      "afpfs", "webdav", "davfs", "fuse.sshfs", "sshfs", "9p", "v9fs", "drvfs", "fuse", "autofs");
+
+  /**
+   * A warning when the folder of the lock files is on a network file system (NFS, SMB, WSL drives): its locks may not
+   * exclude another process, so two processes could write one catalog; null when it is a local disk.
+   */
+  public String lockFolderWarning() {
+    try {
+      File dir = locks.folder();
+      dir.mkdirs();
+      String type = java.nio.file.Files.getFileStore(dir.toPath()).type().toLowerCase(java.util.Locale.ROOT);
+      if (NETWORK.contains(type) || type.startsWith("fuse.") || type.startsWith("nfs"))
+        return "The folder of the catalog locks " + dir + " is on a network file system (" + type + "): its locks may not "
+            + "keep another process from writing a catalog. Give a folder on a local disk with --locks";
+    } catch (IOException | RuntimeException e) {
+      // unknown: no warning
+    }
+    return null;
+  }
+
+  /**
+   * Takes the lock of a catalog this server is about to create: the tracker loads a catalog it creates itself, without
+   * {@link #load}. False when another process holds it.
+   */
+  public boolean lock(File dir) throws IOException {
+    return locks.acquire(dir);
+  }
+
+  /** Releases the lock of {@link #lock} (the catalog was not created). */
+  public void unlock(File dir) {
+    locks.release(dir);
+  }
+
+  /**
+   * Loads a loaded project again from its files (on the loader thread): its tree is stopped and loaded. False when the
+   * folder is not a project of the workspace.
+   */
+  public boolean reloadProject(File dir) {
+    Project p;
+    synchronized (this) {
+      p = null;
+      for (Project x : projects.values())
+        if (x.dir.getAbsoluteFile().equals(dir.getAbsoluteFile()))
+          p = x;
+    }
+    if (p == null)
+      return false;
+    Project fp = p;
+    // loading until the new load ends: no caller takes the tree that is stopped next, nor a tree in the middle
+    fp.loading = true;
+    run(() -> {
+      try {
+        // the catalog stays locked between the two: another process does not take it in the middle
+        unload(fp, false, true);
+        load(fp);
+      } finally {
+        fp.loading = false;
+      }
+    });
+    return true;
+  }
+
+  /**
+   * Stops the tree of a project and releases its catalog for another process; the project stays in the workspace (not
+   * closed). {@link #loadProject} loads it again.
+   */
+  public void releaseProject(File dir) {
+    Project p = byDir(dir);
+    if (p == null || p.closed || !p.requality)
+      return;
+    // released from now on: no caller takes the tree that the loader thread stops next (a load after it clears the mark)
+    p.released = true;
+    run(() -> {
+      unload(p);
+      changed();
+    });
   }
 
   /** (Re)loads the workspace project in a folder (on the loader thread); false when the folder is not a project. */
@@ -512,13 +673,21 @@ public final class Workspace {
 
   private void load(Project p) {
     EclipseTracker t = CoreBootstrap.tracker();
-    if (t == null || p.closed)
+    if (t == null)
       return;
-    // a project removed (or replaced) after this load was queued is not loaded
+    // a closed project, or one removed (or replaced) after this load was queued, is not loaded; a lock taken for it by
+    // the wait for another process goes
     synchronized (this) {
-      if (projects.get(p.localName) != p)
+      if (p.closed || projects.get(p.localName) != p) {
+        releaseUnloaded(p);
         return;
+      }
     }
+    // a new load clears the error of the last one (a lock that another process held, for example)
+    p.error = null;
+    p.released = false;
+    if (!lock(p))
+      return;
     // A project the tracker has open (created by the tracker, or already loading) is not loaded twice; a tree that
     // can be (re)loaded (not loaded, canceled, restart) is loaded.
     TreeDB open = Nodes.findDB(p.localName);
@@ -530,6 +699,7 @@ public final class Workspace {
       }
     }
     p.loading = true;
+    p.loadedAt = System.currentTimeMillis();
     changed();
     try {
       t.handleNewProject(p.dir.toURI(), p.localName, false, false);
@@ -547,6 +717,16 @@ public final class Workspace {
     } finally {
       p.loading = false;
     }
+    // a project that failed to load, or that was closed while it loaded (and not opened again), releases its catalog
+    if (p.closed || p.error != null)
+      releaseUnloaded(p);
+    else
+      for (java.util.function.Consumer<Project> l : loadListeners)
+        try {
+          l.accept(p);
+        } catch (RuntimeException e) {
+          RLogger.logError(e);
+        }
     // The tree may have come ready without an open notification (after a version update): the explorer shows it.
     com.unitesk.requality.vscode.services.ExplorerService.refreshAllNodes();
     changed();
@@ -561,6 +741,11 @@ public final class Workspace {
   }
 
   private void unload(Project p, boolean deleted) {
+    unload(p, deleted, false);
+  }
+
+  /** Stops the tree of the project; {@code keepLock} keeps the catalog locked (a load in progress continues). */
+  private void unload(Project p, boolean deleted, boolean keepLock) {
     TreeDB db = Nodes.findDB(p.localName);
     if (db != null) {
       try {
@@ -570,6 +755,49 @@ public final class Workspace {
         RLogger.logError(e instanceof Exception ? (Exception) e : new RuntimeException(e));
       }
     }
+    if (!keepLock)
+      locks.release(p.dir);
+  }
+
+  /**
+   * Takes the lock of the catalog of a project to load (this process may hold it already). False when another process
+   * holds it: the project tells it, and a thread waits for the lock and loads the project then.
+   */
+  private boolean lock(Project p) {
+    try {
+      if (!locks.tryAcquire(p.dir)) {
+        p.error = LOCKED + " (VS Code or requality-mcp): " + p.dir;
+        // a tree of this process without the lock (another process took it) is out of date: it stops
+        TreeDB open = Nodes.findDB(p.localName);
+        if (open != null && !open.isDisposed())
+          unload(p, false, true);
+        changed();
+        // the wait for the other process runs apart: the other catalogs load meanwhile
+        awaitLock(p);
+        return false;
+      }
+      p.unlocked = null;
+    } catch (IOException e) {
+      // no folder for the lock files (a read-only home): the catalog loads without the lock, the project tells it
+      p.unlocked = e.getMessage();
+      RLogger.logError(e);
+    }
+    return true;
+  }
+
+  /**
+   * Releases the catalog of a project that is closed, or whose tree is not open, unless the workspace lists another
+   * project of the same folder (a project found again by a scan), which keeps the lock.
+   */
+  private void releaseUnloaded(Project p) {
+    synchronized (this) {
+      for (Project q : projects.values())
+        if (q != p && !q.closed && sameLocation(q.dir, p.dir))
+          return;
+    }
+    TreeDB db = p.closed ? null : Nodes.findDB(p.localName);
+    if (db == null || db.isDisposed())
+      locks.release(p.dir);
   }
 
   public synchronized Project project(String localName) {
@@ -611,6 +839,8 @@ public final class Workspace {
       String state;
       if (p.closed) {
         state = "closed";
+      } else if (p.released) {
+        state = "released";
       } else if (p.error != null || isBroken(p.dir)) {
         state = "broken";
       } else if (db == null || t == null) {

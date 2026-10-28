@@ -304,6 +304,11 @@
         "category": "Requality"
       },
       {
+        "command": "requality.configureMcp",
+        "title": "Connect AI Agent (MCP)...",
+        "category": "Requality"
+      },
+      {
         "command": "requality.new",
         "title": "Other...",
         "category": "Requality"
@@ -1394,6 +1399,11 @@
     ],
     "menus": {
       "view/title": [
+        {
+          "command": "requality.configureMcp",
+          "when": "view =~ /^requality\\.explorer(View)?$/",
+          "group": "mcp@1"
+        },
         {
           "command": "requality.explorer.back",
           "when": "view =~ /^requality\\.explorer(View)?$/ && requality.explorer.frames",
@@ -3268,13 +3278,16 @@
     "test:server": "node scripts/gradle.js test --console=plain",
     "test:unit": "npm run compile && node --test \"out/test/unit/**/*.test.js\"",
     "test:integration": "npm run compile && node out/test/runIntegration.js",
-    "test": "npm run build:server && npm run test:server && npm run test:unit && npm run test:integration",
+    "test": "npm run build:server && npm run test:server && npm run test:unit && npm run test:mcp && npm run test:integration",
     "manifest": "python3 scripts/gen-manifest.py",
     "vscode:prepublish": "node scripts/prepublish.js",
     "package": "vsce package --githubBranch main --out requality-vscode-1.5.0.vsix",
     "check": "tsc -p . --noEmit",
     "package:platforms": "node scripts/package-platforms.js",
-    "media": "npm run compile && node out/test/media/run.js"
+    "package:mcp": "node scripts/package-mcp.js",
+    "test:mcp": "node test/mcp/smoke.js",
+    "media": "npm run compile && node out/test/media/run.js",
+    "media:agent": "node scripts/record-agent-flow.js"
   },
   "dependencies": {
     "vscode-jsonrpc": "8.2.1"

@@ -23,10 +23,11 @@ public class ParentChildrenUpdater extends StructChangePropogator {
                             BY_LOC = new HashSet<>(),
                             BY_NAMES = new HashSet<>();
   static{
+    // VSCODE-PATCH: Location references affect sibling order only for BY_LOCATIONS. Re-sorting the whole parent
+    // for every reference added or removed makes bulk specification updates quadratic even in name/index order.
     BY_IND.add(TreeDB.INDEX_ATTRIBUTE);
     BY_IND.add(TreeNode.ATTR_NAMEORID);
     BY_IND.add(TreeNode.ATTR_PREDICATE);
-    BY_IND.add(Requirement.ATTR_LOCATIONS);
     BY_IND.add(VirtualNode.ATTR_COLLAPSEVNODE);
 
     BY_LOC.add(TreeNode.ATTR_NAMEORID);
@@ -36,7 +37,6 @@ public class ParentChildrenUpdater extends StructChangePropogator {
     
     BY_NAMES.add(TreeNode.ATTR_NAMEORID);
     BY_NAMES.add(TreeNode.ATTR_PREDICATE);
-    BY_NAMES.add(Requirement.ATTR_LOCATIONS);
     BY_NAMES.add(VirtualNode.ATTR_COLLAPSEVNODE);
     
     BY_IND = Collections.unmodifiableSet(BY_IND);

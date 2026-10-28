@@ -296,6 +296,9 @@ public class DefaultAPISource implements IAPISource, IAPICacheProvider,
   public void init() {
     API.register(new RepoManager());
     initIgnoreMoveListener();
+    // VSCODE-PATCH: no HTTP or WebSocket server when nothing shows the web editors (requality-mcp)
+    if (Boolean.getBoolean("requality.noServers"))
+      return;
     WSServer.startSockets(socketPorts);
 
     ResourcesProvider.getOne().init();
@@ -303,6 +306,8 @@ public class DefaultAPISource implements IAPISource, IAPICacheProvider,
 
   @Override
   public void destroy() {
+    if (Boolean.getBoolean("requality.noServers")) // VSCODE-PATCH: started no servers
+      return;
 	WSServer.stopSockets();
 	ResourcesProvider.getOne().destroy();
   }

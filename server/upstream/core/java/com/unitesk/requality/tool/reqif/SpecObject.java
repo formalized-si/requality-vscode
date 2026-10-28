@@ -73,12 +73,12 @@ public abstract class SpecObject extends ReqIFDefinition {
     if (ads == null) return null;
     AttributeDefinition best = null;
     for (AttributeDefinition ad : ads) {
-      if (ad.getDesc() != null && ad.getDesc().equals("System Attribute")
-          || ad.getDesc().equals("")) // System
+      // VSCODE-PATCH: DESC is optional (null), not only in the files of DOORS
+      if ("System Attribute".equals(ad.getDesc()) || "".equals(ad.getDesc())) // System
         // attr
         // is
         // prior
-        if (best == null || !best.getDesc().equals("System Attribute")) best = ad;
+        if (best == null || !"System Attribute".equals(best.getDesc())) best = ad;
     }
     if (best != null) return best;
     if (ads.length == 0) return null;

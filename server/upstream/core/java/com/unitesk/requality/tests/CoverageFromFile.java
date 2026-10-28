@@ -94,6 +94,10 @@ public class CoverageFromFile implements ICoverageStorageSource {
       if(is == null)
         return new OperationResult(lastErrors, true);
       DocumentBuilderFactory factory = DocumentBuilderFactory.newInstance();
+      // VSCODE-PATCH: no DOCTYPE, so no external entity can read a file into the coverage data (XXE)
+      factory.setFeature("http://apache.org/xml/features/disallow-doctype-decl", true);
+      factory.setXIncludeAware(false);
+      factory.setExpandEntityReferences(false);
       DocumentBuilder builder = factory.newDocumentBuilder();
       Document document = builder.parse(is);
       NodeList nodeList = document.getDocumentElement().getChildNodes();

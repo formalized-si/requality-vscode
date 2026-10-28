@@ -689,7 +689,8 @@ public class ReqIFModel {
     ste.ai.map.put("BUILD-DATE", getTime());
     ste.rao = new ReadOnlyAttributes();
     ste.setDeleted(new Deleted());
-    return null;
+    // VSCODE-PATCH: the extensions made here (a ReqIF file of another tool has none of DOORS)
+    return te;
   }
 
   public Set<SpecObject> getDeleted() {

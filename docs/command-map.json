@@ -200,6 +200,11 @@
     "eclipse": null
   },
   {
+    "command": "requality.configureMcp",
+    "title": "Connect AI Agent (MCP)...",
+    "eclipse": null
+  },
+  {
     "command": "requality.new",
     "title": "Other...",
     "eclipse": "com.unitesk.requality.CreateDynNewMenu (NewMenuPoint)"

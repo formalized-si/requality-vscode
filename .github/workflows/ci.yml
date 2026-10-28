@@ -27,6 +27,88 @@ jobs:
       - run: npm run build
       - run: npm run test:server
       - run: npm run test:unit
+      # the launcher of the MCP server (bin/requality-mcp) in an empty folder, and its installer: an install, an install
+      # over it, and the smoke test through the installed command (a relative installation folder becomes absolute)
+      - run: npm run test:mcp
+      - run: |
+          node scripts/package-mcp.js --no-build --no-runtime
+          archive=$(ls release/requality-mcp-*.zip | head -n 1)
+          cd "$RUNNER_TEMP"
+          for i in 1 2; do
+            REQUALITY_MCP_HOME="mcp home" REQUALITY_MCP_BIN=bin REQUALITY_MCP_ARCHIVE="$GITHUB_WORKSPACE/$archive" \
+              sh "$GITHUB_WORKSPACE/scripts/install-mcp.sh"
+          done
+          test "$(ls -d "$RUNNER_TEMP/mcp home"/requality-mcp-* | wc -l)" -eq 1
+          node "$GITHUB_WORKSPACE/test/mcp/smoke.js" --command "$RUNNER_TEMP/bin/requality-mcp"
+      # the download path of the installer, from a fake releases API (the archive without a Java runtime as the archive
+      # of this machine): an install and the smoke test through the installed command, then an archive with a wrong
+      # SHA-256, which must fail and leave the installation as it is
+      - run: |
+          v=$(node -p "require('./package.json').version")
+          dl="$RUNNER_TEMP/dl"
+          mkdir -p "$dl"
+          unzip -q "release/requality-mcp-$v.zip" -d "$dl"
+          arch=$([ "$(uname -m)" = aarch64 ] && echo arm64 || echo x64)
+          export FAKE_ASSET="$dl/requality-mcp-$v-linux-$arch.tar.gz" FAKE_PORT_FILE="$dl/port"
+          tar -czf "$FAKE_ASSET" -C "$dl" "requality-mcp-$v"
+          node -e 'eval(process.env.FAKE_RELEASES_JS)' &
+          server=$!
+          trap 'kill $server' EXIT
+          for i in $(seq 100); do [ -s "$FAKE_PORT_FILE" ] && break; sleep 0.1; done
+          api="http://127.0.0.1:$(cat "$FAKE_PORT_FILE")"
+          export REQUALITY_MCP_HOME="$dl/mcp home" REQUALITY_MCP_BIN="$dl/bin"
+          # without a check of the build provenance attestation (gh is not signed in here) the install stops
+          if REQUALITY_MCP_RELEASES_URL="$api/good/releases" sh scripts/install-mcp.sh 2> "$dl/err"; then
+            echo "An archive was installed without its attestation"
+            exit 1
+          fi
+          grep -q "REQUALITY_MCP_UNVERIFIED=1" "$dl/err"
+          # the archives of the fake releases have no attestation
+          export REQUALITY_MCP_UNVERIFIED=1
+          REQUALITY_MCP_RELEASES_URL="$api/good/releases" sh scripts/install-mcp.sh
+          node test/mcp/smoke.js --command "$REQUALITY_MCP_BIN/requality-mcp"
+          find "$REQUALITY_MCP_HOME" | sort > "$dl/before"
+          if REQUALITY_MCP_RELEASES_URL="$api/bad/releases" sh scripts/install-mcp.sh; then
+            echo "An archive with a wrong SHA-256 was installed"
+            exit 1
+          fi
+          find "$REQUALITY_MCP_HOME" | sort | diff "$dl/before" -
+          "$REQUALITY_MCP_BIN/requality-mcp" --version
+        # the fake releases API (node -e 'eval(process.env.FAKE_RELEASES_JS)'), also for the steps of Windows: one release
+        # with the archive FAKE_ASSET; /good/releases gives its SHA-256, /bad/releases a wrong one. The port goes to the
+        # file FAKE_PORT_FILE.
+        env: &fake-releases
+          FAKE_RELEASES_JS: |
+            const crypto = require('crypto');
+            const fs = require('fs');
+            const http = require('http');
+            const path = require('path');
+            const asset = process.env.FAKE_ASSET;
+            const name = path.basename(asset);
+            const tag = 'v' + /^requality-mcp-(\d+\.\d+\.\d+)/.exec(name)[1];
+            const digest = crypto.createHash('sha256').update(fs.readFileSync(asset)).digest('hex');
+            const server = http.createServer((req, res) => {
+              const url = new URL(req.url, 'http://127.0.0.1');
+              const api = /^\/(good|bad)\/releases(\/latest|\/tags\/[^/]+)?$/.exec(url.pathname);
+              if (url.pathname === `/download/${tag}/${name}`) {
+                res.writeHead(200, { 'Content-Type': 'application/octet-stream' });
+                fs.createReadStream(asset).pipe(res);
+              } else if (api && (!api[2] || api[2] === '/latest' || api[2] === `/tags/${tag}`)) {
+                // the fields of a GitHub asset, in their order, with the object of the uploader before the digest
+                const release = { tag_name: tag, prerelease: false, assets: [{ name, uploader: { login: 'github-actions[bot]' },
+                  digest: 'sha256:' + (api[1] === 'good' ? digest : '0'.repeat(64)),
+                  browser_download_url: `http://127.0.0.1:${server.address().port}/download/${tag}/${name}` }] };
+                res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
+                res.end(JSON.stringify(api[2] ? release : [release], null, 2));
+              } else {
+                res.writeHead(404);
+                res.end();
+              }
+            });
+            server.listen(0, '127.0.0.1', () => {
+              fs.writeFileSync(process.env.FAKE_PORT_FILE + '.tmp', String(server.address().port));
+              fs.renameSync(process.env.FAKE_PORT_FILE + '.tmp', process.env.FAKE_PORT_FILE);
+            });
       - run: xvfb-run -a npm run test:integration
         env:
           VSCODE_TEST_VERSION: ${{ matrix.vscode }}
@@ -64,6 +146,101 @@ jobs:
       - run: npm run build
       - run: npm run test:server
       - run: npm run test:unit
+      - run: npm run test:mcp
+      # the installer of the MCP server with the archive without a Java runtime (the Java of the job runs it), in Windows
+      # PowerShell 5.1 and in PowerShell 7 (an install over the first one), in a folder with a space and Cyrillic
+      # letters; the smoke test runs through the installed command
+      - run: node scripts/package-mcp.js --no-build --no-runtime
+      - shell: powershell
+        run: |
+          # "Треб mcp", from the character codes: the script file of the step can be read in another code page
+          $env:REQUALITY_MCP_HOME = "$env:RUNNER_TEMP\" + (-join [char[]](0x0422, 0x0440, 0x0435, 0x0431)) + ' mcp'
+          $env:REQUALITY_MCP_ARCHIVE = (Get-ChildItem release\requality-mcp-*.zip | Select-Object -First 1).FullName
+          ./scripts/install-mcp.ps1
+      - shell: pwsh
+        run: |
+          # "Треб mcp", from the character codes: the script file of the step can be read in another code page
+          $env:REQUALITY_MCP_HOME = "$env:RUNNER_TEMP\" + (-join [char[]](0x0422, 0x0440, 0x0435, 0x0431)) + ' mcp'
+          $env:REQUALITY_MCP_ARCHIVE = (Get-ChildItem release\requality-mcp-*.zip | Select-Object -First 1).FullName
+          ./scripts/install-mcp.ps1
+          if (@(Get-ChildItem -Directory "$env:REQUALITY_MCP_HOME\requality-mcp-*").Count -ne 1) { throw 'one version expected' }
+          node test/mcp/smoke.js --command "$env:REQUALITY_MCP_HOME\requality-mcp.cmd"
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      # the download path of the installer, from the fake releases API, in Windows PowerShell 5.1 and in PowerShell 7: an
+      # install as "irm ... | iex" runs it and the smoke test through the installed command, then an archive with a wrong
+      # SHA-256, which must fail and leave the installation as it is
+      - shell: powershell
+        env: *fake-releases
+        run: |
+          $zip = Get-ChildItem release\requality-mcp-*.zip | Select-Object -First 1
+          $dl = Join-Path $env:RUNNER_TEMP "dl-$($PSVersionTable.PSVersion.Major)"
+          New-Item -ItemType Directory -Force -Path $dl | Out-Null
+          $env:FAKE_ASSET = Join-Path $dl "$($zip.BaseName)-win32-x64.zip"
+          $env:FAKE_PORT_FILE = Join-Path $dl port
+          Copy-Item $zip.FullName $env:FAKE_ASSET
+          $server = Start-Process node -ArgumentList '-e', 'eval(process.env.FAKE_RELEASES_JS)' -PassThru -WindowStyle Hidden
+          try {
+            for ($i = 0; $i -lt 100 -and -not (Test-Path $env:FAKE_PORT_FILE); $i++) { Start-Sleep -Milliseconds 100 }
+            $api = 'http://127.0.0.1:' + (Get-Content $env:FAKE_PORT_FILE)
+            $env:REQUALITY_MCP_HOME = Join-Path $dl 'mcp home'
+            $cmd = Join-Path $env:REQUALITY_MCP_HOME requality-mcp.cmd
+            $env:REQUALITY_MCP_RELEASES_URL = "$api/good/releases"
+            # the archives of the fake releases have no attestation
+            $env:REQUALITY_MCP_UNVERIFIED = '1'
+            # as "irm ... | iex" runs it: its settings and variables must not stay in the session
+            $progress = $ProgressPreference
+            Get-Content -Raw scripts\install-mcp.ps1 | Invoke-Expression
+            if ($ProgressPreference -ne $progress -or (Get-Variable rqHome -ErrorAction SilentlyContinue)) { throw 'The script changed the session' }
+            node test/mcp/smoke.js --command $cmd
+            if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+            $before = (Get-ChildItem -Recurse -Force -Name $env:REQUALITY_MCP_HOME | Sort-Object) -join "`n"
+            $env:REQUALITY_MCP_RELEASES_URL = "$api/bad/releases"
+            $failed = $false
+            try { ./scripts/install-mcp.ps1 } catch { $failed = $true; Write-Host "Expected error: $_" }
+            if (-not $failed) { throw 'An archive with a wrong SHA-256 was installed' }
+            $after = (Get-ChildItem -Recurse -Force -Name $env:REQUALITY_MCP_HOME | Sort-Object) -join "`n"
+            if ($after -ne $before) { throw 'The failed install changed the installation' }
+            & cmd /c "`"$cmd`" --version"
+            if ($LASTEXITCODE -ne 0) { throw 'The installation does not start after the failed install' }
+          } finally {
+            Stop-Process -Id $server.Id -Force -ErrorAction SilentlyContinue
+          }
+      - shell: pwsh
+        env: *fake-releases
+        run: |
+          $zip = Get-ChildItem release\requality-mcp-*.zip | Select-Object -First 1
+          $dl = Join-Path $env:RUNNER_TEMP "dl-$($PSVersionTable.PSVersion.Major)"
+          New-Item -ItemType Directory -Force -Path $dl | Out-Null
+          $env:FAKE_ASSET = Join-Path $dl "$($zip.BaseName)-win32-x64.zip"
+          $env:FAKE_PORT_FILE = Join-Path $dl port
+          Copy-Item $zip.FullName $env:FAKE_ASSET
+          $server = Start-Process node -ArgumentList '-e', 'eval(process.env.FAKE_RELEASES_JS)' -PassThru -WindowStyle Hidden
+          try {
+            for ($i = 0; $i -lt 100 -and -not (Test-Path $env:FAKE_PORT_FILE); $i++) { Start-Sleep -Milliseconds 100 }
+            $api = 'http://127.0.0.1:' + (Get-Content $env:FAKE_PORT_FILE)
+            $env:REQUALITY_MCP_HOME = Join-Path $dl 'mcp home'
+            $cmd = Join-Path $env:REQUALITY_MCP_HOME requality-mcp.cmd
+            $env:REQUALITY_MCP_RELEASES_URL = "$api/good/releases"
+            # the archives of the fake releases have no attestation
+            $env:REQUALITY_MCP_UNVERIFIED = '1'
+            # as "irm ... | iex" runs it: its settings and variables must not stay in the session
+            $progress = $ProgressPreference
+            Get-Content -Raw scripts\install-mcp.ps1 | Invoke-Expression
+            if ($ProgressPreference -ne $progress -or (Get-Variable rqHome -ErrorAction SilentlyContinue)) { throw 'The script changed the session' }
+            node test/mcp/smoke.js --command $cmd
+            if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+            $before = (Get-ChildItem -Recurse -Force -Name $env:REQUALITY_MCP_HOME | Sort-Object) -join "`n"
+            $env:REQUALITY_MCP_RELEASES_URL = "$api/bad/releases"
+            $failed = $false
+            try { ./scripts/install-mcp.ps1 } catch { $failed = $true; Write-Host "Expected error: $_" }
+            if (-not $failed) { throw 'An archive with a wrong SHA-256 was installed' }
+            $after = (Get-ChildItem -Recurse -Force -Name $env:REQUALITY_MCP_HOME | Sort-Object) -join "`n"
+            if ($after -ne $before) { throw 'The failed install changed the installation' }
+            & cmd /c "`"$cmd`" --version"
+            if ($LASTEXITCODE -ne 0) { throw 'The installation does not start after the failed install' }
+          } finally {
+            Stop-Process -Id $server.Id -Force -ErrorAction SilentlyContinue
+          }
       - run: npm run test:integration
         env:
           VSCODE_TEST_VERSION: stable

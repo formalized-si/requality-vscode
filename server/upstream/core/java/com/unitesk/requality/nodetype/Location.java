@@ -392,6 +392,9 @@ public class Location extends TreeNode{
 
   public List<int[]> getFragments() {
     List<Object> markup = attrs().getListAttributeValue(ATTR_MARKUP);
+    // VSCODE-PATCH: a location of a converted catalog can have no markup (no ranges)
+    if (markup == null)
+      return Collections.emptyList();
     List<int[]> ret = null;
     for(Object o : markup) {
       String lm = (String) o;
