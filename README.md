@@ -15,6 +15,16 @@ The extension uses the original Requality core and the original user interface c
 > **Unofficial port.** ISP RAS develops Requality. This extension is not a product of ISP RAS.
 > formalized.si made the port from the Requality source code that ISP RAS published under the Apache License 2.0.
 
+## Agent workflow
+
+![Live Requality MCP workflow: import a specification, create traceable requirements, check coverage, review a changed specification and revert it](media/readme/agent-flow.gif)
+
+This reproducible demo runs a scripted MCP client against the real Requality server. It shows the actual tool
+responses, including a changed stopping distance (60 → 55 m), a new untraced statement, and a verified revert.
+It is not a recording of a Codex or Claude conversation. [Full request/response transcript](media/readme/agent-flow.json).
+
+## VS Code workbench
+
 ![The Requality Explorer, the Properties view, the Document Editor and the UniEditor](media/readme/overview.gif)
 
 ## Two ways to use Requality

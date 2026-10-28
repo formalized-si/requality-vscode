@@ -1,0 +1,1916 @@
+{
+  "client": "Scripted MCP client; real server requests and responses",
+  "recorded_at": "2026-10-28T09:32:31.666Z",
+  "server": {
+    "name": "requality",
+    "title": "Requality",
+    "version": "1.5.0"
+  },
+  "scenes": [
+    {
+      "title": "Connect to Requality",
+      "intent": "Discover the tools before changing the catalog.",
+      "calls": [
+        "initialize",
+        "tools/list"
+      ],
+      "result": {
+        "server": "requality",
+        "version": "1.5.0",
+        "tools": 25,
+        "transport": "stdio"
+      }
+    },
+    {
+      "title": "Import the specification",
+      "intent": "Bring the source document into a new catalog.",
+      "calls": [
+        "create_project",
+        "import_document"
+      ],
+      "result": {
+        "project": "Brakes",
+        "document": "/Documents/brakes.xhtml"
+      }
+    },
+    {
+      "title": "Read before editing",
+      "intent": "Extract requirements from the actual source paragraphs.",
+      "calls": [
+        "read_document"
+      ],
+      "result": {
+        "paragraphs": [
+          {
+            "p": 0,
+            "coverage": "none",
+            "text": "The braking system shall stop the vehicle within 60 m."
+          },
+          {
+            "p": 1,
+            "coverage": "none",
+            "text": "The system shall record every braking event."
+          }
+        ]
+      }
+    },
+    {
+      "title": "Create traceable requirements",
+      "intent": "Create both requirements and link them to their source in one change.",
+      "calls": [
+        "apply_changes  // 2 create + 2 locate",
+        "get_node /Requirements/BRAKE"
+      ],
+      "result": {
+        "change": 2,
+        "requirement": "/Requirements/BRAKE",
+        "source": {
+          "uuid": "8e7e06a9-fee0-4a51-8b90-efef6d201f67",
+          "document": "/Documents/brakes.xhtml",
+          "p": 0,
+          "text": "The braking system shall stop the vehicle within 60 m."
+        }
+      }
+    },
+    {
+      "title": "Check coverage",
+      "intent": "Check source coverage and expose missing test purposes.",
+      "calls": [
+        "trace_coverage"
+      ],
+      "result": {
+        "under": "/Requirements",
+        "requirements": {
+          "total": 2,
+          "leaves": 2,
+          "leaves_without_locations": {
+            "total": 0,
+            "items": []
+          },
+          "leaves_without_test_purposes": {
+            "total": 2,
+            "items": [
+              {
+                "path": "/Requirements/BRAKE",
+                "name": "Stopping distance"
+              },
+              {
+                "path": "/Requirements/LOG",
+                "name": "Braking event log"
+              }
+            ]
+          },
+          "broken_links": {
+            "total": 0,
+            "items": []
+          }
+        },
+        "problems": {
+          "total": 0,
+          "items": [],
+          "errors": 0,
+          "warnings": 0
+        },
+        "documents": [
+          {
+            "document": "/Documents/brakes.xhtml",
+            "locations": 2,
+            "paragraphs": 2,
+            "covered_paragraphs": 2,
+            "partly_covered_paragraphs": 0,
+            "uncovered_paragraphs": 0,
+            "covered_text_percent": 100
+          }
+        ],
+        "review_items": {
+          "total": 0,
+          "items": [],
+          "completed": 0
+        }
+      }
+    },
+    {
+      "title": "Review a new specification",
+      "intent": "Detect the 60 m → 55 m change and the new, untraced statement.",
+      "calls": [
+        "update_document_version"
+      ],
+      "result": {
+        "old_document": "/Documents/brakes.xhtml",
+        "new_document": "/Documents/brakes_1.xhtml",
+        "summary": {
+          "requirements": 2,
+          "unchanged": 1,
+          "context_changed": 0,
+          "changed": 1,
+          "lost": 0,
+          "new_sentences": 1
+        },
+        "new_sentences": [
+          {
+            "p": 2,
+            "quote": "The system shall monitor brake pressure.",
+            "statement": true
+          }
+        ],
+        "requirements": [
+          {
+            "requirement": "/Requirements/BRAKE",
+            "uuid": "9f2a2789-c064-4442-87c9-5bee7aa01613",
+            "name": "Stopping distance",
+            "status": "changed",
+            "locations": [
+              {
+                "status": "changed",
+                "old_location": "8e7e06a9-fee0-4a51-8b90-efef6d201f67",
+                "old_text": [
+                  "The braking system shall stop the vehicle within 60 m."
+                ],
+                "new_location": "49e4561b-3294-486e-9dd1-30def8db22a0",
+                "p": 0,
+                "new_text": "The braking system shall stop the vehicle within 55 m.",
+                "similarity": 0.88,
+                "words_removed": [],
+                "words_added": [],
+                "numbers_changed": true
+              }
+            ]
+          }
+        ],
+        "unchanged": "The unchanged requirements are not listed (include_unchanged true lists them)",
+        "note": "The requirements have no locations in the old document now; the document stays as the history (superseded_by names the new version). Check the changed requirements (words_removed and words_added, modality_changed, numbers_changed) and the ones whose paragraph changed (context_changed), fix the lost ones, and add requirements for the new sentences that are statements, with apply_changes.",
+        "change": 3
+      }
+    },
+    {
+      "title": "Inspect the recorded change",
+      "intent": "Read what changed before accepting it.",
+      "calls": [
+        "review_changes"
+      ],
+      "result": {
+        "change": 3,
+        "time": "2026-10-28T09:32:31.604796Z",
+        "project": "Brakes",
+        "tool": "update_document_version",
+        "summary": "New version of /Documents/brakes.xhtml",
+        "label": "Update document version",
+        "operations": [
+          {
+            "uuid": "44914b62-16cc-4903-87c9-5bbcee7349d8",
+            "path": "/Documents/brakes_1.xhtml",
+            "type": "Document",
+            "id": "brakes_1.xhtml",
+            "op": "import",
+            "file": "$DEMO/catalogs/v2/brakes.html"
+          },
+          {
+            "op": "update_version",
+            "path": "/Documents/brakes_1.xhtml",
+            "old_document": "/Documents/brakes.xhtml",
+            "summary": {
+              "requirements": 2,
+              "unchanged": 1,
+              "context_changed": 0,
+              "changed": 1,
+              "lost": 0,
+              "new_sentences": 1
+            },
+            "requirements": [
+              {
+                "requirement": "/Requirements/BRAKE",
+                "uuid": "9f2a2789-c064-4442-87c9-5bee7aa01613",
+                "name": "Stopping distance",
+                "status": "changed",
+                "locations": [
+                  {
+                    "status": "changed",
+                    "old_location": "8e7e06a9-fee0-4a51-8b90-efef6d201f67",
+                    "old_text": [
+                      "The braking system shall stop the vehicle within 60 m."
+                    ],
+                    "new_location": "49e4561b-3294-486e-9dd1-30def8db22a0",
+                    "p": 0,
+                    "new_text": "The braking system shall stop the vehicle within 55 m.",
+                    "similarity": 0.88,
+                    "words_removed": [],
+                    "words_added": [],
+                    "numbers_changed": true
+                  }
+                ]
+              },
+              {
+                "requirement": "/Requirements/LOG",
+                "uuid": "1d53d557-7203-4c85-9b42-ed8a9bfee685",
+                "name": "Braking event log",
+                "status": "unchanged",
+                "locations": [
+                  {
+                    "status": "unchanged",
+                    "old_location": "1c5274ba-1ad5-4ad7-88dd-7ea1928567c2",
+                    "new_location": "aeb60c71-6cdb-455d-9384-04444a1c0c8d",
+                    "p": 1
+                  }
+                ]
+              }
+            ],
+            "new_sentences": [
+              {
+                "p": 2,
+                "quote": "The system shall monitor brake pressure.",
+                "statement": true
+              }
+            ]
+          }
+        ],
+        "nodes": 6,
+        "state": "done"
+      }
+    },
+    {
+      "title": "Revert and verify",
+      "intent": "Restore the original source links while keeping the requirement UUID.",
+      "calls": [
+        "revert_change",
+        "get_node /Requirements/BRAKE",
+        "read_document"
+      ],
+      "result": {
+        "reverted_change": 3,
+        "revert": 4,
+        "requirement": "/Requirements/BRAKE",
+        "source": "/Documents/brakes.xhtml",
+        "uuid_preserved": true,
+        "original_text": "The braking system shall stop the vehicle within 60 m."
+      }
+    }
+  ],
+  "transcript": [
+    {
+      "request": {
+        "jsonrpc": "2.0",
+        "id": 1,
+        "method": "initialize",
+        "params": {
+          "protocolVersion": "2025-06-18",
+          "capabilities": {},
+          "clientInfo": {
+            "name": "requality-agent-demo",
+            "version": "1"
+          }
+        }
+      },
+      "response": {
+        "jsonrpc": "2.0",
+        "id": 1,
+        "result": {
+          "protocolVersion": "2025-06-18",
+          "capabilities": {
+            "tools": {
+              "listChanged": false
+            },
+            "prompts": {
+              "listChanged": false
+            }
+          },
+          "serverInfo": {
+            "name": "requality",
+            "title": "Requality",
+            "version": "1.5.0"
+          },
+          "instructions": "Requality is a requirements management tool. A project (catalog) has a tree of requirements (/Requirements), specification documents (/Documents) whose marked text are the locations of the requirements, test purposes under the requirements, and reports. Jobs and their tools: requirements from a specification: import_document, read_document (filter uncovered), apply_changes (create, then locate with the exact sentence as quote); a new version of a specification: update_document_version first (its result is the list of what to fix), then apply_changes; traceability: trace_coverage; review of your changes: review_changes, undo (this session), revert_change (any change), compare_with_revision (all changes since a Git commit); ReqIF files: import_reqif; project settings (attributes, enumerations, checker rules): get_project_settings, change_project_settings. Make related changes in one apply_changes call with a summary: it is one step for the review and for undo; check a large call with dry_run first. Address a node by its path (/Requirements/A/B), UUID or unique id, and give the project name (list_projects) with each call. A project must be ready; a project in the format of an older Requality needs convert_project first; a locked project is open in another process (a call waits for it). Files to import and report folders must be in the folders of the server (the user may allow another folder when the client asks). Read all result pages: pass next_from as from for read_document and next_offset as offset for search_nodes, coverage lists, review_changes and compare_with_revision. Keep the same filters and finish reading before changing the catalog or input file."
+        }
+      }
+    },
+    {
+      "request": {
+        "jsonrpc": "2.0",
+        "id": 2,
+        "method": "tools/list",
+        "params": {}
+      },
+      "response": {
+        "jsonrpc": "2.0",
+        "id": 2,
+        "result": {
+          "tools": [
+            {
+              "name": "list_projects",
+              "title": "List projects",
+              "description": "Lists the Requality projects (catalogs) in the workspace folders with their state: loading, ready, broken (with the error), closed, locked (open in VS Code or another session: a call waits until that process gives it up), released (unused for a while: the next call loads it again), or needs_conversion (a catalog of an older Requality: convert_project converts it after a backup).",
+              "inputSchema": {
+                "type": "object",
+                "properties": {}
+              },
+              "annotations": {
+                "title": "List projects",
+                "readOnlyHint": true,
+                "destructiveHint": false,
+                "idempotentHint": true,
+                "openWorldHint": false
+              }
+            },
+            {
+              "name": "get_tree",
+              "title": "Get tree",
+              "description": "The subtree of a node: the children (id, name, type, number of children; the locations of a document as a number) to the given depth. The path of a child is the path of its parent, \"/\" and its id. The top folders of a project are /Requirements, /Documents, /Reports, /Types and /Templates.",
+              "inputSchema": {
+                "type": "object",
+                "properties": {
+                  "project": {
+                    "type": "string",
+                    "description": "Project name (see list_projects)."
+                  },
+                  "node": {
+                    "type": "string",
+                    "description": "Node: its UUID or its path in the project, for example /Requirements/A/B. Default: the project root."
+                  },
+                  "depth": {
+                    "type": "integer",
+                    "description": "Levels of children (1 to 10, default 2)."
+                  },
+                  "max_nodes": {
+                    "type": "integer",
+                    "description": "At most this many nodes (default 200)."
+                  }
+                },
+                "required": [
+                  "project"
+                ]
+              },
+              "annotations": {
+                "title": "Get tree",
+                "readOnlyHint": true,
+                "destructiveHint": false,
+                "idempotentHint": true,
+                "openWorldHint": false
+              }
+            },
+            {
+              "name": "get_node",
+              "title": "Get node",
+              "description": "All about one node: id, name, type, description, user attributes, outgoing and incoming links, the document locations of a requirement (with the marked text), checker problems, parent, children, and the node types apply_changes can create in it.",
+              "inputSchema": {
+                "type": "object",
+                "properties": {
+                  "project": {
+                    "type": "string",
+                    "description": "Project name (see list_projects)."
+                  },
+                  "node": {
+                    "type": "string",
+                    "description": "Node: its UUID or its path in the project, for example /Requirements/A/B."
+                  },
+                  "html": {
+                    "type": "boolean",
+                    "description": "Give descriptions and HTML attributes as HTML (default: plain text)."
+                  }
+                },
+                "required": [
+                  "project",
+                  "node"
+                ]
+              },
+              "annotations": {
+                "title": "Get node",
+                "readOnlyHint": true,
+                "destructiveHint": false,
+                "idempotentHint": true,
+                "openWorldHint": false
+              }
+            },
+            {
+              "name": "search_nodes",
+              "title": "Search nodes",
+              "description": "Finds nodes under a node. With 'text': the nodes whose user-visible attributes (id, name, description and the others) contain the text. With 'attribute': the nodes where this attribute matches 'operator' and 'value'. With 'type' alone: the nodes of the type. Each match gives the attributes that matched; a document location gives its text, its document and its requirements. Results are sorted by path; use next_offset as offset with the same filters to read the next page.",
+              "inputSchema": {
+                "type": "object",
+                "properties": {
+                  "project": {
+                    "type": "string",
+                    "description": "Project name (see list_projects)."
+                  },
+                  "text": {
+                    "type": "string",
+                    "description": "Text to find in the user-visible attributes (case-insensitive)."
+                  },
+                  "attribute": {
+                    "type": "string",
+                    "description": "Attribute name, for example status, name, id, description or type."
+                  },
+                  "operator": {
+                    "type": "string",
+                    "description": "Comparison for 'attribute' (default CONTAINS).",
+                    "enum": [
+                      "EQUALS",
+                      "NOT_EQUALS",
+                      "CONTAINS",
+                      "NOT_CONTAINS",
+                      "EXISTS",
+                      "NOT_EXISTS"
+                    ]
+                  },
+                  "value": {
+                    "type": "string",
+                    "description": "Value for 'attribute'."
+                  },
+                  "under": {
+                    "type": "string",
+                    "description": "Node: its UUID or its path in the project, for example /Requirements/A/B. Search only under this node (default: the project root)."
+                  },
+                  "type": {
+                    "type": "string",
+                    "description": "Only nodes of this type, for example Requirement or Location; alone: all nodes of the type."
+                  },
+                  "offset": {
+                    "type": "integer",
+                    "description": "First match to return (default 0; use next_offset for the next page)."
+                  },
+                  "limit": {
+                    "type": "integer",
+                    "description": "At most this many matches (default 100)."
+                  }
+                },
+                "required": [
+                  "project"
+                ]
+              },
+              "annotations": {
+                "title": "Search nodes",
+                "readOnlyHint": true,
+                "destructiveHint": false,
+                "idempotentHint": true,
+                "openWorldHint": false
+              }
+            },
+            {
+              "name": "read_document",
+              "title": "Read document",
+              "description": "Reads a document of the project (a node under /Documents) paragraph by paragraph. Each paragraph has its number 'p', its heading level (h1 to h6, when it is a heading), its table, row and column (in a table), the alternative texts of its pictures (images), its text, its coverage by requirement locations (none; partial, with the sentences no location covers in uncovered_text; full: each sentence is covered) and the requirements that mark it. Use 'filter': 'uncovered' to see only the paragraphs with text that no requirement covers yet: the work list when you turn a document into requirements with apply_changes (op 'locate').",
+              "inputSchema": {
+                "type": "object",
+                "properties": {
+                  "project": {
+                    "type": "string",
+                    "description": "Project name (see list_projects)."
+                  },
+                  "document": {
+                    "type": "string",
+                    "description": "The document: Node: its UUID or its path in the project, for example /Requirements/A/B."
+                  },
+                  "from": {
+                    "type": "integer",
+                    "description": "First paragraph number (default 0)."
+                  },
+                  "count": {
+                    "type": "integer",
+                    "description": "Number of paragraphs (default 200)."
+                  },
+                  "filter": {
+                    "type": "string",
+                    "description": "Which paragraphs (default all).",
+                    "enum": [
+                      "all",
+                      "uncovered",
+                      "partial",
+                      "covered"
+                    ]
+                  },
+                  "ranges": {
+                    "type": "boolean",
+                    "description": "Give the character range of each paragraph (for locate with start and end; default false)."
+                  }
+                },
+                "required": [
+                  "project",
+                  "document"
+                ]
+              },
+              "annotations": {
+                "title": "Read document",
+                "readOnlyHint": true,
+                "destructiveHint": false,
+                "idempotentHint": true,
+                "openWorldHint": false
+              }
+            },
+            {
+              "name": "apply_changes",
+              "title": "Apply changes",
+              "description": "Changes a project with a list of operations in one transaction: all of them or none (an error names the operation and changes nothing), one undo step, one entry in review_changes. 'dry_run' checks the operations, changes nothing and reports every operation that fails. The operations ('op'; the schema gives the keys of each): create (Requirement by default; TestPurpose, Comment, TextNode, DocFolder, ReportFolder, VirtualNode with target, InstancesFolder, RestrictedFolder), update, update_all (many nodes of a subtree), rename_attribute (another name or value type in a subtree), delete (recursive for a node with nodes under it), move, copy, link, unlink, locate (mark the text of a document for a requirement: 'quote', where white space, typographic quotes, dashes and letter case do not matter, or 'paragraph', or 'start' and 'end'), unlocate, resolve (a review item of trace_coverage). Name a node with 'as' and refer to it later in the same call as \"$name\". Descriptions are text (paragraphs separated by empty lines) or HTML (starts with '<'). Attribute values: string, number, boolean, list of strings; null removes one. The result is short (verbose gives all); warnings name repeated texts and nodes.",
+              "inputSchema": {
+                "type": "object",
+                "properties": {
+                  "project": {
+                    "type": "string",
+                    "description": "Project name (see list_projects)."
+                  },
+                  "operations": {
+                    "type": "array",
+                    "description": "The operations, made in this order.",
+                    "items": {
+                      "oneOf": [
+                        {
+                          "type": "object",
+                          "properties": {
+                            "op": {
+                              "const": "create"
+                            },
+                            "parent": {
+                              "type": "string",
+                              "description": "The parent node: a path, a UUID, or \"$name\" of an earlier operation."
+                            },
+                            "type": {
+                              "type": "string",
+                              "description": "create: Requirement (default), TestPurpose, Comment, TextNode, DocFolder, ReportFolder, VirtualNode (with target), InstancesFolder or RestrictedFolder. update_all: only nodes of this type."
+                            },
+                            "id": {
+                              "type": "string",
+                              "description": "The id (default for create: the next free id)."
+                            },
+                            "name": {
+                              "type": "string",
+                              "description": "The name."
+                            },
+                            "description": {
+                              "type": "string",
+                              "description": "Text (paragraphs separated by empty lines) or HTML (starts with '<')."
+                            },
+                            "attributes": {
+                              "type": "object",
+                              "description": "User attributes: name -> value (string, number, boolean, list of strings; null removes)."
+                            },
+                            "target": {
+                              "type": "string",
+                              "description": "VirtualNode: the node it reuses (a Requirement, TestPurpose, Comment or VirtualNode); its subtree appears under the virtual node."
+                            },
+                            "template": {
+                              "type": "string",
+                              "description": "A node template of /Templates to copy attributes from, or \"none\" (default: the active template of the type, as in Requality)."
+                            },
+                            "as": {
+                              "type": "string",
+                              "description": "A name for the node, to refer to it later in the call as \"$name\"."
+                            }
+                          },
+                          "required": [
+                            "op",
+                            "parent"
+                          ],
+                          "additionalProperties": false
+                        },
+                        {
+                          "type": "object",
+                          "properties": {
+                            "op": {
+                              "const": "update"
+                            },
+                            "node": {
+                              "type": "string",
+                              "description": "The node: a path, a UUID, or \"$name\"."
+                            },
+                            "id": {
+                              "type": "string"
+                            },
+                            "name": {
+                              "type": "string"
+                            },
+                            "description": {
+                              "type": "string"
+                            },
+                            "attributes": {
+                              "type": "object"
+                            },
+                            "as": {
+                              "type": "string"
+                            }
+                          },
+                          "required": [
+                            "op",
+                            "node"
+                          ],
+                          "additionalProperties": false
+                        },
+                        {
+                          "type": "object",
+                          "properties": {
+                            "op": {
+                              "const": "update_all"
+                            },
+                            "under": {
+                              "type": "string",
+                              "description": "The subtree root: the operation changes the nodes under it (and it)."
+                            },
+                            "type": {
+                              "type": "string"
+                            },
+                            "where_attribute": {
+                              "type": "string",
+                              "description": "update_all: only nodes that have this attribute (with where_value: of this value)."
+                            },
+                            "where_value": {
+                              "type": "string",
+                              "description": "update_all: the value where_attribute must have (compared as text)."
+                            },
+                            "attributes": {
+                              "type": "object"
+                            }
+                          },
+                          "required": [
+                            "op",
+                            "under",
+                            "attributes"
+                          ],
+                          "additionalProperties": false
+                        },
+                        {
+                          "type": "object",
+                          "properties": {
+                            "op": {
+                              "const": "rename_attribute"
+                            },
+                            "under": {
+                              "type": "string"
+                            },
+                            "attribute": {
+                              "type": "string",
+                              "description": "link, unlink: the link attribute (default: the default link attribute of the project); rename_attribute: the attribute to rename."
+                            },
+                            "new_name": {
+                              "type": "string",
+                              "description": "The new attribute name (default: the same name)."
+                            },
+                            "value_type": {
+                              "type": "string",
+                              "description": "rename_attribute: the new type of the values: string, integer, number or boolean (default: the same); a value that does not convert is an error."
+                            }
+                          },
+                          "required": [
+                            "op",
+                            "under",
+                            "attribute"
+                          ],
+                          "additionalProperties": false
+                        },
+                        {
+                          "type": "object",
+                          "properties": {
+                            "op": {
+                              "const": "delete"
+                            },
+                            "node": {
+                              "type": "string"
+                            },
+                            "recursive": {
+                              "type": "boolean",
+                              "description": "delete: true to delete a node that has nodes under it (they go with it)."
+                            }
+                          },
+                          "required": [
+                            "op",
+                            "node"
+                          ],
+                          "additionalProperties": false
+                        },
+                        {
+                          "type": "object",
+                          "properties": {
+                            "op": {
+                              "const": "move"
+                            },
+                            "node": {
+                              "type": "string"
+                            },
+                            "parent": {
+                              "type": "string"
+                            },
+                            "after": {
+                              "type": "string",
+                              "description": "A child of the new parent to put the node after (default: last)."
+                            }
+                          },
+                          "required": [
+                            "op",
+                            "node",
+                            "parent"
+                          ],
+                          "additionalProperties": false
+                        },
+                        {
+                          "type": "object",
+                          "properties": {
+                            "op": {
+                              "const": "copy"
+                            },
+                            "node": {
+                              "type": "string"
+                            },
+                            "parent": {
+                              "type": "string"
+                            },
+                            "as": {
+                              "type": "string"
+                            }
+                          },
+                          "required": [
+                            "op",
+                            "node",
+                            "parent"
+                          ],
+                          "additionalProperties": false
+                        },
+                        {
+                          "type": "object",
+                          "properties": {
+                            "op": {
+                              "const": "link"
+                            },
+                            "from": {
+                              "type": "string",
+                              "description": "The node the link starts at."
+                            },
+                            "to": {
+                              "type": "string",
+                              "description": "The target: a path, a UUID, \"$name\", or \"<project>::<path>\" in another project."
+                            },
+                            "attribute": {
+                              "type": "string"
+                            }
+                          },
+                          "required": [
+                            "op",
+                            "from",
+                            "to"
+                          ],
+                          "additionalProperties": false
+                        },
+                        {
+                          "type": "object",
+                          "properties": {
+                            "op": {
+                              "const": "unlink"
+                            },
+                            "from": {
+                              "type": "string"
+                            },
+                            "to": {
+                              "type": "string"
+                            },
+                            "attribute": {
+                              "type": "string"
+                            }
+                          },
+                          "required": [
+                            "op",
+                            "from",
+                            "to"
+                          ],
+                          "additionalProperties": false
+                        },
+                        {
+                          "type": "object",
+                          "properties": {
+                            "op": {
+                              "const": "locate"
+                            },
+                            "requirement": {
+                              "type": "string",
+                              "description": "The requirement."
+                            },
+                            "document": {
+                              "type": "string",
+                              "description": "The document (under /Documents)."
+                            },
+                            "quote": {
+                              "type": "string",
+                              "description": "Text of the document to mark (white space, typographic quotes, dashes and case do not matter)."
+                            },
+                            "paragraph": {
+                              "type": "integer",
+                              "description": "Paragraph number: with quote, the paragraph to look in; alone, mark all its text."
+                            },
+                            "occurrence": {
+                              "type": "integer",
+                              "description": "With quote: the n-th occurrence (1 = first) when the quote occurs more than once."
+                            },
+                            "start": {
+                              "type": "integer",
+                              "description": "Start offset of the range to mark (see read_document with ranges)."
+                            },
+                            "end": {
+                              "type": "integer",
+                              "description": "End offset of the range to mark."
+                            },
+                            "as": {
+                              "type": "string"
+                            }
+                          },
+                          "required": [
+                            "op",
+                            "requirement",
+                            "document"
+                          ],
+                          "additionalProperties": false
+                        },
+                        {
+                          "type": "object",
+                          "properties": {
+                            "op": {
+                              "const": "unlocate"
+                            },
+                            "location": {
+                              "type": "string",
+                              "description": "The location UUID."
+                            },
+                            "requirement": {
+                              "type": "string"
+                            }
+                          },
+                          "required": [
+                            "op",
+                            "location"
+                          ],
+                          "additionalProperties": false
+                        },
+                        {
+                          "type": "object",
+                          "properties": {
+                            "op": {
+                              "const": "resolve"
+                            },
+                            "item": {
+                              "type": "string",
+                              "description": "A review item (see trace_coverage)."
+                            },
+                            "status": {
+                              "type": "string",
+                              "description": "COMPLETED (default) or CHECK."
+                            }
+                          },
+                          "required": [
+                            "op",
+                            "item"
+                          ],
+                          "additionalProperties": false
+                        }
+                      ]
+                    }
+                  },
+                  "summary": {
+                    "type": "string",
+                    "description": "What the change does and why, for the person who reviews it."
+                  },
+                  "dry_run": {
+                    "type": "boolean",
+                    "description": "Check the operations, change nothing (default false)."
+                  },
+                  "verbose": {
+                    "type": "boolean",
+                    "description": "The full result of each operation (default: short results; with more than 50 operations the counts, the named nodes and the first results)."
+                  }
+                },
+                "required": [
+                  "project",
+                  "operations"
+                ]
+              },
+              "annotations": {
+                "title": "Apply changes",
+                "readOnlyHint": false,
+                "destructiveHint": true,
+                "idempotentHint": false,
+                "openWorldHint": false
+              }
+            },
+            {
+              "name": "import_document",
+              "title": "Import document",
+              "description": "Imports a document file (HTML, XHTML, XML, DOC, DOCX, ODT, RTF, PDF, TXT) into the project as a Document under a document folder, in one change. Then read it with read_document. The file must be in a folder of the server (the folders of the catalogs and the --allow folders).",
+              "inputSchema": {
+                "type": "object",
+                "properties": {
+                  "project": {
+                    "type": "string",
+                    "description": "Project name (see list_projects)."
+                  },
+                  "file": {
+                    "type": "string",
+                    "description": "Absolute path of the file."
+                  },
+                  "folder": {
+                    "type": "string",
+                    "description": "The document folder: Node: its UUID or its path in the project, for example /Requirements/A/B. Default: /Documents."
+                  }
+                },
+                "required": [
+                  "project",
+                  "file"
+                ]
+              },
+              "annotations": {
+                "title": "Import document",
+                "readOnlyHint": false,
+                "destructiveHint": false,
+                "idempotentHint": false,
+                "openWorldHint": false
+              }
+            },
+            {
+              "name": "import_reqif",
+              "title": "Import ReqIF",
+              "description": "Imports the requirements of one specification of a ReqIF file (.reqif or .xml, the exchange format of DOORS, Polarion and other tools) into /Requirements of a project, in one change: the structure of the specification, ReqIF.Text as the description, ReqIF.Name or ReqIF.ChapterName as the name, the other attributes by their names, enumerations as enumerations of the project. Pictures and OLE objects of the texts are left out. Import into an empty project (create_project). 'replace' imports again into a project with requirements: the requirements that are in the file (by ReqIF.ForeignID, else by the identifier of the object) are updated and keep their UUIDs, test purposes and other nodes; the ones that are not in the file go (the result lists them; a test purpose goes only with force; revert_change brings all back).",
+              "inputSchema": {
+                "type": "object",
+                "properties": {
+                  "project": {
+                    "type": "string",
+                    "description": "Project name (see list_projects)."
+                  },
+                  "file": {
+                    "type": "string",
+                    "description": "Absolute path of the ReqIF file (in a folder of the server)."
+                  },
+                  "specification": {
+                    "type": "string",
+                    "description": "The specification (its name or identifier) when the file has several."
+                  },
+                  "replace": {
+                    "type": "boolean",
+                    "description": "Import also when /Requirements has nodes (default false)."
+                  },
+                  "force": {
+                    "type": "boolean",
+                    "description": "With replace: also delete the test purposes of requirements that are not in the file (default false)."
+                  }
+                },
+                "required": [
+                  "project",
+                  "file"
+                ]
+              },
+              "annotations": {
+                "title": "Import ReqIF",
+                "readOnlyHint": false,
+                "destructiveHint": true,
+                "idempotentHint": false,
+                "openWorldHint": false
+              }
+            },
+            {
+              "name": "update_document_version",
+              "title": "Update document version",
+              "description": "A new version of a specification. Call it first: its result is the list of what to fix. It imports the new version (or takes one already imported) and moves the requirement locations of the old document to it sentence by sentence, in one change (one undo step). The result: a summary; the sentences of the new version that the old one does not have and no requirement marks (new_sentences; statement true when it has shall, must or the like); and the requirements to check, lost first: lost (no similar sentence; with suggestions), changed (moved to the most similar sentence: old and new text, similarity, words_removed and words_added, modality_changed when shall/must/may/not changed, numbers_changed, and the new location UUID to unlocate when it is wrong), context_changed (the same text; sentences came into or went out of its paragraph). Unchanged requirements are counted, not listed. The old document stays as the history and links to the new one (superseded_by); by default the requirements lose their locations in it (detach_old).",
+              "inputSchema": {
+                "type": "object",
+                "properties": {
+                  "project": {
+                    "type": "string",
+                    "description": "Project name (see list_projects)."
+                  },
+                  "document": {
+                    "type": "string",
+                    "description": "The old document: Node: its UUID or its path in the project, for example /Requirements/A/B."
+                  },
+                  "file": {
+                    "type": "string",
+                    "description": "Absolute path of the new version (in a folder of the server)."
+                  },
+                  "new_document": {
+                    "type": "string",
+                    "description": "The new version, already imported: Node: its UUID or its path in the project, for example /Requirements/A/B."
+                  },
+                  "detach_old": {
+                    "type": "boolean",
+                    "description": "Remove the locations of the old document from the requirements, so that they trace to the new version only (default true; false keeps both)."
+                  },
+                  "include_unchanged": {
+                    "type": "boolean",
+                    "description": "Also list the unchanged requirements (default false)."
+                  },
+                  "limit": {
+                    "type": "integer",
+                    "description": "At most this many new sentences and requirements (default 50; review_changes lists the rest)."
+                  }
+                },
+                "required": [
+                  "project",
+                  "document"
+                ]
+              },
+              "annotations": {
+                "title": "Update document version",
+                "readOnlyHint": false,
+                "destructiveHint": true,
+                "idempotentHint": false,
+                "openWorldHint": false
+              }
+            },
+            {
+              "name": "trace_coverage",
+              "title": "Trace coverage",
+              "description": "The traceability of a project as data: requirements without document locations or without test purposes (leaf requirements), links that do not resolve, checker problems, the coverage of each document by locations, and the open review items of document updates. Each list gives its total and next_offset when more items remain; use offset to read the next page. Keep filters unchanged between pages.",
+              "inputSchema": {
+                "type": "object",
+                "properties": {
+                  "project": {
+                    "type": "string",
+                    "description": "Project name (see list_projects)."
+                  },
+                  "under": {
+                    "type": "string",
+                    "description": "Only the requirements under this node (default /Requirements)."
+                  },
+                  "refresh": {
+                    "type": "boolean",
+                    "description": "Run the checkers again first (default false)."
+                  },
+                  "documents": {
+                    "type": "boolean",
+                    "description": "Include the coverage of the documents (default true)."
+                  },
+                  "offset": {
+                    "type": "integer",
+                    "description": "First item in each list (default 0). For subsequent pages use refresh false and documents false to avoid repeating checker work and document summaries."
+                  },
+                  "limit": {
+                    "type": "integer",
+                    "description": "At most this many items in each list (default 50)."
+                  }
+                },
+                "required": [
+                  "project"
+                ]
+              },
+              "annotations": {
+                "title": "Trace coverage",
+                "readOnlyHint": true,
+                "destructiveHint": false,
+                "idempotentHint": true,
+                "openWorldHint": false
+              }
+            },
+            {
+              "name": "test_coverage",
+              "title": "Test coverage",
+              "description": "The coverage of the requirements by tests, from a coverage file of the test runs (XML, the file a coverage source of Requality reads): the leaf requirements tests cover (with the tests and hits), the ones no test covers, the test failures with the requirements they violate, and the requirements of the file that the project does not have. Each list gives its total and next_offset when more items remain; use offset with the same file and filters to read the next page. It changes nothing. The file: <coverage><reqcoverage qid=\"/Requirements/A/B\"><covered_by uri=\"test/path\" label=\"Test name\" hits=\"1\"/></reqcoverage><error name=\"...\" testuri=\"test/path\"><violates qid=\"/Requirements/A/B\"/><description format=\"plain\">...</description></error></coverage>. A qid is the path, the UUID, the user-visible id (with the id prefix of the project) or the id of a requirement that one node has.",
+              "inputSchema": {
+                "type": "object",
+                "properties": {
+                  "project": {
+                    "type": "string",
+                    "description": "Project name (see list_projects)."
+                  },
+                  "coverage_file": {
+                    "type": "string",
+                    "description": "Absolute path of the coverage file (in a folder of the server)."
+                  },
+                  "under": {
+                    "type": "string",
+                    "description": "Only the requirements under this node (default /Requirements)."
+                  },
+                  "offset": {
+                    "type": "integer",
+                    "description": "First item in each list (default 0; use its next_offset for the next page)."
+                  },
+                  "limit": {
+                    "type": "integer",
+                    "description": "At most this many items in each list (default 50)."
+                  }
+                },
+                "required": [
+                  "project",
+                  "coverage_file"
+                ]
+              },
+              "annotations": {
+                "title": "Test coverage",
+                "readOnlyHint": true,
+                "destructiveHint": false,
+                "idempotentHint": true,
+                "openWorldHint": false
+              }
+            },
+            {
+              "name": "review_changes",
+              "title": "Review changes",
+              "description": "What the agent changed, newest first, also in earlier sessions: each change (apply_changes, import_document, update_document_version, revert_change) with its number, time, project, summary, kinds of operations, first nodes and state (done, undone or reverted). With project and change: the operations of that change with the values before and after, a page at a time (offset, limit; next_offset when there are more).",
+              "inputSchema": {
+                "type": "object",
+                "properties": {
+                  "project": {
+                    "type": "string",
+                    "description": "Only the changes of this project."
+                  },
+                  "change": {
+                    "type": "integer",
+                    "description": "One change (with project): its operations."
+                  },
+                  "offset": {
+                    "type": "integer",
+                    "description": "With change: the first operation (or list item of a document update) to give (default 0)."
+                  },
+                  "limit": {
+                    "type": "integer",
+                    "description": "With change: at most this many operations or list items (default 100)."
+                  },
+                  "verbose": {
+                    "type": "boolean",
+                    "description": "The operations of each change (default false)."
+                  },
+                  "last": {
+                    "type": "integer",
+                    "description": "At most this many changes (default 20)."
+                  }
+                }
+              },
+              "annotations": {
+                "title": "Review changes",
+                "readOnlyHint": true,
+                "destructiveHint": false,
+                "idempotentHint": true,
+                "openWorldHint": false
+              }
+            },
+            {
+              "name": "compare_with_revision",
+              "title": "Compare with revision",
+              "description": "The nodes of a project that differ from a Git revision of its catalog (the catalog must be in a Git repository): added, deleted and changed nodes with the attributes that changed (name, description, locations, user attributes; before and after) and the old path of a moved or renamed node. It shows every change since the revision, also the ones of VS Code, of a colleague or of another session: for a review before a commit or a pull request. Results are paged with offset and limit; next_offset gives the next page.",
+              "inputSchema": {
+                "type": "object",
+                "properties": {
+                  "project": {
+                    "type": "string",
+                    "description": "Project name (see list_projects)."
+                  },
+                  "revision": {
+                    "type": "string",
+                    "description": "A commit, branch or tag, for example HEAD (default), main or HEAD~3."
+                  },
+                  "under": {
+                    "type": "string",
+                    "description": "Only the nodes under this path, for example /Requirements/A."
+                  },
+                  "offset": {
+                    "type": "integer",
+                    "description": "First node in each list (default 0; use next_offset for the next page)."
+                  },
+                  "limit": {
+                    "type": "integer",
+                    "description": "At most this many nodes in each list (default 100)."
+                  }
+                },
+                "required": [
+                  "project"
+                ]
+              },
+              "annotations": {
+                "title": "Compare with revision",
+                "readOnlyHint": true,
+                "destructiveHint": false,
+                "idempotentHint": true,
+                "openWorldHint": false
+              }
+            },
+            {
+              "name": "revert_change",
+              "title": "Revert change",
+              "description": "Reverts a change of review_changes, also of an earlier session: its nodes become as they were before it, with their UUIDs (deleted nodes come back with their links and locations), in one change. It is refused when a node of the change was changed later (by the agent or in VS Code), or when other nodes link to a node the revert deletes; the error lists them and the later changes to revert first. 'force' reverts anyway (the later changes of these nodes are lost, such links break); 'dry_run' tells what would be reverted. The result counts the nodes restored, recreated and deleted, with the first ones.",
+              "inputSchema": {
+                "type": "object",
+                "properties": {
+                  "project": {
+                    "type": "string",
+                    "description": "Project name (see list_projects)."
+                  },
+                  "change": {
+                    "type": "integer",
+                    "description": "The change number (see review_changes)."
+                  },
+                  "dry_run": {
+                    "type": "boolean",
+                    "description": "Tell what the revert does, change nothing (default false)."
+                  },
+                  "force": {
+                    "type": "boolean",
+                    "description": "Revert also when nodes of the change were changed later (default false)."
+                  },
+                  "verbose": {
+                    "type": "boolean",
+                    "description": "List every node of the revert (default: the first 20)."
+                  }
+                },
+                "required": [
+                  "project",
+                  "change"
+                ]
+              },
+              "annotations": {
+                "title": "Revert change",
+                "readOnlyHint": false,
+                "destructiveHint": true,
+                "idempotentHint": false,
+                "openWorldHint": false
+              }
+            },
+            {
+              "name": "undo",
+              "title": "Undo",
+              "description": "Undoes the newest change of the agent in this session and marks it undone in review_changes. With project, only when that change is of the project (else the error names it). For a change of an earlier session, or after the catalog was loaded again, use revert_change.",
+              "inputSchema": {
+                "type": "object",
+                "properties": {
+                  "project": {
+                    "type": "string",
+                    "description": "Only a change of this project."
+                  }
+                }
+              },
+              "annotations": {
+                "title": "Undo",
+                "readOnlyHint": false,
+                "destructiveHint": true,
+                "idempotentHint": false,
+                "openWorldHint": false
+              }
+            },
+            {
+              "name": "redo",
+              "title": "Redo",
+              "description": "Redoes the newest undone change of this session (with project: only of that project).",
+              "inputSchema": {
+                "type": "object",
+                "properties": {
+                  "project": {
+                    "type": "string",
+                    "description": "Only a change of this project."
+                  }
+                }
+              },
+              "annotations": {
+                "title": "Redo",
+                "readOnlyHint": false,
+                "destructiveHint": true,
+                "idempotentHint": false,
+                "openWorldHint": false
+              }
+            },
+            {
+              "name": "get_project_settings",
+              "title": "Get project settings",
+              "description": "The settings of a project: the project attributes (every node inherits them), the enumerations (enum types), the mandatory attributes of each node type with their defaults, the checker rules (JavaScript formulas, true for a correct node), the checkers of user-visible ids and defined terms, the id prefix, the default link attribute and the node templates of /Templates.",
+              "inputSchema": {
+                "type": "object",
+                "properties": {
+                  "project": {
+                    "type": "string",
+                    "description": "Project name (see list_projects)."
+                  }
+                },
+                "required": [
+                  "project"
+                ]
+              },
+              "annotations": {
+                "title": "Get project settings",
+                "readOnlyHint": true,
+                "destructiveHint": false,
+                "idempotentHint": true,
+                "openWorldHint": false
+              }
+            },
+            {
+              "name": "change_project_settings",
+              "title": "Change project settings",
+              "description": "Changes the settings of a project in one change (one undo step, revertible). Give only what changes:\n- attributes: name -> {\"type\": string|integer|number|boolean|list|html|enum:<enumeration>, \"value\": ...} or null (removes it): project attributes, inherited by every node\n- enums: name -> {\"type\": string|integer|number, \"values\": [value or {\"value\", \"comment\"}]} or null (removes an unused one); a value that nodes use cannot be removed\n- required_attributes: node type -> [{\"attribute\", \"default\"}] or null: the nodes of the type get the attributes they miss, with the default\n- checker_rules: [{\"name\", \"formula\"}] replaces the rules: JavaScript, true for a correct node. A formula sees the node as 'one': one.attr(name) (a user attribute, or %Name, %Id, %Description, %Type; null when absent), one.attrs(), one.getParent(), one.getChildren(), one.getLinked(attribute), one.getQID(). Example: \"one.attr('priority') != null\". A new rule is tried on a few requirements; it sees no files or programs\n- checkers: {\"user_visible_ids\": boolean, \"defined_terms\": boolean}\n- id_prefix, default_link_attribute: strings\n- active_templates: node type -> template id of /Templates, or null",
+              "inputSchema": {
+                "type": "object",
+                "properties": {
+                  "project": {
+                    "type": "string",
+                    "description": "Project name (see list_projects)."
+                  },
+                  "attributes": {
+                    "type": "object",
+                    "description": "Project attributes to set (or null to remove)."
+                  },
+                  "enums": {
+                    "type": "object",
+                    "description": "Enumerations to set (or null to remove)."
+                  },
+                  "required_attributes": {
+                    "type": "object",
+                    "description": "Mandatory attributes by node type."
+                  },
+                  "checker_rules": {
+                    "type": "array",
+                    "description": "All checker rules (they replace the ones of the project).",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "name": {
+                          "type": "string",
+                          "description": "The name of the rule (shown with a problem)."
+                        },
+                        "formula": {
+                          "type": "string",
+                          "description": "JavaScript that is true for a correct node."
+                        }
+                      },
+                      "required": [
+                        "name",
+                        "formula"
+                      ]
+                    }
+                  },
+                  "checkers": {
+                    "type": "object",
+                    "description": "Checkers to switch on or off."
+                  },
+                  "id_prefix": {
+                    "type": "string",
+                    "description": "The id prefix of the project (empty: the default)."
+                  },
+                  "default_link_attribute": {
+                    "type": "string",
+                    "description": "The attribute of new links."
+                  },
+                  "active_templates": {
+                    "type": "object",
+                    "description": "Active node template by node type (or null)."
+                  },
+                  "summary": {
+                    "type": "string",
+                    "description": "What the change does and why, for the person who reviews it."
+                  }
+                },
+                "required": [
+                  "project"
+                ]
+              },
+              "annotations": {
+                "title": "Change project settings",
+                "readOnlyHint": false,
+                "destructiveHint": true,
+                "idempotentHint": false,
+                "openWorldHint": false
+              }
+            },
+            {
+              "name": "list_report_templates",
+              "title": "List report templates",
+              "description": "The report templates the project can use: id, name (in English; name_original is the name in Requality), purpose, group, description and parameters (name, type, description, default).",
+              "inputSchema": {
+                "type": "object",
+                "properties": {
+                  "project": {
+                    "type": "string",
+                    "description": "Project name (see list_projects)."
+                  }
+                },
+                "required": [
+                  "project"
+                ]
+              },
+              "annotations": {
+                "title": "List report templates",
+                "readOnlyHint": true,
+                "destructiveHint": false,
+                "idempotentHint": true,
+                "openWorldHint": false
+              }
+            },
+            {
+              "name": "generate_report",
+              "title": "Generate report",
+              "description": "Generates a report from a template (see list_report_templates) for the requirements under a node, or from saved report settings of the project (a node under /Reports), and writes it to a new or empty folder in a folder of the server (not inside a catalog), for example to show it to a person. The coverage report takes the test coverage from coverage_file (the file of test_coverage). 'save_as' also saves the template, root and parameters as report settings under /Reports (one change), for later reports here or in VS Code.",
+              "inputSchema": {
+                "type": "object",
+                "properties": {
+                  "project": {
+                    "type": "string",
+                    "description": "Project name (see list_projects)."
+                  },
+                  "template": {
+                    "type": "string",
+                    "description": "Template id (or give settings)."
+                  },
+                  "settings": {
+                    "type": "string",
+                    "description": "Saved report settings: Node: its UUID or its path in the project, for example /Requirements/A/B. (instead of template, root and parameters)."
+                  },
+                  "output": {
+                    "type": "string",
+                    "description": "Absolute path of the output folder: new or empty."
+                  },
+                  "root": {
+                    "type": "string",
+                    "description": "Requirements under this node (default /Requirements)."
+                  },
+                  "coverage_file": {
+                    "type": "string",
+                    "description": "Absolute path of a coverage file of the test runs, for the coverage report."
+                  },
+                  "parameters": {
+                    "type": "object",
+                    "description": "Template parameters: name -> value (see the parameters of list_report_templates; a boolean, a number, a string, or a list of strings)."
+                  },
+                  "save_as": {
+                    "type": "string",
+                    "description": "With template: save the settings as a node with this id under /Reports."
+                  }
+                },
+                "required": [
+                  "project",
+                  "output"
+                ]
+              },
+              "annotations": {
+                "title": "Generate report",
+                "readOnlyHint": false,
+                "destructiveHint": false,
+                "idempotentHint": false,
+                "openWorldHint": false
+              }
+            },
+            {
+              "name": "open_project",
+              "title": "Open project",
+              "description": "Opens a closed project, loads a broken one again (for example after another process released its catalog), or loads a ready one again from its files (for example after git pull changed them), and waits until it is loaded. The undo steps of the project end with a load.",
+              "inputSchema": {
+                "type": "object",
+                "properties": {
+                  "project": {
+                    "type": "string",
+                    "description": "Project name (see list_projects)."
+                  }
+                },
+                "required": [
+                  "project"
+                ]
+              },
+              "annotations": {
+                "title": "Open project",
+                "readOnlyHint": false,
+                "destructiveHint": false,
+                "idempotentHint": true,
+                "openWorldHint": false
+              }
+            },
+            {
+              "name": "close_project",
+              "title": "Close project",
+              "description": "Closes a project: its catalog is released for VS Code or another requality-mcp. open_project opens it again.",
+              "inputSchema": {
+                "type": "object",
+                "properties": {
+                  "project": {
+                    "type": "string",
+                    "description": "Project name (see list_projects)."
+                  }
+                },
+                "required": [
+                  "project"
+                ]
+              },
+              "annotations": {
+                "title": "Close project",
+                "readOnlyHint": false,
+                "destructiveHint": false,
+                "idempotentHint": true,
+                "openWorldHint": false
+              }
+            },
+            {
+              "name": "convert_project",
+              "title": "Convert project",
+              "description": "Converts a project in the catalog format of an older Requality (state needs_conversion) to the current format: first a copy of the catalog goes to the backups folder of the server storage, then the catalog is converted and loaded. Older Requality versions cannot open it after that.",
+              "inputSchema": {
+                "type": "object",
+                "properties": {
+                  "project": {
+                    "type": "string",
+                    "description": "Project name (see list_projects)."
+                  }
+                },
+                "required": [
+                  "project"
+                ]
+              },
+              "annotations": {
+                "title": "Convert project",
+                "readOnlyHint": false,
+                "destructiveHint": true,
+                "idempotentHint": false,
+                "openWorldHint": false
+              }
+            },
+            {
+              "name": "create_project",
+              "title": "Create project",
+              "description": "Creates a new empty Requality project (catalog) in the first folder of the server.",
+              "inputSchema": {
+                "type": "object",
+                "properties": {
+                  "name": {
+                    "type": "string",
+                    "description": "Project name (also the folder name)."
+                  }
+                },
+                "required": [
+                  "name"
+                ]
+              },
+              "annotations": {
+                "title": "Create project",
+                "readOnlyHint": false,
+                "destructiveHint": false,
+                "idempotentHint": false,
+                "openWorldHint": false
+              }
+            },
+            {
+              "name": "server_messages",
+              "title": "Server messages",
+              "description": "The messages and questions the Requality core showed (for example the result of a format conversion) and the answers the headless server gave, oldest first.",
+              "inputSchema": {
+                "type": "object",
+                "properties": {}
+              },
+              "annotations": {
+                "title": "Server messages",
+                "readOnlyHint": true,
+                "destructiveHint": false,
+                "idempotentHint": true,
+                "openWorldHint": false
+              }
+            }
+          ]
+        }
+      }
+    },
+    {
+      "request": {
+        "jsonrpc": "2.0",
+        "id": 3,
+        "method": "tools/call",
+        "params": {
+          "name": "create_project",
+          "arguments": {
+            "name": "Brakes"
+          }
+        }
+      },
+      "response": {
+        "jsonrpc": "2.0",
+        "id": 3,
+        "result": {
+          "isError": false,
+          "content": [
+            {
+              "type": "text",
+              "text": "{\"project\":\"Brakes\"}"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "request": {
+        "jsonrpc": "2.0",
+        "id": 4,
+        "method": "tools/call",
+        "params": {
+          "name": "import_document",
+          "arguments": {
+            "project": "Brakes",
+            "file": "$DEMO/catalogs/brakes.html"
+          }
+        }
+      },
+      "response": {
+        "jsonrpc": "2.0",
+        "id": 4,
+        "result": {
+          "isError": false,
+          "content": [
+            {
+              "type": "text",
+              "text": "{\"uuid\":\"da18caf8-3b82-4c8a-9ac5-4dea5c3af9a7\",\"path\":\"/Documents/brakes.xhtml\",\"type\":\"Document\",\"id\":\"brakes.xhtml\",\"paragraphs\":2,\"text_length\":99,\"change\":1}"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "request": {
+        "jsonrpc": "2.0",
+        "id": 5,
+        "method": "tools/call",
+        "params": {
+          "name": "read_document",
+          "arguments": {
+            "project": "Brakes",
+            "document": "/Documents/brakes.xhtml"
+          }
+        }
+      },
+      "response": {
+        "jsonrpc": "2.0",
+        "id": 5,
+        "result": {
+          "isError": false,
+          "content": [
+            {
+              "type": "text",
+              "text": "{\"uuid\":\"da18caf8-3b82-4c8a-9ac5-4dea5c3af9a7\",\"path\":\"/Documents/brakes.xhtml\",\"type\":\"Document\",\"id\":\"brakes.xhtml\",\"paragraphs_total\":2,\"locations\":0,\"covered_text_percent\":0.0,\"filter\":\"all\",\"paragraphs\":[{\"p\":0,\"coverage\":\"none\",\"text\":\"The braking system shall stop the vehicle within 60 m.\"},{\"p\":1,\"coverage\":\"none\",\"text\":\"The system shall record every braking event.\"}]}"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "request": {
+        "jsonrpc": "2.0",
+        "id": 6,
+        "method": "tools/call",
+        "params": {
+          "name": "apply_changes",
+          "arguments": {
+            "project": "Brakes",
+            "summary": "Extract braking requirements",
+            "operations": [
+              {
+                "op": "create",
+                "parent": "/Requirements",
+                "id": "BRAKE",
+                "name": "Stopping distance",
+                "as": "brake"
+              },
+              {
+                "op": "create",
+                "parent": "/Requirements",
+                "id": "LOG",
+                "name": "Braking event log",
+                "as": "log"
+              },
+              {
+                "op": "locate",
+                "requirement": "$brake",
+                "document": "/Documents/brakes.xhtml",
+                "quote": "The braking system shall stop the vehicle within 60 m."
+              },
+              {
+                "op": "locate",
+                "requirement": "$log",
+                "document": "/Documents/brakes.xhtml",
+                "quote": "The system shall record every braking event."
+              }
+            ]
+          }
+        }
+      },
+      "response": {
+        "jsonrpc": "2.0",
+        "id": 6,
+        "result": {
+          "isError": false,
+          "content": [
+            {
+              "type": "text",
+              "text": "{\"change\":2,\"results\":[{\"op\":\"create\",\"path\":\"/Requirements/BRAKE\",\"uuid\":\"9f2a2789-c064-4442-87c9-5bee7aa01613\",\"i\":0},{\"op\":\"create\",\"path\":\"/Requirements/LOG\",\"uuid\":\"1d53d557-7203-4c85-9b42-ed8a9bfee685\",\"i\":1},{\"op\":\"locate\",\"path\":\"/Requirements/BRAKE\",\"uuid\":\"9f2a2789-c064-4442-87c9-5bee7aa01613\",\"location\":{\"uuid\":\"8e7e06a9-fee0-4a51-8b90-efef6d201f67\",\"p\":0},\"i\":2},{\"op\":\"locate\",\"path\":\"/Requirements/LOG\",\"uuid\":\"1d53d557-7203-4c85-9b42-ed8a9bfee685\",\"location\":{\"uuid\":\"1c5274ba-1ad5-4ad7-88dd-7ea1928567c2\",\"p\":1},\"i\":3}]}"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "request": {
+        "jsonrpc": "2.0",
+        "id": 7,
+        "method": "tools/call",
+        "params": {
+          "name": "get_node",
+          "arguments": {
+            "project": "Brakes",
+            "node": "/Requirements/BRAKE"
+          }
+        }
+      },
+      "response": {
+        "jsonrpc": "2.0",
+        "id": 7,
+        "result": {
+          "isError": false,
+          "content": [
+            {
+              "type": "text",
+              "text": "{\"uuid\":\"9f2a2789-c064-4442-87c9-5bee7aa01613\",\"path\":\"/Requirements/BRAKE\",\"type\":\"Requirement\",\"id\":\"BRAKE\",\"name\":\"Stopping distance\",\"uvid\":\"Stopping distance\",\"parent\":\"/Requirements\",\"attributes\":{},\"links\":{},\"linked_from\":{},\"locations\":[{\"uuid\":\"8e7e06a9-fee0-4a51-8b90-efef6d201f67\",\"document\":\"/Documents/brakes.xhtml\",\"p\":0,\"text\":\"The braking system shall stop the vehicle within 60 m.\"}],\"problems\":[],\"children\":[],\"child_types\":[\"Requirement\",\"TestPurpose\",\"Comment\",\"TextNode\",\"VirtualNode\"]}"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "request": {
+        "jsonrpc": "2.0",
+        "id": 8,
+        "method": "tools/call",
+        "params": {
+          "name": "trace_coverage",
+          "arguments": {
+            "project": "Brakes"
+          }
+        }
+      },
+      "response": {
+        "jsonrpc": "2.0",
+        "id": 8,
+        "result": {
+          "isError": false,
+          "content": [
+            {
+              "type": "text",
+              "text": "{\"under\":\"/Requirements\",\"requirements\":{\"total\":2,\"leaves\":2,\"leaves_without_locations\":{\"total\":0,\"items\":[]},\"leaves_without_test_purposes\":{\"total\":2,\"items\":[{\"path\":\"/Requirements/BRAKE\",\"name\":\"Stopping distance\"},{\"path\":\"/Requirements/LOG\",\"name\":\"Braking event log\"}]},\"broken_links\":{\"total\":0,\"items\":[]}},\"problems\":{\"total\":0,\"items\":[],\"errors\":0,\"warnings\":0},\"documents\":[{\"document\":\"/Documents/brakes.xhtml\",\"locations\":2,\"paragraphs\":2,\"covered_paragraphs\":2,\"partly_covered_paragraphs\":0,\"uncovered_paragraphs\":0,\"covered_text_percent\":100.0}],\"review_items\":{\"total\":0,\"items\":[],\"completed\":0}}"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "request": {
+        "jsonrpc": "2.0",
+        "id": 9,
+        "method": "tools/call",
+        "params": {
+          "name": "update_document_version",
+          "arguments": {
+            "project": "Brakes",
+            "document": "/Documents/brakes.xhtml",
+            "file": "$DEMO/catalogs/v2/brakes.html"
+          }
+        }
+      },
+      "response": {
+        "jsonrpc": "2.0",
+        "id": 9,
+        "result": {
+          "isError": false,
+          "content": [
+            {
+              "type": "text",
+              "text": "{\"old_document\":\"/Documents/brakes.xhtml\",\"new_document\":\"/Documents/brakes_1.xhtml\",\"summary\":{\"requirements\":2,\"unchanged\":1,\"context_changed\":0,\"changed\":1,\"lost\":0,\"new_sentences\":1},\"new_sentences\":[{\"p\":2,\"quote\":\"The system shall monitor brake pressure.\",\"statement\":true}],\"requirements\":[{\"requirement\":\"/Requirements/BRAKE\",\"uuid\":\"9f2a2789-c064-4442-87c9-5bee7aa01613\",\"name\":\"Stopping distance\",\"status\":\"changed\",\"locations\":[{\"status\":\"changed\",\"old_location\":\"8e7e06a9-fee0-4a51-8b90-efef6d201f67\",\"old_text\":[\"The braking system shall stop the vehicle within 60 m.\"],\"new_location\":\"49e4561b-3294-486e-9dd1-30def8db22a0\",\"p\":0,\"new_text\":\"The braking system shall stop the vehicle within 55 m.\",\"similarity\":0.88,\"words_removed\":[],\"words_added\":[],\"numbers_changed\":true}]}],\"unchanged\":\"The unchanged requirements are not listed (include_unchanged true lists them)\",\"note\":\"The requirements have no locations in the old document now; the document stays as the history (superseded_by names the new version). Check the changed requirements (words_removed and words_added, modality_changed, numbers_changed) and the ones whose paragraph changed (context_changed), fix the lost ones, and add requirements for the new sentences that are statements, with apply_changes.\",\"change\":3}"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "request": {
+        "jsonrpc": "2.0",
+        "id": 10,
+        "method": "tools/call",
+        "params": {
+          "name": "review_changes",
+          "arguments": {
+            "project": "Brakes",
+            "change": 3
+          }
+        }
+      },
+      "response": {
+        "jsonrpc": "2.0",
+        "id": 10,
+        "result": {
+          "isError": false,
+          "content": [
+            {
+              "type": "text",
+              "text": "{\"change\":3,\"time\":\"2026-10-28T09:32:31.604796Z\",\"project\":\"Brakes\",\"tool\":\"update_document_version\",\"summary\":\"New version of /Documents/brakes.xhtml\",\"label\":\"Update document version\",\"operations\":[{\"uuid\":\"44914b62-16cc-4903-87c9-5bbcee7349d8\",\"path\":\"/Documents/brakes_1.xhtml\",\"type\":\"Document\",\"id\":\"brakes_1.xhtml\",\"op\":\"import\",\"file\":\"$DEMO/catalogs/v2/brakes.html\"},{\"op\":\"update_version\",\"path\":\"/Documents/brakes_1.xhtml\",\"old_document\":\"/Documents/brakes.xhtml\",\"summary\":{\"requirements\":2,\"unchanged\":1,\"context_changed\":0,\"changed\":1,\"lost\":0,\"new_sentences\":1},\"requirements\":[{\"requirement\":\"/Requirements/BRAKE\",\"uuid\":\"9f2a2789-c064-4442-87c9-5bee7aa01613\",\"name\":\"Stopping distance\",\"status\":\"changed\",\"locations\":[{\"status\":\"changed\",\"old_location\":\"8e7e06a9-fee0-4a51-8b90-efef6d201f67\",\"old_text\":[\"The braking system shall stop the vehicle within 60 m.\"],\"new_location\":\"49e4561b-3294-486e-9dd1-30def8db22a0\",\"p\":0,\"new_text\":\"The braking system shall stop the vehicle within 55 m.\",\"similarity\":0.88,\"words_removed\":[],\"words_added\":[],\"numbers_changed\":true}]},{\"requirement\":\"/Requirements/LOG\",\"uuid\":\"1d53d557-7203-4c85-9b42-ed8a9bfee685\",\"name\":\"Braking event log\",\"status\":\"unchanged\",\"locations\":[{\"status\":\"unchanged\",\"old_location\":\"1c5274ba-1ad5-4ad7-88dd-7ea1928567c2\",\"new_location\":\"aeb60c71-6cdb-455d-9384-04444a1c0c8d\",\"p\":1}]}],\"new_sentences\":[{\"p\":2,\"quote\":\"The system shall monitor brake pressure.\",\"statement\":true}]}],\"nodes\":6,\"state\":\"done\"}"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "request": {
+        "jsonrpc": "2.0",
+        "id": 11,
+        "method": "tools/call",
+        "params": {
+          "name": "revert_change",
+          "arguments": {
+            "project": "Brakes",
+            "change": 3
+          }
+        }
+      },
+      "response": {
+        "jsonrpc": "2.0",
+        "id": 11,
+        "result": {
+          "isError": false,
+          "content": [
+            {
+              "type": "text",
+              "text": "{\"project\":\"Brakes\",\"reverted_change\":3,\"change\":4,\"counts\":{\"restored\":3,\"recreated\":0,\"deleted\":3},\"nodes\":[{\"op\":\"restore\",\"path\":\"/Requirements/BRAKE\",\"type\":\"Requirement\",\"uuid\":\"9f2a2789-c064-4442-87c9-5bee7aa01613\"},{\"op\":\"restore\",\"path\":\"/Requirements/LOG\",\"type\":\"Requirement\",\"uuid\":\"1d53d557-7203-4c85-9b42-ed8a9bfee685\"},{\"op\":\"restore\",\"path\":\"/Documents/brakes.xhtml\",\"type\":\"Document\",\"uuid\":\"da18caf8-3b82-4c8a-9ac5-4dea5c3af9a7\"},{\"op\":\"delete\",\"path\":\"/Documents/brakes_1.xhtml/aeb60c71-6cdb-455d-9384-04444a1c0c8d\",\"type\":\"Location\",\"text\":\"The system shall record every braking event.\",\"document\":\"/Documents/brakes_1.xhtml\",\"uuid\":\"aeb60c71-6cdb-455d-9384-04444a1c0c8d\"},{\"op\":\"delete\",\"path\":\"/Documents/brakes_1.xhtml/49e4561b-3294-486e-9dd1-30def8db22a0\",\"type\":\"Location\",\"text\":\"The braking system shall stop the vehicle within 55 m.\",\"document\":\"/Documents/brakes_1.xhtml\",\"uuid\":\"49e4561b-3294-486e-9dd1-30def8db22a0\"},{\"op\":\"delete\",\"path\":\"/Documents/brakes_1.xhtml\",\"type\":\"Document\",\"uuid\":\"44914b62-16cc-4903-87c9-5bbcee7349d8\"}]}"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "request": {
+        "jsonrpc": "2.0",
+        "id": 12,
+        "method": "tools/call",
+        "params": {
+          "name": "get_node",
+          "arguments": {
+            "project": "Brakes",
+            "node": "/Requirements/BRAKE"
+          }
+        }
+      },
+      "response": {
+        "jsonrpc": "2.0",
+        "id": 12,
+        "result": {
+          "isError": false,
+          "content": [
+            {
+              "type": "text",
+              "text": "{\"uuid\":\"9f2a2789-c064-4442-87c9-5bee7aa01613\",\"path\":\"/Requirements/BRAKE\",\"type\":\"Requirement\",\"id\":\"BRAKE\",\"name\":\"Stopping distance\",\"uvid\":\"Stopping distance\",\"parent\":\"/Requirements\",\"attributes\":{},\"links\":{},\"linked_from\":{},\"locations\":[{\"uuid\":\"8e7e06a9-fee0-4a51-8b90-efef6d201f67\",\"document\":\"/Documents/brakes.xhtml\",\"p\":0,\"text\":\"The braking system shall stop the vehicle within 60 m.\"}],\"problems\":[],\"children\":[],\"child_types\":[\"Requirement\",\"TestPurpose\",\"Comment\",\"TextNode\",\"VirtualNode\"]}"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "request": {
+        "jsonrpc": "2.0",
+        "id": 13,
+        "method": "tools/call",
+        "params": {
+          "name": "read_document",
+          "arguments": {
+            "project": "Brakes",
+            "document": "/Documents/brakes.xhtml"
+          }
+        }
+      },
+      "response": {
+        "jsonrpc": "2.0",
+        "id": 13,
+        "result": {
+          "isError": false,
+          "content": [
+            {
+              "type": "text",
+              "text": "{\"uuid\":\"da18caf8-3b82-4c8a-9ac5-4dea5c3af9a7\",\"path\":\"/Documents/brakes.xhtml\",\"type\":\"Document\",\"id\":\"brakes.xhtml\",\"paragraphs_total\":2,\"locations\":2,\"covered_text_percent\":100.0,\"filter\":\"all\",\"paragraphs\":[{\"p\":0,\"coverage\":\"full\",\"text\":\"The braking system shall stop the vehicle within 60 m.\",\"requirements\":[\"/Requirements/BRAKE\"]},{\"p\":1,\"coverage\":\"full\",\"text\":\"The system shall record every braking event.\",\"requirements\":[\"/Requirements/LOG\"]}]}"
+            }
+          ]
+        }
+      }
+    }
+  ]
+}
