@@ -2,6 +2,8 @@
 
 # Requality for VS Code (Unofficial)
 
+[Research page at Formalized](https://formalized.si/projects/requality-vscode/)
+
 [![Visual Studio Marketplace](https://img.shields.io/visual-studio-marketplace/v/formalized-si.requality-vscode?label=Marketplace)](https://marketplace.visualstudio.com/items?itemName=formalized-si.requality-vscode)
 [![Installs](https://img.shields.io/visual-studio-marketplace/i/formalized-si.requality-vscode)](https://marketplace.visualstudio.com/items?itemName=formalized-si.requality-vscode)
 [![Open VSX](https://img.shields.io/open-vsx/v/formalized-si/requality-vscode?label=Open%20VSX)](https://open-vsx.org/extension/formalized-si/requality-vscode)
